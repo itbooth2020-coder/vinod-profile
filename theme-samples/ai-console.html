@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinod Pyarelal Yadav - AI console theme sample</title>
+<meta name="color-scheme" content="dark light">
+<!-- Ideas only (no code copied): chat/prompt layouts common to open-source LLM UIs (e.g. Open WebUI, Vercel AI SDK chatbot template - MIT/Apache) and model-card layout from Hugging Face model cards. All code is original. -->
+<style>
+:root{
+  --bg:#0b0e14;--panel:#121722;--panel2:#181f2d;--border:#2a3448;--text:#e8ecf4;--muted:#a3adc2;
+  --accent:#8b8cff;--accent2:#3dd6c6;--accent-ink:#0b0e14;--user:#1f2a44;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+[data-theme=light]{
+  --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef1f8;--border:#c7cfe0;--text:#1a2033;--muted:#4d5670;
+  --accent:#4a3fd6;--accent2:#0b6e64;--accent-ink:#ffffff;--user:#e4e8fb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 var(--sans);
+  background-image:radial-gradient(60rem 30rem at 85% -10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent),radial-gradient(40rem 24rem at -10% 10%,color-mix(in srgb,var(--accent2) 12%,transparent),transparent);background-repeat:no-repeat}
+:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radius:4px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:var(--accent-ink);padding:8px 12px;z-index:9}.skip:focus{left:8px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;flex-wrap:wrap}
+.brand{font:600 14px var(--mono);color:var(--muted)}.brand b{color:var(--accent2)}
+.toggle{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:8px 14px;min-height:40px;font:13px var(--mono);cursor:pointer}
+.toggle:hover{border-color:var(--accent)}
+h1{font:700 clamp(1.9rem,6vw,3.2rem)/1.1 var(--sans);letter-spacing:-.03em;margin:.5em 0 .25em}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+@supports not (background-clip:text){h1 em{color:var(--accent)}}
+.lede{color:var(--muted);max-width:60ch}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px;margin:28px 0}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.card>h2{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.chat{display:flex;flex-direction:column;min-height:420px}
+.log{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;max-height:460px;overflow:auto}
+.msg{max-width:92%;padding:10px 14px;border-radius:12px;border:1px solid var(--border)}
+.msg.u{align-self:flex-end;background:var(--user)}
+.msg.a{background:var(--panel2)}
+.msg small{display:block;font:11px var(--mono);color:var(--muted);margin-bottom:2px}
+.msg ul{margin:.3em 0 0;padding-left:1.1em}
+.tok{animation:tok .25s ease both}@keyframes tok{from{opacity:0}}
+.caret{display:inline-block;width:8px;height:1em;background:var(--accent2);vertical-align:text-bottom;animation:blink 1s steps(1) infinite}@keyframes blink{50%{opacity:0}}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+.chips button{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:999px;padding:8px 14px;min-height:40px;font:13px var(--sans);cursor:pointer}
+.chips button:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.metrics{display:flex;gap:16px;padding:8px 16px 12px;font:12px var(--mono);color:var(--muted);flex-wrap:wrap}
+.side{display:grid;gap:20px;align-content:start}
+.kv{margin:0;padding:8px 16px 14px;display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:14px}
+.kv dt{font:12px var(--mono);color:var(--muted);padding-top:2px}.kv dd{margin:0}
+.badge{display:inline-block;font:11px var(--mono);padding:2px 8px;border-radius:999px;border:1px solid var(--accent2);color:var(--accent2)}
+#graph{display:block;width:100%;height:auto;aspect-ratio:4/3}
+section{padding:20px 0}
+h3.sec{font:700 1.3rem var(--sans);margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.mc{padding:16px}.mc h4{margin:0 0 6px;font-size:1.02rem}.mc ul{margin:0;padding-left:1.1em;color:var(--muted);font-size:14.5px}
+.mc{transition:border-color .2s,transform .2s}.mc:hover{border-color:var(--accent);transform:translateY(-2px)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.stat{padding:18px}.stat b{display:block;font:700 2.2rem/1 var(--mono);color:var(--accent2)}.stat span{color:var(--muted);font-size:14px}
+footer{padding:28px 0 48px;color:var(--muted);font-size:14px;border-top:1px solid var(--border)}footer a{color:var(--accent2)}
+@media(prefers-reduced-motion:reduce){.tok,.caret{animation:none}.mc{transition:none}.mc:hover{transform:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header><span class="brand"><b>&gt;</b> vinod.profile / console</span><button class="toggle" id="theme" aria-pressed="false">Theme: dark</button></header>
+<main id="main">
+  <p class="badge">Custom Software Engineering Manager &middot; Accenture</p>
+  <h1>Vinod Pyarelal <em>Yadav</em></h1>
+  <p class="lede" id="tag"></p>
+  <div class="layout">
+    <div class="card chat">
+      <h2>Prompt console</h2>
+      <div class="log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+      <div class="metrics" aria-hidden="true"><span>tokens: <span id="tk">0</span></span><span>source: src/data.js</span></div>
+      <div class="chips" id="chips" role="group" aria-label="Suggested prompts"></div>
+    </div>
+    <div class="side">
+      <div class="card"><h2>Profile card</h2><dl class="kv" id="kv"></dl></div>
+      <div class="card"><h2>Domain graph</h2><canvas id="graph" width="480" height="360" role="img" aria-label="Node graph connecting Vinod to Mobile, IoT, Device Management, Enterprise Platforms and Web"></canvas></div>
+    </div>
+  </div>
+  <section><h3 class="sec">Capabilities</h3><div class="grid" id="exp"></div></section>
+  <section><h3 class="sec">At a glance</h3><div class="stats" id="stats"></div></section>
+</main>
+<footer>Prompts here are canned views of the profile content, not a live model. <a href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener">LinkedIn</a></footer>
+</div>
+<script>
+// Content mirrors src/data.js (no additions).
+const P={role:'Custom Software Engineering Manager',company:'Accenture',tag:'Engineering leader building mobile, IoT and enterprise platforms',domains:['Mobile','IoT','Device Management','Enterprise Platforms','Web']};
+const stats=[['14+','Years in software engineering'],['35+','Engineers led'],['3','Industries: transit, healthcare, retail']];
+const exp=[
+['Mobile Engineering',['Native Android and iOS application development and delivery','Enterprise-grade mobile apps for regulated and high-usage domains']],
+['IoT & Connected Devices',['End-to-end IoT solutions spanning devices, connectivity and applications']],
+['MDM / EMM',['Mobile Device Management and Enterprise Mobility Management solutions','Managing and securing device fleets and enterprise apps at scale']],
+['Enterprise Software',['Large-scale custom software delivery for enterprise clients']],
+['Web Platforms',['Web application and platform development, including modern JavaScript/TypeScript stacks']],
+['Engineering Leadership',['Leading and scaling engineering teams (35+ engineers)','Delivery management, technical architecture, hiring and mentoring','Bridging client requirements and engineering execution']]];
+const ANS={
+'Who is Vinod?':"Vinod is an engineering leader with 14+ years of experience designing, building and delivering software across mobile, IoT, enterprise and web platforms. He has led teams of 35+ engineers.",
+'What is the current role?':"Custom Software Engineering Manager at Accenture. Previously at HTC.",
+'Which domains?':"Mobile, IoT, Device Management, Enterprise Platforms and Web. Industries served: Transit, Healthcare and Retail.",
+'How does he lead?':"Delivery management, technical architecture, hiring and mentoring, and bridging client requirements and engineering execution."};
+const $=id=>document.getElementById(id);
+const rm=matchMedia('(prefers-reduced-motion: reduce)');
+$('tag').textContent=P.tag;
+$('kv').innerHTML=[['role',P.role],['company',P.company],['previously','HTC'],['experience','14+ years'],['team scale','35+ engineers'],['industries','Transit, Healthcare, Retail']].map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');
+$('exp').innerHTML=exp.map(([t,p])=>`<article class="card mc"><h4>${t.replace('&','&amp;')}</h4><ul>${p.map(x=>`<li>${x}</li>`).join('')}</ul></article>`).join('');
+$('stats').innerHTML=stats.map(([v,l])=>`<div class="card stat"><b>${v}</b><span>${l}</span></div>`).join('');
+const log=$('log');let busy=false,total=0,timer;
+function add(cls,label,text){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=`<small>${label}</small><span></span>`;log.appendChild(d);log.scrollTop=log.scrollHeight;return d.lastChild}
+function ask(q){
+  if(busy)return;busy=true;add('u','you',null).textContent=q;
+  const out=add('a','profile-model',null),words=ANS[q].split(' ');
+  if(rm.matches){out.textContent=ANS[q];total+=words.length;$('tk').textContent=total;busy=false;return}
+  let i=0;const cur=document.createElement('span');cur.className='caret';cur.setAttribute('aria-hidden','true');out.appendChild(cur);
+  timer=setInterval(()=>{
+    const s=document.createElement('span');s.className='tok';s.textContent=(i?' ':'')+words[i];out.insertBefore(s,cur);i++;total++;$('tk').textContent=total;log.scrollTop=log.scrollHeight;
+    if(i>=words.length){clearInterval(timer);cur.remove();busy=false}},45);
+}
+$('chips').innerHTML=Object.keys(ANS).map(q=>`<button>${q}</button>`).join('');
+$('chips').onclick=e=>{if(e.target.tagName==='BUTTON')ask(e.target.textContent)};
+ask('Who is Vinod?');
+/* node graph */
+const cv=$('graph'),g=cv.getContext('2d');
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+let t=0;
+function draw(){
+  const w=cv.width,h=cv.height,cx=w/2,cy=h/2,n=P.domains.length,R=Math.min(w,h)*.36;
+  g.clearRect(0,0,w,h);g.font='12px ui-monospace,Consolas,monospace';g.textAlign='center';
+  const pts=P.domains.map((d,i)=>{const a=i/n*Math.PI*2-Math.PI/2+(rm.matches?0:Math.sin(t/60+i)*.06);return[cx+Math.cos(a)*R*1.15,cy+Math.sin(a)*R,d]});
+  g.lineWidth=1.5;
+  pts.forEach(([x,y],i)=>{g.strokeStyle=css('--border');g.beginPath();g.moveTo(cx,cy);g.lineTo(x,y);g.stroke();
+    const nx=pts[(i+1)%n];g.globalAlpha=.5;g.beginPath();g.moveTo(x,y);g.lineTo(nx[0],nx[1]);g.stroke();g.globalAlpha=1;
+    if(!rm.matches){const p=((t/90)+i/n)%1;g.fillStyle=css('--accent2');g.beginPath();g.arc(cx+(x-cx)*p,cy+(y-cy)*p,3,0,7);g.fill()}});
+  g.fillStyle=css('--accent');g.beginPath();g.arc(cx,cy,26,0,7);g.fill();g.fillStyle=css('--accent-ink');g.font='700 13px ui-monospace,Consolas,monospace';g.fillText('Vinod',cx,cy+4);
+  g.font='12px ui-monospace,Consolas,monospace';
+  pts.forEach(([x,y,d])=>{g.fillStyle=css('--panel2');g.strokeStyle=css('--accent2');const tw=g.measureText(d).width+16;
+    g.beginPath();g.roundRect(x-tw/2,y-13,tw,26,13);g.fill();g.stroke();g.fillStyle=css('--text');g.fillText(d,x,y+4)});
+  t++;if(!rm.matches&&!document.hidden)requestAnimationFrame(draw)}
+draw();rm.addEventListener('change',()=>{t=0;draw()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)draw()});
+const root=document.documentElement,tg=$('theme');
+function setT(v){root.dataset.theme=v;tg.textContent='Theme: '+v;tg.setAttribute('aria-pressed',v==='light');if(rm.matches)draw()}
+setT(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+tg.onclick=()=>setT(root.dataset.theme==='dark'?'light':'dark');
+</script>
+</body>
+</html>

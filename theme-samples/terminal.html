@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinod Pyarelal Yadav - Terminal theme sample</title>
+<meta name="color-scheme" content="dark light">
+<!-- Design ideas inspired by terminal/IDE portfolio patterns (e.g. Parth-Bisht-227/Terminal-Portfolio, Jimmy2026/modern-portfolio-template). Ideas only; all code written from scratch. -->
+<style>
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c232c;--border:#30363d;
+  --text:#e6edf3;--muted:#9da7b3;--accent:#3fb950;--accent2:#79c0ff;--warn:#e3b341;
+  --accent-ink:#0d1117;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+[data-theme=light]{
+  --bg:#f6f8fa;--surface:#ffffff;--surface2:#eef1f4;--border:#c9d1d9;
+  --text:#1f2328;--muted:#59636e;--accent:#116329;--accent2:#0550ae;--warn:#7d4e00;
+  --accent-ink:#ffffff;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--accent2)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.mono{font-family:var(--mono)}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:var(--accent-ink);padding:8px 12px;z-index:20}
+.skip:focus{left:8px}
+header.bar{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.bar .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;flex-wrap:wrap}
+nav a{font:14px var(--mono);color:var(--muted);text-decoration:none;margin-right:14px}
+nav a:hover{color:var(--accent)}
+button.toggle{font:13px var(--mono);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;min-height:36px}
+button.toggle:hover{border-color:var(--accent)}
+.progress{position:fixed;top:0;left:0;height:2px;width:100%;background:var(--accent);transform-origin:0 50%;transform:scaleX(0);z-index:30}
+/* window chrome */
+.win{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 12px 32px -16px rgba(0,0,0,.5)}
+.win-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font:13px var(--mono);color:var(--muted)}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--border)}
+.dot:nth-child(1){background:#f85149}.dot:nth-child(2){background:#e3b341}.dot:nth-child(3){background:#3fb950}
+.win-head span{margin-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.win-body{padding:20px;font-family:var(--mono);font-size:14.5px;overflow-x:auto}
+.prompt{color:var(--accent)}
+.k{color:var(--accent2)}.s{color:var(--warn)}.c{color:var(--muted)}
+h1{font:700 clamp(1.7rem,6vw,2.6rem)/1.15 var(--mono);margin:.4em 0 .2em;letter-spacing:-.02em}
+.caret{display:inline-block;width:.6ch;height:1.05em;background:var(--accent);vertical-align:text-bottom;margin-left:2px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.hero{padding:56px 0 32px}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+.btn{font:600 14px var(--mono);padding:10px 16px;border-radius:6px;text-decoration:none;border:1px solid var(--accent);min-height:44px;display:inline-flex;align-items:center}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{color:var(--accent)}
+.btn:hover{filter:brightness(1.1)}
+section{padding:36px 0}
+h2{font:700 1.15rem var(--mono);margin:0 0 18px;color:var(--text)}
+h2::before{content:"## ";color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
+.stat b{display:block;font:700 2.2rem var(--mono);color:var(--accent)}
+.stat span{color:var(--muted);font-size:.92rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px;position:relative;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.card h3{font:600 .98rem var(--mono);margin:0 0 8px;color:var(--accent2)}
+.card ul{margin:0;padding-left:18px;color:var(--muted);font-size:.94rem}
+.tag{display:inline-block;font:12px var(--mono);border:1px solid var(--border);color:var(--muted);border-radius:99px;padding:3px 10px;margin:0 6px 6px 0}
+dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:6px 18px}
+dt{color:var(--accent2)}dd{margin:0;color:var(--text);min-width:0}
+@media(max-width:520px){dl{grid-template-columns:1fr}dt{margin-top:8px}}
+footer{border-top:1px solid var(--border);padding:24px 0 40px;color:var(--muted);font:13px var(--mono)}
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .6s,transform .6s}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .caret{animation:none}
+  .reveal{opacity:1;transform:none;transition:none}
+  .card{transition:none}.card:hover{transform:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<header class="bar"><div class="wrap">
+  <nav aria-label="Primary"><a href="#about">about</a><a href="#stats">stats</a><a href="#expertise">expertise</a><a href="#experience">experience</a><a href="index.html">../samples</a></nav>
+  <button class="toggle" id="toggle" type="button" aria-label="Toggle colour theme">theme: <span id="tl">dark</span></button>
+</div></header>
+
+<main id="main" class="wrap">
+  <div class="hero">
+    <div class="win">
+      <div class="win-head"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>vinod@profile: ~</span></div>
+      <div class="win-body">
+        <div><span class="prompt">$</span> whoami</div>
+        <h1>Vinod Pyarelal Yadav<span class="caret" aria-hidden="true"></span></h1>
+        <div><span class="c">// </span><span id="typed">Custom Software Engineering Manager</span> <span class="c">@</span> <span class="s">Accenture</span></div>
+        <div class="c" style="margin-top:8px">Engineering leader building mobile, IoT and enterprise platforms</div>
+        <div class="cta">
+          <a class="btn primary" href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener">connect --linkedin</a>
+          <a class="btn ghost" href="#experience">view --experience</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="about" class="reveal">
+    <h2>about</h2>
+    <p>I'm an engineering leader with 14+ years of experience designing, building and delivering software across mobile, IoT, enterprise and web platforms. I have led teams of 35+ engineers and have shipped solutions for the transit, healthcare and retail industries.</p>
+    <p>I enjoy the space where hands-on technical depth meets delivery leadership: shaping architecture, growing engineers, and turning complex requirements into reliable products.</p>
+    <p><span class="tag">Mobile</span><span class="tag">IoT</span><span class="tag">Device Management</span><span class="tag">Enterprise Platforms</span><span class="tag">Web</span></p>
+  </section>
+
+  <section id="stats" class="reveal">
+    <h2>stats</h2>
+    <div class="stats">
+      <div class="stat"><b data-count="14" data-suffix="+">14+</b><span>Years in software engineering</span></div>
+      <div class="stat"><b data-count="35" data-suffix="+">35+</b><span>Engineers led</span></div>
+      <div class="stat"><b data-count="3">3</b><span>Industries: transit, healthcare, retail</span></div>
+    </div>
+  </section>
+
+  <section id="expertise" class="reveal">
+    <h2>expertise</h2>
+    <div class="grid">
+      <article class="card"><h3>Mobile Engineering</h3><ul><li>Native Android and iOS application development and delivery</li><li>Enterprise-grade mobile apps for regulated and high-usage domains</li></ul></article>
+      <article class="card"><h3>IoT &amp; Connected Devices</h3><ul><li>End-to-end IoT solutions spanning devices, connectivity and applications</li></ul></article>
+      <article class="card"><h3>MDM / EMM</h3><ul><li>Mobile Device Management and Enterprise Mobility Management solutions</li><li>Managing and securing device fleets and enterprise apps at scale</li></ul></article>
+      <article class="card"><h3>Enterprise Software</h3><ul><li>Large-scale custom software delivery for enterprise clients</li></ul></article>
+      <article class="card"><h3>Web Platforms</h3><ul><li>Web application and platform development, including modern JavaScript/TypeScript stacks</li></ul></article>
+      <article class="card"><h3>Engineering Leadership</h3><ul><li>Leading and scaling engineering teams (35+ engineers)</li><li>Delivery management, technical architecture, hiring and mentoring</li><li>Bridging client requirements and engineering execution</li></ul></article>
+    </div>
+  </section>
+
+  <section id="experience" class="reveal">
+    <h2>experience</h2>
+    <div class="win"><div class="win-head"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>git log --career</span></div>
+    <div class="win-body">
+      <p style="margin-top:0"><span class="s">HEAD -&gt; current</span> <b>Custom Software Engineering Manager</b>, Accenture</p>
+      <ul class="c"><li>Lead engineering teams delivering custom software across mobile, IoT, MDM/EMM, enterprise and web</li><li>Own technical delivery, team growth and client-facing engineering outcomes</li></ul>
+      <p><span class="c">previous</span> <b>Earlier career</b>, HTC</p>
+    </div></div>
+  </section>
+
+  <section class="reveal" aria-label="Snapshot">
+    <h2>snapshot</h2>
+    <div class="win"><div class="win-body"><dl>
+      <dt>experience</dt><dd>14+ years in software engineering and engineering leadership</dd>
+      <dt>team_scale</dt><dd>Led teams of 35+ engineers</dd>
+      <dt>current_role</dt><dd>Custom Software Engineering Manager, Accenture</dd>
+      <dt>previously</dt><dd>HTC</dd>
+      <dt>industries</dt><dd>Transit, Healthcare, Retail</dd>
+    </dl></div></div>
+  </section>
+</main>
+<footer><div class="wrap">Theme sample: terminal. Ideas inspired by open-source terminal portfolios (MIT); code original.</div></footer>
+
+<script>
+(function(){
+  var root=document.documentElement,rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var saved=null;try{saved=localStorage.getItem('sample-theme')}catch(e){}
+  function set(t){root.dataset.theme=t;document.getElementById('tl').textContent=t;try{localStorage.setItem('sample-theme',t)}catch(e){}}
+  set(saved||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
+  document.getElementById('toggle').onclick=function(){set(root.dataset.theme==='dark'?'light':'dark')};
+  var bar=document.getElementById('progress');
+  function prog(){var h=document.documentElement;var m=h.scrollHeight-innerHeight;bar.style.transform='scaleX('+(m>0?scrollY/m:0)+')'}
+  addEventListener('scroll',prog,{passive:true});prog();
+  var els=document.querySelectorAll('.reveal');
+  if(rm||!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')})}
+  else{var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);e.target.querySelectorAll('[data-count]').forEach(count)}})},{threshold:.15});els.forEach(function(e){io.observe(e)})}
+  function count(el){var n=+el.dataset.count,s=el.dataset.suffix||'',t0=null;function f(t){t0=t0||t;var p=Math.min((t-t0)/900,1);el.textContent=Math.round(n*p)+(p===1?s:'');if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+  // typing effect for role (text stays in DOM for assistive tech)
+  var ty=document.getElementById('typed');
+  if(!rm){var full=ty.textContent;ty.setAttribute('aria-label',full);ty.textContent='';var i=0;(function step(){ty.textContent=full.slice(0,++i);if(i<full.length)setTimeout(step,38)})()}
+})();
+</script>
+</body>
+</html>

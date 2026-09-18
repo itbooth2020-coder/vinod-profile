@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinod Pyarelal Yadav - Blueprint theme sample</title>
+<meta name="color-scheme" content="dark light">
+<!-- Design ideas: engineering drawing / blueprint (grid paper, dimension lines, title block). Concept only; code written from scratch. -->
+<style>
+:root{
+  --bg:#0b2545;--paper:#0e2e57;--line:rgba(125,211,252,.16);--line2:rgba(125,211,252,.32);
+  --text:#eaf2ff;--muted:#a9c1e6;--accent:#7dd3fc;--accent2:#fde68a;--accent-ink:#0b2545;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --stroke:#7dd3fc;
+}
+[data-theme=light]{
+  --bg:#f4f8ff;--paper:#ffffff;--line:rgba(11,87,208,.12);--line2:rgba(11,87,208,.3);
+  --text:#0b2545;--muted:#41597f;--accent:#0b57d0;--accent2:#8a4b00;--accent-ink:#ffffff;--stroke:#0b57d0;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--text);font:16px/1.65 var(--sans);background-color:var(--bg);
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px),linear-gradient(var(--line2) 1px,transparent 1px),linear-gradient(90deg,var(--line2) 1px,transparent 1px);
+  background-size:20px 20px,20px 20px,100px 100px,100px 100px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+:focus-visible{outline:2px dashed var(--accent2);outline-offset:3px}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:var(--accent-ink);padding:8px 12px;z-index:20}
+.skip:focus{left:8px}
+header.bar{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line2)}
+.bar .wrap{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;flex-wrap:wrap}
+nav a{font:13px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;margin-right:16px}
+nav a:hover{color:var(--accent)}
+.toggle{font:12px var(--mono);letter-spacing:.08em;text-transform:uppercase;background:transparent;color:var(--text);border:1px solid var(--line2);padding:7px 12px;cursor:pointer;min-height:36px}
+.toggle:hover{border-color:var(--accent)}
+.progress{position:fixed;top:0;left:0;height:3px;width:100%;background:var(--accent2);transform-origin:0 50%;transform:scaleX(0);z-index:30}
+.hero{padding:64px 0 36px}
+.sheet{background:var(--paper);border:2px solid var(--stroke);position:relative;padding:28px 24px}
+.sheet::before,.sheet::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--accent2)}
+.sheet::before{top:-8px;left:-8px;border-right:0;border-bottom:0}
+.sheet::after{bottom:-8px;right:-8px;border-left:0;border-top:0}
+.label{font:12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font:800 clamp(1.9rem,7vw,3.2rem)/1.08 var(--sans);margin:.3em 0 .2em;letter-spacing:-.02em}
+.sub{color:var(--muted);max-width:60ch}
+.dim{display:flex;align-items:center;gap:8px;margin:20px 0 6px;font:12px var(--mono);color:var(--muted)}
+.dim i{flex:1;height:0;border-top:1px solid var(--stroke);position:relative}
+.dim i::before,.dim i::after{content:"";position:absolute;top:-5px;width:1px;height:10px;background:var(--stroke)}
+.dim i::before{left:0}.dim i::after{right:0}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.btn{font:600 13px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:11px 18px;text-decoration:none;border:1.5px solid var(--stroke);min-height:44px;display:inline-flex;align-items:center;color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--accent2)}
+.btn{transition:transform .15s,box-shadow .15s}
+section{padding:34px 0}
+h2{font:700 .9rem var(--mono);letter-spacing:.16em;text-transform:uppercase;margin:0 0 18px;display:flex;align-items:center;gap:12px;color:var(--accent)}
+h2 em{font-style:normal;color:var(--accent2)}
+h2::after{content:"";flex:1;border-top:1px solid var(--line2)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border:1px solid var(--stroke);background:var(--paper)}
+.stat{padding:18px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);margin:0 -1px -1px 0}
+.stat b{display:block;font:700 2.4rem var(--mono);color:var(--accent2)}
+.stat span{color:var(--muted);font-size:.92rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:var(--paper);border:1px solid var(--line2);padding:18px;position:relative;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--accent);transform:translateY(-3px)}
+.card .n{position:absolute;top:10px;right:12px;font:11px var(--mono);color:var(--muted)}
+.card h3{margin:0 0 8px;font:700 1rem var(--sans)}
+.card ul{margin:0;padding-left:18px;color:var(--muted);font-size:.94rem}
+.tag{display:inline-block;font:12px var(--mono);border:1px solid var(--line2);color:var(--muted);padding:3px 10px;margin:0 6px 6px 0}
+table{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--stroke)}
+th,td{text-align:left;padding:10px 14px;border:1px solid var(--line2);vertical-align:top}
+th{font:600 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);width:34%;background:transparent}
+@media(max-width:520px){th,td{display:block;width:100%}th{border-bottom:0;padding-bottom:0}}
+.tb{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--stroke);background:var(--paper);font:12px var(--mono)}
+.tb div{padding:10px 14px;border:1px solid var(--line2);color:var(--muted)}
+.tb b{display:block;color:var(--text);font-size:13px}
+footer{padding:24px 0 40px;color:var(--muted);font:12px var(--mono)}
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .6s,transform .6s}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal{opacity:1;transform:none;transition:none}.card,.btn{transition:none}.card:hover,.btn:hover{transform:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<header class="bar"><div class="wrap">
+  <nav aria-label="Primary"><a href="#about">About</a><a href="#stats">Stats</a><a href="#expertise">Expertise</a><a href="#experience">Experience</a><a href="index.html">Samples</a></nav>
+  <button class="toggle" id="toggle" type="button" aria-label="Toggle colour theme">Theme: <span id="tl">dark</span></button>
+</div></header>
+
+<main id="main" class="wrap">
+  <div class="hero">
+    <div class="sheet">
+      <div class="label">Sheet 01 / Profile</div>
+      <h1>Vinod Pyarelal Yadav</h1>
+      <p class="sub"><strong>Custom Software Engineering Manager</strong>, Accenture. Engineering leader building mobile, IoT and enterprise platforms.</p>
+      <div class="dim" aria-hidden="true">14+ YEARS<i></i></div>
+      <div class="cta">
+        <a class="btn primary" href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener">Connect on LinkedIn</a>
+        <a class="btn" href="#experience">View experience</a>
+      </div>
+    </div>
+  </div>
+
+  <section id="about" class="reveal">
+    <h2><em>A</em> About</h2>
+    <p>I'm an engineering leader with 14+ years of experience designing, building and delivering software across mobile, IoT, enterprise and web platforms. I have led teams of 35+ engineers and have shipped solutions for the transit, healthcare and retail industries.</p>
+    <p>I enjoy the space where hands-on technical depth meets delivery leadership: shaping architecture, growing engineers, and turning complex requirements into reliable products.</p>
+    <p><span class="tag">Mobile</span><span class="tag">IoT</span><span class="tag">Device Management</span><span class="tag">Enterprise Platforms</span><span class="tag">Web</span></p>
+  </section>
+
+  <section id="stats" class="reveal">
+    <h2><em>B</em> Key figures</h2>
+    <div class="stats">
+      <div class="stat"><b data-count="14" data-suffix="+">14+</b><span>Years in software engineering</span></div>
+      <div class="stat"><b data-count="35" data-suffix="+">35+</b><span>Engineers led</span></div>
+      <div class="stat"><b data-count="3">3</b><span>Industries: transit, healthcare, retail</span></div>
+    </div>
+  </section>
+
+  <section id="expertise" class="reveal">
+    <h2><em>C</em> Expertise</h2>
+    <div class="grid">
+      <article class="card"><span class="n">C-01</span><h3>Mobile Engineering</h3><ul><li>Native Android and iOS application development and delivery</li><li>Enterprise-grade mobile apps for regulated and high-usage domains</li></ul></article>
+      <article class="card"><span class="n">C-02</span><h3>IoT &amp; Connected Devices</h3><ul><li>End-to-end IoT solutions spanning devices, connectivity and applications</li></ul></article>
+      <article class="card"><span class="n">C-03</span><h3>MDM / EMM</h3><ul><li>Mobile Device Management and Enterprise Mobility Management solutions</li><li>Managing and securing device fleets and enterprise apps at scale</li></ul></article>
+      <article class="card"><span class="n">C-04</span><h3>Enterprise Software</h3><ul><li>Large-scale custom software delivery for enterprise clients</li></ul></article>
+      <article class="card"><span class="n">C-05</span><h3>Web Platforms</h3><ul><li>Web application and platform development, including modern JavaScript/TypeScript stacks</li></ul></article>
+      <article class="card"><span class="n">C-06</span><h3>Engineering Leadership</h3><ul><li>Leading and scaling engineering teams (35+ engineers)</li><li>Delivery management, technical architecture, hiring and mentoring</li><li>Bridging client requirements and engineering execution</li></ul></article>
+    </div>
+  </section>
+
+  <section id="experience" class="reveal">
+    <h2><em>D</em> Experience</h2>
+    <table>
+      <tr><th scope="row">Current</th><td><strong>Custom Software Engineering Manager</strong>, Accenture<ul style="margin:6px 0 0;padding-left:18px;color:var(--muted)"><li>Lead engineering teams delivering custom software across mobile, IoT, MDM/EMM, enterprise and web</li><li>Own technical delivery, team growth and client-facing engineering outcomes</li></ul></td></tr>
+      <tr><th scope="row">Earlier career</th><td>HTC</td></tr>
+    </table>
+  </section>
+
+  <section class="reveal" aria-label="Title block">
+    <h2><em>E</em> Snapshot</h2>
+    <div class="tb">
+      <div>Experience<b>14+ years in software engineering and engineering leadership</b></div>
+      <div>Team scale<b>Led teams of 35+ engineers</b></div>
+      <div>Current role<b>Custom Software Engineering Manager, Accenture</b></div>
+      <div>Industries<b>Transit, Healthcare, Retail</b></div>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap">Theme sample: blueprint. Engineering-drawing concept; code original.</div></footer>
+
+<script>
+(function(){
+  var root=document.documentElement,rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var saved=null;try{saved=localStorage.getItem('sample-theme')}catch(e){}
+  function set(t){root.dataset.theme=t;document.getElementById('tl').textContent=t;try{localStorage.setItem('sample-theme',t)}catch(e){}}
+  set(saved||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
+  document.getElementById('toggle').onclick=function(){set(root.dataset.theme==='dark'?'light':'dark')};
+  var bar=document.getElementById('progress');
+  function prog(){var m=document.documentElement.scrollHeight-innerHeight;bar.style.transform='scaleX('+(m>0?scrollY/m:0)+')'}
+  addEventListener('scroll',prog,{passive:true});prog();
+  var els=document.querySelectorAll('.reveal');
+  function count(el){var n=+el.dataset.count,s=el.dataset.suffix||'',t0=null;function f(t){t0=t0||t;var p=Math.min((t-t0)/900,1);el.textContent=Math.round(n*p)+(p===1?s:'');if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+  if(rm||!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')})}
+  else{var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);e.target.querySelectorAll('[data-count]').forEach(count)}})},{threshold:.15});els.forEach(function(e){io.observe(e)})}
+})();
+</script>
+</body>
+</html>

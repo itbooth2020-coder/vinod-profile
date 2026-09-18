@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinod Pyarelal Yadav - API / DevOps dashboard theme sample</title>
+<meta name="color-scheme" content="dark light">
+<!-- Ideas only (no code copied): endpoint-card layout and HTTP method colour-coding from Swagger UI / OpenAPI docs (Apache-2.0), pipeline-stage view common to CI dashboards. All code is original. -->
+<style>
+:root{
+  --bg:#0c1116;--panel:#141b23;--panel2:#1a232d;--border:#2b3746;--text:#e7edf4;--muted:#9fadbd;
+  --get:#4cc38a;--post:#5ab0ff;--put:#f0b429;--accent:#4cc38a;--accent-ink:#06120c;--ok-bg:#0f2a1e;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+[data-theme=light]{
+  --bg:#f3f6f9;--panel:#ffffff;--panel2:#eef2f6;--border:#c6d0dc;--text:#16202b;--muted:#4b5a6b;
+  --get:#0d6b3e;--post:#0a5aa8;--put:#8a5a00;--accent:#0d6b3e;--accent-ink:#ffffff;--ok-bg:#e0f3e8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 var(--sans)}
+:focus-visible{outline:2px solid var(--post);outline-offset:3px;border-radius:4px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:var(--accent-ink);padding:8px 12px;z-index:9}.skip:focus{left:8px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+.top{background:var(--panel);border-bottom:1px solid var(--border)}
+.top .wrap{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;min-height:60px}
+.logo{font:700 15px var(--mono)}.logo small{color:var(--muted);font-weight:400;margin-left:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--mono);padding:3px 10px;border-radius:999px;border:1px solid var(--get);color:var(--get);background:var(--ok-bg)}
+.badge::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--get);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.toggle{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 14px;min-height:40px;font:13px var(--mono);cursor:pointer}.toggle:hover{border-color:var(--post)}
+h1{font:800 clamp(1.8rem,6vw,3rem)/1.12 var(--sans);letter-spacing:-.03em;margin:36px 0 8px}
+.lede{color:var(--muted);max-width:62ch}
+.ver{font:12px var(--mono);color:var(--muted)}
+h2{font:700 1.2rem var(--sans);margin:40px 0 14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:22px}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden}
+.tile b{display:block;font:800 2.3rem/1.1 var(--mono);color:var(--get)}.tile span{font-size:14px;color:var(--muted)}
+.tile svg{position:absolute;right:8px;bottom:8px;width:90px;height:34px;opacity:.55}
+.ep{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.ep summary{list-style:none;display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;flex-wrap:wrap;min-height:48px}
+.ep summary::-webkit-details-marker{display:none}
+.ep summary:hover{background:var(--panel2)}
+.m{font:700 12px var(--mono);min-width:56px;text-align:center;padding:4px 8px;border-radius:5px;background:var(--panel2);border:1px solid currentColor}
+.m.get{color:var(--get)}.m.post{color:var(--post)}.m.put{color:var(--put)}
+.path{font:600 14.5px var(--mono)}.desc{color:var(--muted);font-size:14px;margin-left:auto}
+.ep summary::after{content:"+";font:700 18px var(--mono);color:var(--muted)}
+.ep[open] summary::after{content:"\2212"}
+.body{border-top:1px solid var(--border);padding:14px;display:grid;gap:10px;animation:open .25s ease}
+@keyframes open{from{opacity:0;transform:translateY(-4px)}}
+.status{display:flex;gap:8px;align-items:center;font:12px var(--mono);color:var(--muted)}
+.status b{color:var(--get)}
+pre{margin:0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;overflow:auto;font:13px/1.6 var(--mono);color:var(--text)}
+.k{color:var(--post)}.s{color:var(--put)}.n{color:var(--get)}
+.pipe{display:flex;gap:0;align-items:stretch;flex-wrap:wrap;list-style:none;margin:0;padding:0}
+.stage{flex:1 1 240px;background:var(--panel);border:1px solid var(--border);padding:16px;position:relative;min-width:0}
+.stage:first-child{border-radius:10px 0 0 10px}.stage:last-child{border-radius:0 10px 10px 0}
+.stage h3{margin:0 0 4px;font:700 1rem var(--sans)}.stage .badge{margin-bottom:8px}
+.stage.hist .badge{border-color:var(--muted);color:var(--muted);background:transparent}.stage.hist .badge::before{background:var(--muted);animation:none}
+.stage ul{margin:6px 0 0;padding-left:1.1em;color:var(--muted);font-size:14.5px}
+.bar{height:3px;background:var(--border);margin-top:12px;border-radius:2px;overflow:hidden}.bar i{display:block;height:100%;width:100%;background:var(--get);transform-origin:left;animation:fill 1.6s ease both}
+@keyframes fill{from{transform:scaleX(0)}}
+@media(max-width:620px){.stage,.stage:first-child,.stage:last-child{border-radius:0;flex-basis:100%}.stage:first-child{border-radius:10px 10px 0 0}.stage:last-child{border-radius:0 0 10px 10px}.desc{margin-left:0;flex-basis:100%}}
+.svc{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--post);transform:translateY(-2px)}
+.card h3{margin:0 0 8px;font:700 1rem var(--sans)}.card ul{margin:0;padding-left:1.1em;color:var(--muted);font-size:14.5px}
+footer{border-top:1px solid var(--border);margin-top:48px;padding:24px 0 48px;color:var(--muted);font-size:14px}footer a{color:var(--post)}
+@media(prefers-reduced-motion:reduce){.badge::before,.bar i,.body{animation:none}.card{transition:none}.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="top"><div class="wrap"><span class="logo">Profile API<small>OpenAPI-style docs</small></span><span class="badge">200 OK</span><button class="toggle" id="theme" aria-pressed="false">Theme: dark</button></div></div>
+<main id="main" class="wrap">
+  <h1>Vinod Pyarelal Yadav</h1>
+  <p class="lede">Custom Software Engineering Manager at Accenture. Engineering leader building mobile, IoT and enterprise platforms. Below, the profile is documented as an API: expand an endpoint to see its response.</p>
+  <div class="tiles" aria-label="Key figures">
+    <div class="tile"><b>14+</b><span>Years in software engineering</span><svg viewBox="0 0 90 34" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="2" style="color:var(--get)" points="0,30 15,24 30,26 45,16 60,18 75,8 90,4"/></svg></div>
+    <div class="tile"><b>35+</b><span>Engineers led</span><svg viewBox="0 0 90 34" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="2" style="color:var(--post)" points="0,28 15,26 30,20 45,22 60,12 75,14 90,6"/></svg></div>
+    <div class="tile"><b>3</b><span>Industries: transit, healthcare, retail</span><svg viewBox="0 0 90 34" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="2" style="color:var(--put)" points="0,20 15,22 30,14 45,18 60,10 75,12 90,8"/></svg></div>
+  </div>
+  <p class="ver">Sparklines are decorative and do not represent data.</p>
+
+  <h2>Endpoints</h2>
+  <div id="eps"></div>
+
+  <h2>Career pipeline</h2>
+  <ol class="pipe">
+    <li class="stage hist"><span class="badge">completed</span><h3>HTC</h3><ul><li>Earlier career</li></ul></li>
+    <li class="stage"><span class="badge">running</span><h3>Accenture &middot; Custom Software Engineering Manager</h3>
+      <ul><li>Lead engineering teams delivering custom software across mobile, IoT, MDM/EMM, enterprise and web</li><li>Own technical delivery, team growth and client-facing engineering outcomes</li></ul><div class="bar" aria-hidden="true"><i></i></div></li>
+  </ol>
+
+  <h2>Services</h2>
+  <div class="svc" id="svc"></div>
+</main>
+<footer><div class="wrap">Industries: Transit, Healthcare, Retail. <a href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener">LinkedIn</a></div></footer>
+<script>
+// Content mirrors src/data.js (no additions).
+const X=[['Mobile Engineering',['Native Android and iOS application development and delivery','Enterprise-grade mobile apps for regulated and high-usage domains']],
+['IoT & Connected Devices',['End-to-end IoT solutions spanning devices, connectivity and applications']],
+['MDM / EMM',['Mobile Device Management and Enterprise Mobility Management solutions','Managing and securing device fleets and enterprise apps at scale']],
+['Enterprise Software',['Large-scale custom software delivery for enterprise clients']],
+['Web Platforms',['Web application and platform development, including modern JavaScript/TypeScript stacks']],
+['Engineering Leadership',['Leading and scaling engineering teams (35+ engineers)','Delivery management, technical architecture, hiring and mentoring','Bridging client requirements and engineering execution']]];
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const hl=o=>esc(JSON.stringify(o,null,2)).replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(\d+)\b/g,(m,s,c,n)=>s?(c?`<span class="k">${s}</span>${c}`:`<span class="s">${s}</span>`):`<span class="n">${n}</span>`);
+const E=[
+['get','/profile','Name, role and tagline',{name:'Vinod Pyarelal Yadav',role:'Custom Software Engineering Manager',company:'Accenture',tagline:'Engineering leader building mobile, IoT and enterprise platforms'}],
+['get','/domains','Technology domains',['Mobile','IoT','Device Management','Enterprise Platforms','Web']],
+['get','/expertise','Areas of expertise',X.map(([t])=>t)],
+['get','/industries','Industries served',['Transit','Healthcare','Retail']],
+['get','/experience','Roles held',[{role:'Custom Software Engineering Manager',company:'Accenture',current:true},{role:'Earlier career',company:'HTC',current:false}]],
+['get','/team','Leadership scale',{engineersLed:'35+',yearsExperience:'14+'}]];
+document.getElementById('eps').innerHTML=E.map(([m,p,d,r])=>`<details class="ep"><summary><span class="m ${m}">${m.toUpperCase()}</span><span class="path">${p}</span><span class="desc">${d}</span></summary><div class="body"><div class="status">Response <b>200</b> application/json</div><pre><code>${hl(r)}</code></pre></div></details>`).join('');
+document.getElementById('svc').innerHTML=X.map(([t,p])=>`<article class="card"><h3>${esc(t)}</h3><ul>${p.map(x=>`<li>${x}</li>`).join('')}</ul></article>`).join('');
+document.querySelector('.ep').open=true;
+const root=document.documentElement,tg=document.getElementById('theme');
+function setT(v){root.dataset.theme=v;tg.textContent='Theme: '+v;tg.setAttribute('aria-pressed',v==='light')}
+setT(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+tg.onclick=()=>setT(root.dataset.theme==='dark'?'light':'dark');
+</script>
+</body>
+</html>

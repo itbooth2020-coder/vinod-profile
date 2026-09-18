@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinod Pyarelal Yadav - Mobile dev theme sample</title>
+<meta name="color-scheme" content="dark light">
+<!-- Ideas only (no code copied): device-frame mockup convention (e.g. the MIT-licensed devices.css by picturepan2) and browser DevTools element-inspector/responsive-ruler UI. All code is original. -->
+<style>
+:root{
+  --bg:#10131a;--surface:#181c26;--surface2:#212736;--border:#333b50;--text:#eef1f7;--muted:#a7b0c4;
+  --accent:#ff7a59;--accent2:#5ac8fa;--accent-ink:#10131a;--frame:#05060a;--inspect:#5ac8fa;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+[data-theme=light]{
+  --bg:#f5f3ef;--surface:#ffffff;--surface2:#efece6;--border:#cfc9bd;--text:#1d1b18;--muted:#57524a;
+  --accent:#b23a17;--accent2:#075a8a;--accent-ink:#ffffff;--frame:#22252e;--inspect:#075a8a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 var(--sans)}
+:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radius:4px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--accent);color:var(--accent-ink);padding:8px 12px;z-index:99}.skip:focus{left:8px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+/* breakpoint ruler */
+.ruler{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.ruler .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:52px;padding-top:6px;padding-bottom:6px}
+.bp{display:flex;flex:1;min-width:220px;position:relative;height:28px;font:11px var(--mono);color:var(--muted)}
+.bp i{flex:var(--w);border-left:1px solid var(--border);padding:8px 0 0 4px;font-style:normal;white-space:nowrap;overflow:hidden;transition:background .2s,color .2s}
+.bp i.on{background:color-mix(in srgb,var(--accent2) 22%,transparent);color:var(--text)}
+.read{font:12px var(--mono);color:var(--text);white-space:nowrap}.read b{color:var(--accent2)}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-height:40px;font:13px var(--mono)}
+.btn:hover{border-color:var(--accent2)}.btn[aria-pressed=true]{background:var(--accent2);color:var(--accent-ink);border-color:var(--accent2)}
+/* hero with device */
+.hero{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center;padding:56px 0 36px}
+@media(max-width:820px){.hero{grid-template-columns:1fr;padding-top:32px}}
+.tag{font:600 13px var(--mono);color:var(--accent2)}
+h1{font:800 clamp(2rem,7vw,3.4rem)/1.08 var(--sans);letter-spacing:-.03em;margin:.3em 0}
+.lede{color:var(--muted);max-width:52ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0;padding:0;list-style:none}
+.chips li{font:12.5px var(--mono);border:1px solid var(--border);border-radius:999px;padding:5px 12px;background:var(--surface)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+.cta a{display:inline-flex;align-items:center;min-height:46px;padding:0 20px;border-radius:10px;font-weight:600;text-decoration:none;border:1px solid var(--accent)}
+.cta .p{background:var(--accent);color:var(--accent-ink)}.cta .g{color:var(--text)}
+.stage{display:flex;justify-content:center;gap:0;perspective:1200px}
+.phone{width:min(270px,78vw);aspect-ratio:9/18.5;background:var(--frame);border-radius:38px;padding:11px;box-shadow:0 30px 60px -25px rgba(0,0,0,.6),inset 0 0 0 2px #2b2f3a;position:relative;transition:transform .5s ease;transform:rotateY(-8deg) rotateX(3deg)}
+.phone:hover,.phone:focus-within{transform:none}
+.phone::before{content:"";position:absolute;top:18px;left:50%;width:70px;height:20px;background:var(--frame);border-radius:12px;transform:translateX(-50%);z-index:2}
+.screen{height:100%;background:var(--surface);border-radius:28px;overflow:hidden;display:flex;flex-direction:column;color:var(--text)}
+.status{display:flex;justify-content:space-between;padding:12px 20px 4px;font:600 11px var(--mono);color:var(--muted)}
+.sbody{flex:1;padding:22px 16px 10px;overflow:hidden}
+.avatar{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font:800 20px var(--sans);color:var(--accent-ink)}
+.sbody h2{font-size:1.02rem;margin:12px 0 2px}.sbody p{font-size:.8rem;color:var(--muted);margin:0 0 12px;line-height:1.4}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.mini div{background:var(--surface2);border-radius:10px;padding:8px 4px;text-align:center}.mini b{display:block;font:700 1rem var(--mono);color:var(--accent2)}.mini span{font-size:.6rem;color:var(--muted);line-height:1.2;display:block}
+.tabbar{display:flex;justify-content:space-around;padding:10px 6px 14px;border-top:1px solid var(--border);font:11px var(--mono);color:var(--muted)}
+.tabbar span:first-child{color:var(--accent)}
+/* sections */
+section{padding:34px 0}
+h3{font:700 1.4rem var(--sans);margin:0 0 6px}
+.sub{font:13px var(--mono);color:var(--muted);margin:0 0 18px}
+.tree{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.comp{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative}
+.comp h4{margin:0 0 6px;font-size:1.05rem}.comp ul{margin:0;padding-left:1.1em;color:var(--muted);font-size:14.5px}
+.comp .nm{position:absolute;top:-1px;left:14px;transform:translateY(-50%);font:11px var(--mono);background:var(--inspect);color:var(--accent-ink);padding:2px 8px;border-radius:4px;opacity:0;pointer-events:none}
+body.inspect .comp,body.inspect .phone,body.inspect .stat,body.inspect .mini div{outline:1.5px dashed var(--inspect);outline-offset:-1px}
+body.inspect .comp .nm{opacity:1}
+.comp:hover{border-color:var(--accent2)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+.stat b{font:800 2.4rem/1 var(--mono);color:var(--accent2);display:block}.stat span{color:var(--muted);font-size:14px}
+.tl{border-left:2px solid var(--border);margin:0 0 0 8px;padding:0 0 0 20px;list-style:none}
+.tl li{position:relative;padding-bottom:22px}.tl li::before{content:"";position:absolute;left:-27px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.tl li.old::before{background:var(--muted)}
+.tl h4{margin:0}.tl small{font:12px var(--mono);color:var(--muted)}.tl ul{margin:6px 0 0;padding-left:1.1em;color:var(--muted)}
+footer{border-top:1px solid var(--border);padding:28px 0 48px;color:var(--muted);font-size:14px}footer a{color:var(--accent2)}
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s}.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.phone{transition:none;transform:none}.reveal{opacity:1;transform:none;transition:none}.bp i{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="ruler"><div class="wrap">
+  <div class="bp" aria-hidden="true" id="bp"><i style="--w:360" data-min="0">360</i><i style="--w:408" data-min="360">768</i><i style="--w:256" data-min="768">1024</i><i style="--w:256" data-min="1024">1280+</i></div>
+  <span class="read" aria-live="off">viewport <b id="vw">0</b>px &middot; <span id="bpn"></span></span>
+  <button class="btn" id="insp" aria-pressed="false">Inspect: off</button>
+  <button class="btn" id="theme" aria-pressed="false">Theme: dark</button>
+</div></div>
+<main id="main" class="wrap">
+  <div class="hero">
+    <div>
+      <p class="tag">// mobile &middot; IoT &middot; enterprise &middot; web</p>
+      <h1>Vinod Pyarelal Yadav</h1>
+      <p class="lede">Engineering leader building mobile, IoT and enterprise platforms. Custom Software Engineering Manager at Accenture, with 14+ years of experience designing, building and delivering software.</p>
+      <ul class="chips"><li>Mobile</li><li>IoT</li><li>Device Management</li><li>Enterprise Platforms</li><li>Web</li></ul>
+      <div class="cta"><a class="p" href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener">View LinkedIn</a><a class="g" href="#expertise">See expertise</a></div>
+    </div>
+    <div class="stage">
+      <div class="phone" tabindex="0" aria-label="Phone mockup of the profile card"><div class="screen">
+        <div class="status"><span>9:41</span><span>LTE</span></div>
+        <div class="sbody"><div class="avatar" aria-hidden="true">VY</div><h2>Vinod Pyarelal Yadav</h2><p>Custom Software Engineering Manager, Accenture</p>
+          <div class="mini"><div><b>14+</b><span>years</span></div><div><b>35+</b><span>engineers led</span></div><div><b>3</b><span>industries</span></div></div></div>
+        <div class="tabbar"><span>Profile</span><span>Work</span><span>Skills</span></div>
+      </div></div>
+    </div>
+  </div>
+  <section id="expertise" class="reveal"><h3>Expertise</h3><p class="sub">&lt;ExpertiseList /&gt; &mdash; toggle Inspect to see component boundaries</p><div class="tree" id="tree"></div></section>
+  <section class="reveal"><h3>At a glance</h3><p class="sub">&lt;Stats /&gt;</p>
+    <div class="stats"><div class="stat"><b>14+</b><span>Years in software engineering</span></div><div class="stat"><b>35+</b><span>Engineers led</span></div><div class="stat"><b>3</b><span>Industries: transit, healthcare, retail</span></div></div></section>
+  <section class="reveal"><h3>Experience</h3><p class="sub">&lt;Timeline /&gt;</p>
+    <ul class="tl"><li><h4>Custom Software Engineering Manager</h4><small>Accenture &middot; current</small><ul><li>Lead engineering teams delivering custom software across mobile, IoT, MDM/EMM, enterprise and web</li><li>Own technical delivery, team growth and client-facing engineering outcomes</li></ul></li>
+    <li class="old"><h4>Earlier career</h4><small>HTC</small></li></ul></section>
+</main>
+<footer><div class="wrap">Industries: Transit, Healthcare, Retail. <a href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener">LinkedIn</a></div></footer>
+<script>
+const X=[['Mobile Engineering',['Native Android and iOS application development and delivery','Enterprise-grade mobile apps for regulated and high-usage domains']],
+['IoT & Connected Devices',['End-to-end IoT solutions spanning devices, connectivity and applications']],
+['MDM / EMM',['Mobile Device Management and Enterprise Mobility Management solutions','Managing and securing device fleets and enterprise apps at scale']],
+['Enterprise Software',['Large-scale custom software delivery for enterprise clients']],
+['Web Platforms',['Web application and platform development, including modern JavaScript/TypeScript stacks']],
+['Engineering Leadership',['Leading and scaling engineering teams (35+ engineers)','Delivery management, technical architecture, hiring and mentoring','Bridging client requirements and engineering execution']]];
+document.getElementById('tree').innerHTML=X.map(([t,p])=>`<article class="comp"><span class="nm">&lt;${t.replace(/[^A-Za-z]/g,'')} /&gt;</span><h4>${t.replace('&','&amp;')}</h4><ul>${p.map(x=>`<li>${x}</li>`).join('')}</ul></article>`).join('');
+const vw=document.getElementById('vw'),bpn=document.getElementById('bpn'),bps=[...document.querySelectorAll('#bp i')],names=['phone','tablet','laptop','desktop'];
+function upd(){const w=innerWidth;vw.textContent=w;let k=0;bps.forEach((e,i)=>{if(w>=+e.dataset.min)k=i});bps.forEach((e,i)=>e.classList.toggle('on',i===k));bpn.textContent=names[k]}
+addEventListener('resize',upd);upd();
+const insp=document.getElementById('insp');
+insp.onclick=()=>{const on=document.body.classList.toggle('inspect');insp.setAttribute('aria-pressed',on);insp.textContent='Inspect: '+(on?'on':'off')};
+const io='IntersectionObserver'in window?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1}):null;
+document.querySelectorAll('.reveal').forEach(e=>io?io.observe(e):e.classList.add('in'));
+const root=document.documentElement,tg=document.getElementById('theme');
+function setT(v){root.dataset.theme=v;tg.textContent='Theme: '+v;tg.setAttribute('aria-pressed',v==='light')}
+setT(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+tg.onclick=()=>setT(root.dataset.theme==='dark'?'light':'dark');
+</script>
+</body>
+</html>

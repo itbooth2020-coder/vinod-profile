@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theme samples - Vinod Pyarelal Yadav</title>
+<meta name="color-scheme" content="dark light">
+<style>
+:root{--bg:#f6f8fa;--card:#fff;--border:#c9d1d9;--text:#1f2328;--muted:#59636e;--accent:#0550ae}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--muted:#9da7b3;--accent:#79c0ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:900px;margin:0 auto;padding:48px 20px}
+h1{margin:0 0 6px}p{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:28px}
+a.card{display:block;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;text-decoration:none;color:var(--text);transition:border-color .2s,transform .2s}
+a.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+a.card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+a.card h2{margin:0 0 6px;font-size:1.15rem;color:var(--accent)}
+a.card span{color:var(--muted);font-size:.93rem}
+@media(prefers-reduced-motion:reduce){a.card{transition:none}a.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Theme samples</h1>
+  <p>Seven standalone directions for the profile site. Each supports dark and light (toggle top right; defaults to your OS setting) and uses only content from <code>src/data.js</code>.</p>
+  <div class="grid">
+    <a class="card" href="terminal.html"><h2>Terminal / IDE</h2><span>Window chrome, monospace, prompt-style headings, typing role line, git-log experience.</span></a>
+    <a class="card" href="blueprint.html"><h2>Blueprint</h2><span>Engineering-drawing grid paper, dimension lines, numbered sheets, title-block snapshot.</span></a>
+    <a class="card" href="neon-grid.html"><h2>Neon grid</h2><span>Animated perspective grid, aurora glow, glass cards with pointer spotlight.</span></a>
+    <a class="card" href="ide-editor.html"><h2>IDE editor</h2><span>Explorer tree, editor tabs, syntax-highlighted JSON/TS of the profile data, status bar.</span></a>
+    <a class="card" href="ai-console.html"><h2>AI console</h2><span>Prompt console with streamed answers, model-card panels, animated node graph of domains.</span></a>
+    <a class="card" href="mobile-dev.html"><h2>Mobile dev</h2><span>Phone frame mockup, live breakpoint ruler, component-inspector overlay.</span></a>
+    <a class="card" href="devops-api.html"><h2>API / DevOps</h2><span>Swagger-style endpoint cards, status badges, sparkline tiles, career as a CI pipeline.</span></a>
+  </div>
+  <p style="margin-top:32px;font-size:.85rem">Newer samples, ideas only: primer/github-vscode-theme (MIT), Open WebUI and Vercel AI chatbot template layouts, devices.css (MIT), Swagger UI (Apache-2.0). Earlier inspiration (ideas only, no code copied):Parth-Bisht-227/Terminal-Portfolio, Jimmy2026/modern-portfolio-template, pritamrauniyar/Portfolio, Devstarter cyberpunk template. All code here is original.</p>
+</main>
+</body>
+</html>

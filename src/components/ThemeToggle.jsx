@@ -5,7 +5,7 @@ const getInitial = () => {
     const saved = localStorage.getItem('theme')
     if (saved) return saved
   } catch {}
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return 'dark'
 }
 
 export default function ThemeToggle() {

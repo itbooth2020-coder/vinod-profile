@@ -2,15 +2,17 @@ import { profile } from '../data.js'
 
 export default function Contact() {
   return (
-    <section id="contact" className="section section--alt">
-      <div className="container contact">
-        <h2>Let's Connect</h2>
-        <p className="lead">
-          Interested in discussing engineering delivery, mobile or IoT platforms, or team leadership? I'd be glad to hear from you.
+    <section id="contact" aria-labelledby="contact-h">
+      <div className="card contact">
+        <h3 className="sec" id="contact-h">Let's connect</h3>
+        <p>
+          Interested in engineering leadership, mobile, IoT, MDM or AI-agent platforms? I'd be glad to hear from you.
         </p>
-        <a className="btn btn--primary" href={profile.linkedin} target="_blank" rel="noopener noreferrer">
-          Find me on LinkedIn
-        </a>
+        <div className="actions">
+          <a className="btn btn--primary" href={`mailto:${profile.email}`}>{profile.email}</a>
+          <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Resume (PDF)</a>
+        </div>
       </div>
     </section>
   )

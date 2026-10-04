@@ -5,7 +5,7 @@ const getInitial = () => {
     const saved = localStorage.getItem('theme')
     if (saved) return saved
   } catch {}
-  return 'dark'
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
 export default function ThemeToggle() {
@@ -16,10 +16,14 @@ export default function ThemeToggle() {
     try { localStorage.setItem('theme', theme) } catch {}
   }, [theme])
 
-  const next = theme === 'dark' ? 'light' : 'dark'
   return (
-    <button className="theme-toggle" onClick={() => setTheme(next)} aria-label={`Switch to ${next} theme`}>
-      <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+    <button
+      className="toggle"
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      aria-pressed={theme === 'light'}
+      aria-label="Light theme"
+    >
+      Theme: {theme}
     </button>
   )
 }

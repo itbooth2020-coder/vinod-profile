@@ -2,28 +2,29 @@ import { experience } from '../data.js'
 
 export default function Experience() {
   return (
-    <section id="experience" className="section">
-      <div className="container">
-        <h2>Experience</h2>
-        <ol className="timeline">
-          {experience.map((job) => (
-            <li key={job.company} className={`timeline__item ${job.current ? 'is-current' : ''}`}>
-              <h3>{job.role}</h3>
-              <p className="timeline__company">
-                {job.company}
-                {job.current && <span className="badge">Current</span>}
-              </p>
-              {job.points.length > 0 && (
-                <ul>
-                  {job.points.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ol>
-      </div>
+    <section id="experience" aria-labelledby="experience-h">
+      <h3 className="sec" id="experience-h">Experience</h3>
+      <ol className="timeline">
+        {experience.map((job, i) => (
+          <li key={job.company} className="card job">
+            <details open={i < 2}>
+              <summary>
+                <span className="job__role">{job.role}</span>
+                <span className="job__company">
+                  {job.company}
+                  {job.current && <span className="badge">current</span>}
+                </span>
+                <span className="job__meta">{job.period} · {job.location}</span>
+              </summary>
+              <ul>
+                {job.points.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </details>
+          </li>
+        ))}
+      </ol>
     </section>
   )
 }

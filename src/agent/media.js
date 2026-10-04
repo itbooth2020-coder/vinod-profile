@@ -18,7 +18,7 @@ export const media = [
   { id: 'company/yesha', label: 'Yesha IT Solutions', kind: 'company', mono: 'YI' },
   { id: 'company/hurix', label: 'Hurix Systems', kind: 'company', domain: 'hurix.com' },
 
-  { id: 'edu/thakur', label: 'Thakur Institute of Management Studies (MMS)', kind: 'education', mono: 'TIMS' },
+  { id: 'edu/thakur', label: 'Thakur Institute of Management Studies (MCA)', kind: 'education', mono: 'TIMS' },
   { id: 'edu/ismail-yusuf', label: 'Ismail Yusuf College (B.Sc.)', kind: 'education', mono: 'IYC' },
 
   { id: 'project/darwin', label: 'Darwin Portal – Syngenta', kind: 'project', domain: 'syngenta.com' },

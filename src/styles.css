@@ -216,6 +216,42 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .gdialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); overflow: auto; }
 .gdialog::backdrop { background: rgb(0 0 0 / 0.6); backdrop-filter: blur(2px); }
 
+/* Profile dialog */
+.avatar-btn { padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; transition: transform 0.2s; }
+.avatar-btn:hover { transform: scale(1.04); }
+.avatar-btn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; }
+.gdialog--profile { position: relative; width: min(960px, calc(100vw - 32px)); }
+.pdialog__close { position: absolute; top: 10px; right: 10px; z-index: 1; }
+/* The photo stretches to the height of the details column, so the dialog is only as tall as its text. */
+.pdialog { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+.pdialog__photo { position: relative; margin: 0; min-height: 380px; background: var(--panel2); }
+.pdialog__photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.pdialog__overlay { position: absolute; inset: auto 0 0; padding: 48px 16px 14px; color: #fff; background: linear-gradient(transparent, rgb(0 0 0 / 0.85) 40%); }
+.pdialog__name { margin: 0 0 6px; font: 700 1.15rem var(--sans); }
+.pdialog__facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0; list-style: none; }
+.pdialog__facts li { padding: 2px 10px; border: 1px solid rgb(255 255 255 / 0.4); border-radius: 999px; font: 12px var(--mono); }
+.pdialog__quote { margin: 0 0 8px; padding-left: 10px; border-left: 3px solid var(--accent2); font-size: 14px; animation: gfade 0.5s ease both; }
+.pdialog__quote p { margin: 0 0 4px; font-style: italic; }
+.pdialog__quote footer { font: 12px var(--mono); opacity: 0.8; }
+.pdialog__shuffle { min-height: 32px; padding: 4px 10px; border: 1px solid rgb(255 255 255 / 0.4); border-radius: 8px; background: rgb(0 0 0 / 0.3); color: #fff; font: 12px var(--mono); cursor: pointer; }
+.pdialog__shuffle:hover { border-color: #fff; }
+.pdialog__shuffle:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.pdialog__info { padding: 16px 20px 18px; display: grid; gap: 12px; align-content: start; }
+.pdialog__title { margin: 0; padding-right: 90px; font: 700 1.35rem var(--sans); }
+.pdialog__headline { margin: -6px 0 0; color: var(--muted); font-size: 14px; }
+.pdialog__details { margin: 0; display: grid; gap: 7px; font-size: 14px; line-height: 1.4; }
+.pdialog__details > div { display: grid; grid-template-columns: 100px 1fr; gap: 12px; }
+.pdialog__details dt { font: 12px var(--mono); color: var(--muted); padding-top: 2px; }
+.pdialog__details dd { margin: 0; }
+/* Stacked on narrow screens: a shorter photo keeps as much of the profile on screen as possible. */
+@media (max-width: 720px) {
+  .pdialog { grid-template-columns: 1fr; }
+  .pdialog__photo { min-height: clamp(240px, 36vh, 320px); }
+  .pdialog__name { display: none; } /* the heading right below repeats it */
+  .pdialog__title { padding-right: 0; }
+  .pdialog__details > div { grid-template-columns: 88px 1fr; gap: 10px; }
+}
+
 /* Sections */
 section { padding: 20px 0; scroll-margin-top: 16px; }
 h3.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
@@ -258,6 +294,8 @@ h3.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
   .mc { transition: none; }
   .gnode { animation: none; }
   .mc:hover { transform: none; }
+  .avatar-btn, .pdialog__quote { transition: none; animation: none; }
+  .avatar-btn:hover { transform: none; }
 }
 @media print { .header, .chat, .gview, .actions { display: none; } }
 

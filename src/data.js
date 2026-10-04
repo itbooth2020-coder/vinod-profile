@@ -20,6 +20,24 @@ export const profile = {
     'Results-driven Engineering Manager with 14+ years of experience leading cross-functional teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered, and web platforms at scale. Proven track record of improving system performance by 30%+, shipping solutions supporting 30K+ users and devices, and reducing time-to-market through CI/CD automation. Deep expertise in Android/iOS, MDM/EMM, AI-agent-driven platforms, system architecture, and Agile delivery across Retail, Transit, Healthcare, AgriTech, and Enterprise Mobility verticals. Adept at hiring, mentoring, setting OKRs, managing stakeholder relationships, budget ownership, and aligning engineering roadmaps with business strategy.',
 }
 
+// Profile dialog. Age is calculated from birthDate ('YYYY' or 'YYYY-MM-DD') and hidden while it's empty.
+export const personal = {
+  photo: 'formal-profile.png',
+  birthDate: '1986-01-25', // e.g. '1987' or '1987-06-15'
+  nationality: 'Indian',
+  location: 'Bengaluru, Karnataka, India',
+  languages: 'English (Professional), Hindi (Native), Marathi (Native)',
+}
+
+// One is picked at random each time the profile dialog opens.
+export const quotes = [
+  { text: 'Simplicity is prerequisite for reliability.', by: 'Edsger W. Dijkstra' },
+  { text: 'The best way to predict the future is to invent it.', by: 'Alan Kay' },
+  { text: 'Make it work, make it right, make it fast.', by: 'Kent Beck' },
+  { text: 'Talk is cheap. Show me the code.', by: 'Linus Torvalds' },
+  { text: "It's not who I am underneath, but what I do that defines me.", by: 'Batman Begins (2005)' },
+]
+
 export const profileCard = [
   ['role', 'Custom Software Engineering Manager'],
   ['company', 'Accenture · since Jun 2024'],

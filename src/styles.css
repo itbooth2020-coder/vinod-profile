@@ -1,4 +1,5 @@
-/* AI console theme (from theme-samples/ai-console.html) */
+/* Themes: [data-palette] x [data-theme]. "console" is the default (theme-samples/ai-console.html).
+   Fonts: [data-font]. Pick in the header's Customize panel, then keep only the finalized ones. */
 :root {
   --bg: #0b0e14; --panel: #121722; --panel2: #181f2d; --border: #2a3448; --text: #e8ecf4; --muted: #a3adc2;
   --accent: #8b8cff; --accent2: #3dd6c6; --accent-ink: #0b0e14; --user: #1f2a44;
@@ -11,6 +12,52 @@
   --accent: #4a3fd6; --accent2: #0b6e64; --accent-ink: #ffffff; --user: #e4e8fb;
   color-scheme: light;
 }
+
+/* Ocean Blue: navy surfaces, blue + sky accents */
+:root[data-palette='blue'] {
+  --bg: #0a1220; --panel: #0f1b2e; --panel2: #142540; --border: #233a5c; --text: #e6eefb; --muted: #9fb1cc;
+  --accent: #2563eb; --accent2: #38bdf8; --accent-ink: #ffffff; --user: #16305a;
+}
+:root[data-palette='blue'][data-theme='light'] {
+  --bg: #f3f7fd; --panel: #ffffff; --panel2: #e8f0fb; --border: #c3d3ea; --text: #0f1d33; --muted: #475a78;
+  --accent: #1d4ed8; --accent2: #0369a1; --accent-ink: #ffffff; --user: #dbe7fb;
+}
+
+/* Graphite: neutral greys, slate accents */
+:root[data-palette='graphite'] {
+  --bg: #121417; --panel: #1a1d21; --panel2: #22262b; --border: #353a41; --text: #eceef1; --muted: #a6adb7;
+  --accent: #cbd5e1; --accent2: #94a3b8; --accent-ink: #121417; --user: #2b3036;
+}
+:root[data-palette='graphite'][data-theme='light'] {
+  --bg: #f4f5f7; --panel: #ffffff; --panel2: #eceef1; --border: #cfd4da; --text: #1c1f23; --muted: #545b65;
+  --accent: #374151; --accent2: #4b5563; --accent-ink: #ffffff; --user: #e5e7eb;
+}
+
+/* Noir: pure black and white */
+:root[data-palette='noir'] {
+  --bg: #000000; --panel: #0b0b0b; --panel2: #141414; --border: #2a2a2a; --text: #f5f5f5; --muted: #a3a3a3;
+  --accent: #ffffff; --accent2: #d4d4d4; --accent-ink: #000000; --user: #1c1c1c;
+}
+:root[data-palette='noir'][data-theme='light'] {
+  --bg: #fafafa; --panel: #ffffff; --panel2: #f0f0f0; --border: #d4d4d4; --text: #0a0a0a; --muted: #525252;
+  --accent: #0a0a0a; --accent2: #404040; --accent-ink: #ffffff; --user: #ebebeb;
+}
+
+/* Mahogany: dark reddish-brown with rust + amber accents */
+:root[data-palette='mahogany'] {
+  --bg: #140c0b; --panel: #1d1311; --panel2: #261916; --border: #422a25; --text: #f3e9e6; --muted: #c0a9a2;
+  --accent: #c8644c; --accent2: #e0a96d; --accent-ink: #160b09; --user: #3a1f1a;
+}
+:root[data-palette='mahogany'][data-theme='light'] {
+  --bg: #faf6f4; --panel: #ffffff; --panel2: #f3ebe7; --border: #dfcbc4; --text: #2a1612; --muted: #6b4f48;
+  --accent: #7b2d26; --accent2: #9a5b2e; --accent-ink: #ffffff; --user: #f1e1dc;
+}
+
+/* Font pairings (body / labels) */
+:root[data-font='grotesk'] { --sans: 'Space Grotesk', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace; }
+:root[data-font='plex'] { --sans: 'IBM Plex Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace; }
+:root[data-font='serif'] { --sans: 'Source Serif 4', Georgia, serif; --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace; }
+:root[data-font='system'] { --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 16px; }
@@ -40,6 +87,35 @@ a { color: var(--accent2); }
 .nav a:hover { color: var(--text); }
 .toggle { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; min-height: 40px; font: 13px var(--mono); cursor: pointer; }
 .toggle:hover { border-color: var(--accent); }
+.header__tools { display: flex; gap: 8px; }
+
+/* Theme picker */
+.picker { position: relative; }
+.picker__dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; background: conic-gradient(var(--accent) 0 50%, var(--accent2) 0); }
+.picker__panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(380px, calc(100vw - 32px)); max-height: min(78vh, 640px); overflow: auto; padding: 14px 16px; box-shadow: 0 18px 40px rgb(0 0 0 / 0.35); }
+@media (max-width: 560px) { .header { position: relative; } .picker { position: static; } .picker__panel { left: 0; right: 0; width: auto; top: 100%; } }
+.picker fieldset { border: 0; margin: 0 0 14px; padding: 0; }
+.picker legend { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; padding: 0; }
+.picker input[type='radio'] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.picker__palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.picker__palette { display: grid; gap: 2px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--panel2); }
+.picker__palette:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.picker__palette:has(input:focus-visible), .picker__font:has(input:focus-visible) { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.picker__swatches { display: flex; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 4px; }
+.picker__swatches i { flex: 1; }
+.picker__name { font-weight: 600; font-size: 13px; }
+.picker__note { font: 11px var(--mono); color: var(--muted); }
+.picker__fonts { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker__font { padding: 6px 12px; min-height: 36px; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 14px; }
+.picker__font:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.picker__colors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.picker__color { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.picker__color input { width: 40px; height: 36px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); cursor: pointer; }
+.picker__color span { display: grid; }
+.picker__color code { font: 12px var(--mono); color: var(--muted); }
+.picker__foot { display: flex; gap: 8px; flex-wrap: wrap; }
+.picker__hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.icon-btn:disabled { opacity: 0.45; cursor: default; }
 
 /* Hero */
 .hero { padding-top: 12px; }

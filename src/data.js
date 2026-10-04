@@ -48,6 +48,7 @@ export const experience = [
   {
     company: 'Accenture',
     role: 'Custom Software Engineering Manager',
+    media: 'company/accenture',
     location: 'Bengaluru',
     period: 'Jun 2024 – Present',
     current: true,
@@ -66,6 +67,7 @@ export const experience = [
   },
   {
     company: 'HTC Global Services',
+    media: 'company/htc',
     role: 'Senior Consultant – Lead',
     location: 'Bengaluru',
     period: 'Oct 2016 – May 2024',
@@ -81,6 +83,7 @@ export const experience = [
   },
   {
     company: 'Clean Bill of Health',
+    media: 'company/clean-bill-of-health',
     role: 'Android Developer',
     location: 'Bengaluru',
     period: 'Nov 2015 – Sep 2016',
@@ -92,6 +95,7 @@ export const experience = [
   },
   {
     company: '3Cent Consultancy (Infosys)',
+    media: 'company/3cent',
     role: 'Senior Software Engineer',
     location: 'Bengaluru',
     period: 'May 2015 – Oct 2015',
@@ -102,6 +106,7 @@ export const experience = [
   },
   {
     company: 'Xoriant Solutions Pvt. Ltd',
+    media: 'company/xoriant',
     role: 'Senior Software Engineer',
     location: 'Mumbai',
     period: 'Mar 2014 – Apr 2015',
@@ -112,6 +117,7 @@ export const experience = [
   },
   {
     company: 'IT Gurus Software',
+    media: 'company/it-gurus',
     role: 'Software Engineer',
     location: 'Mumbai',
     period: 'Oct 2012 – Feb 2014',
@@ -119,6 +125,7 @@ export const experience = [
   },
   {
     company: 'Yesha IT Solutions Pvt. Ltd',
+    media: 'company/yesha',
     role: 'Software Engineer',
     location: 'Mumbai',
     period: 'Apr 2012 – Sep 2012',
@@ -126,6 +133,7 @@ export const experience = [
   },
   {
     company: 'Hurix Systems Pvt. Ltd',
+    media: 'company/hurix',
     role: 'Integration Developer',
     location: 'Mumbai',
     period: 'Aug 2011 – Mar 2012',
@@ -136,31 +144,37 @@ export const experience = [
 export const projects = [
   {
     name: 'Darwin Portal – Syngenta',
+    media: 'project/darwin',
     tag: 'Agri-Tech AI Platform',
     text: 'AI-powered agricultural intelligence portal using React Native for Web, CopilotKit, AG-UI and A2-UI, with an orchestrator-core AI assistant and Claude AI agents. Backend APIs with Claude-Agent and Python/Databricks pipelines for crop-yield prediction, crop stabilization forecasting and seed-loss risk prediction.',
   },
   {
     name: 'PRESTO – Transit Payment System',
+    media: 'project/presto',
     tag: 'Transit · Canada',
     text: 'Secure transit payment platform integrating NFC, FarePay smart cards, embedded POS and backend systems, with MDM/EMM for large-scale device deployment. 99.9% uptime and regulatory compliance.',
   },
   {
     name: 'VusionGroup – Retail IoT & ESL',
+    media: 'project/vusion',
     tag: 'Retail IoT',
     text: 'GroceryTech mobile apps with real-time Bluetooth proximity tracking, camera scanning and enterprise API integration. Improved warehouse pick accuracy by 20% and reduced fulfillment time by 15%.',
   },
   {
     name: 'META – MDM Platform for Qculous Devices',
+    media: 'project/meta-mdm',
     tag: 'Device Management',
     text: 'React-based MDM solution and mobile agent app for secure onboarding, monitoring and policy enforcement with encrypted communications across 5,000+ managed devices.',
   },
   {
     name: 'Meijer – Real-time Last-Mile Delivery',
+    media: 'project/meijer',
     tag: 'GroceryTech',
     text: 'Led a 10-member team delivering real-time delivery tracking and last-mile routing. Sprint planning, CI/CD releases and code reviews; 3 major releases on schedule.',
   },
   {
     name: 'INTELITY – Hospitality Platform',
+    media: 'project/intelity',
     tag: 'Hospitality',
     text: 'Managed Android/iOS development with a 12-member team, implementing CI/CD pipelines and zero-downtime production releases.',
   },
@@ -297,8 +311,10 @@ export const languages = ['English (Professional)', 'Hindi (Native)', 'Marathi (
 
 export const suggestedPrompts = [
   'Who is Vinod?',
-  'What is his current role?',
+  'Show his career timeline',
+  'Which companies has he worked for?',
+  'What impact has he had?',
+  'Show me his projects',
   'Tell me about the Darwin Portal AI project',
-  'What MDM / IoT work has he done?',
   'Which tech stack does he know?',
 ]

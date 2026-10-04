@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { profile, suggestedPrompts } from '../data.js'
 import { askAgent } from '../agent/askAgent.js'
+import RichText from './RichText.jsx'
 
-const GREETING = `Hi! I'm ${profile.firstName}'s profile agent. I read his resume and LinkedIn profile at runtime, so ask me anything about his experience, projects, skills or education.`
+const GREETING = `Hi! I'm ${profile.firstName}'s profile agent. I read his resume and LinkedIn profile at runtime, so ask me anything about his experience, projects, skills or education. I can answer with **photos, tables and charts** too.`
 const SOURCES = { live: 'resume.pdf + LinkedIn · Claude', local: 'resume data · offline' }
 const countTokens = (s) => s.split(/\s+/).filter(Boolean).length
 
@@ -75,7 +76,7 @@ export default function PromptConsole() {
           return (
             <div key={i} className={`msg ${m.role === 'user' ? 'u' : 'a'}`}>
               <small>{m.role === 'user' ? 'you' : 'profile-agent'}</small>
-              <span className="msg__text">{m.content}</span>
+              {m.role === 'user' ? <span className="msg__text">{m.content}</span> : <RichText text={m.content} />}
               {streaming && (
                 <>
                   {status && <span className="msg__status"> {status}…</span>}

@@ -309,6 +309,22 @@ export const education = [
 
 export const languages = ['English (Professional)', 'Hindi (Native)', 'Marathi (Native)']
 
+// Blogs section (latest posts load at runtime from each blog's feed).
+export const blogs = {
+  tech: {
+    name: 'AndroidSuperNerds',
+    tagline: 'All about Android UI and libraries',
+    description: 'Hands-on Android UI tutorials: layouts, dialogs, custom views, Jetpack Compose and Material 3.',
+    url: 'https://androidsupernerds.blogspot.com/',
+  },
+  comic: {
+    name: 'Batman: The Legend',
+    tagline: 'A comic blog about the Dark Knight',
+    description: 'Facts and stories from the Batman universe: the Robins, the Wayne family legacy and more.',
+    url: 'https://batmansfact.blogspot.com/',
+  },
+}
+
 export const suggestedPrompts = [
   'Who is Vinod?',
   'Show his career timeline',

@@ -321,7 +321,7 @@ export const certifications = [
 ]
 
 export const education = [
-  'Master of Management Studies (MMS) — Thakur Institute of Management Studies, Career Development & Research, Mumbai (2008 – 2011)',
+  'Master of Computer Applications (MCA) — Thakur Institute of Management Studies, Career Development & Research, Mumbai (2008 – 2011)',
   'Bachelor of Science (B.Sc.) — Ismail Yusuf College, Mumbai (2005 – 2008)',
 ]
 

@@ -323,3 +323,29 @@ h3.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
   .tl__axis > span:first-child { display: none; }
 }
 .rich__cta { text-decoration: none; }
+
+/* Blogs */
+.blogs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.blog { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.blog__head { display: flex; align-items: center; gap: 12px; }
+.blog__icon { flex: none; width: 48px; height: 48px; display: grid; place-items: center; font-size: 26px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 16%, var(--panel2)); border: 1px solid var(--border); }
+.blog h4 { margin: 0; font-size: 1.1rem; }
+.blog__tagline { margin: 0; font: 12px var(--mono); color: var(--accent2); }
+.blog__desc { margin: 0; color: var(--muted); font-size: 14.5px; }
+.blog__posts { flex: 1; }
+.blog__posts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.blog__label { margin: 0 0 8px; font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.blog__note { margin: 0; font-size: 13.5px; color: var(--muted); }
+.post { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: start; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel2); color: var(--text); text-decoration: none; transition: border-color 0.2s, transform 0.2s; }
+.post:hover { border-color: var(--accent); transform: translateY(-1px); }
+.post__thumb { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--panel); }
+.post__thumb--icon { display: grid; place-items: center; font-size: 24px; border: 1px solid var(--border); }
+.post__body { display: grid; gap: 2px; min-width: 0; }
+.post__title { font-weight: 600; font-size: 14px; line-height: 1.35; }
+.post__summary { font-size: 13px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.post__labels { font: 11px var(--mono); color: var(--accent2); }
+.blog__cta { align-self: flex-start; }
+/* Comic blog: halftone dots behind the header for a comic-book feel */
+.blog--comic .blog__head { margin: -18px -18px 0; padding: 18px; background: radial-gradient(color-mix(in srgb, var(--accent2) 22%, transparent) 1px, transparent 1.5px) 0 0 / 8px 8px, var(--panel2); border-bottom: 1px solid var(--border); }
+@media (max-width: 420px) { .post { grid-template-columns: 72px 1fr; } .post__thumb { width: 72px; } }
+@media (prefers-reduced-motion: reduce) { .post { transition: none; } .post:hover { transform: none; } }

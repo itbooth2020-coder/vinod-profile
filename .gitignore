@@ -24,4 +24,8 @@ dist-ssr
 *.sw?
 
 # Claude agents
-.claude/agents/
+
+# Secrets
+.env
+.env.*
+!.env.example

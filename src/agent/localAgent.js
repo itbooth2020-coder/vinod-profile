@@ -2,7 +2,7 @@
 // then keyword retrieval over the resume data in src/data.js.
 // Used when the live Claude agent (/api/ask) isn't available, e.g. on static hosting.
 // Answers use the same Markdown subset as the live agent (see components/RichText.jsx).
-import { profile, highlights, experience, projects, otherProjects, skills, certifications, education, languages } from '../data.js'
+import { profile, highlights, experience, projects, otherProjects, skills, certifications, education, languages, blogs } from '../data.js'
 
 const STOP = new Set('a an the and or of to in on for with by at is are was were be has have had do does did he his him vinod yadav pyarelal what which who whom how tell me about can could would you your please give list any some there their it its this that from as into than then'.split(' '))
 
@@ -68,6 +68,16 @@ const PROJECT_NAMES = /\b(darwin|presto|vusion|meijer|meta|intelity|bayer|elder|
 
 // Requests that read better as links, images, tables or charts than as text. First match wins.
 const RICH = [
+  {
+    test: (q) => /\b(blogs?|blogging|articles?|writes?|writing|comics?|batman|android ?super ?nerds)\b/.test(q),
+    answer: () =>
+      `${profile.firstName} writes two blogs:\n\n` +
+      table(['Blog', 'About'], [
+        [`**${blogs.tech.name}**`, blogs.tech.description],
+        [`**${blogs.comic.name}**`, blogs.comic.description],
+      ]) +
+      `\n\n[Read ${blogs.tech.name} ↗](${blogs.tech.url})\n\n[Read ${blogs.comic.name} ↗](${blogs.comic.url})`,
+  },
   {
     test: (q) => /\b(linked\s?in|contact|reach|connect|hire|email|e-mail|mail)\b/.test(q),
     answer: (q) => {

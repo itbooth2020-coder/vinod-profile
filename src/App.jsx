@@ -10,6 +10,7 @@ import Projects from './components/Projects.jsx'
 import Skills from './components/Skills.jsx'
 import Credentials from './components/Credentials.jsx'
 import Contact from './components/Contact.jsx'
+import Blogs from './components/Blogs.jsx'
 import Footer from './components/Footer.jsx'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
           <Skills />
           <Credentials />
           <Contact />
+          <Blogs />
         </main>
         <Footer />
       </div>

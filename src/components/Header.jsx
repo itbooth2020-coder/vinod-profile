@@ -1,4 +1,5 @@
 import ThemeToggle from './ThemeToggle.jsx'
+import ThemePicker from './ThemePicker.jsx'
 
 const links = [
   { href: '#console', label: 'console' },
@@ -17,7 +18,10 @@ export default function Header() {
           <a key={l.href} href={l.href}>{l.label}</a>
         ))}
       </nav>
-      <ThemeToggle />
+      <div className="header__tools">
+        <ThemePicker />
+        <ThemeToggle />
+      </div>
     </header>
   )
 }

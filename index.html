@@ -14,11 +14,17 @@
       try {
         var t = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
         document.documentElement.dataset.theme = t
+        // Palette, font and custom colors chosen in the Customize panel (see ThemePicker.jsx).
+        var s = JSON.parse(localStorage.getItem('site-theme') || '{}'), r = document.documentElement
+        if (s.palette) r.dataset.palette = s.palette
+        if (s.font) r.dataset.font = s.font
+        if (s.accent) r.style.setProperty('--accent', s.accent)
+        if (s.accent2) r.style.setProperty('--accent2', s.accent2)
       } catch (e) {}
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

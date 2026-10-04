@@ -132,12 +132,12 @@ const RICH = [
       table(['Company', 'Role', 'Period', 'Location'], experience.map((e) => [`**${e.company}**`, e.role, e.period, e.location])),
   },
   {
-    test: (q) => /\b(school|college|educat\w*|stud(y|ied)|degrees?|universit\w*|mms|b\.?sc|qualifications?)\b/.test(q),
+    test: (q) => /\b(school|college|educat\w*|stud(y|ied)|degrees?|universit\w*|mca|mms|b\.?sc|qualifications?)\b/.test(q),
     answer: () =>
       img('edu/thakur', 'Thakur Institute of Management Studies') + ' ' + img('edu/ismail-yusuf', 'Ismail Yusuf College') +
       '\n\n' +
       table(['Degree', 'Institution', 'Years'], [
-        ['Master of Management Studies (MMS)', 'Thakur Institute of Management Studies, Career Development & Research, Mumbai', '2008 – 2011'],
+        ['Master of Computer Applications (MCA)', 'Thakur Institute of Management Studies, Career Development & Research, Mumbai', '2008 – 2011'],
         ['Bachelor of Science (B.Sc.)', 'Ismail Yusuf College, Mumbai', '2005 – 2008'],
       ]) +
       '\n\nThe resume lists college education only; no school details are included.',

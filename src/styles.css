@@ -193,6 +193,7 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .gview--large .gsvg { aspect-ratio: auto; height: min(68vh, 760px); touch-action: none; }
 .gedge { fill: none; stroke: var(--border); stroke-width: 1.5; }
 .gedge--d1 { stroke-width: 2; }
+.gflow { fill: var(--accent2); pointer-events: none; }
 .gnode { cursor: pointer; outline: none; animation: gfade 0.3s ease both; }
 @keyframes gfade { from { opacity: 0; } }
 .gnode text { font: 14px var(--mono); fill: var(--text); pointer-events: none; }

@@ -73,11 +73,85 @@ function bounds(nodes) {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
-function edgePath(p, c) {
+function edgeCurve(p, c) {
   const rm = (RADII[p.depth] + RADII[c.depth]) / 2
-  const [c1x, c1y] = polar(p.depth === 0 ? c.angle : p.angle, rm)
-  const [c2x, c2y] = polar(c.angle, rm)
-  return `M${p.x},${p.y} C${c1x},${c1y} ${c2x},${c2y} ${c.x},${c.y}`
+  return [[p.x, p.y], polar(p.depth === 0 ? c.angle : p.angle, rm), polar(c.angle, rm), [c.x, c.y]]
+}
+
+function edgePath(p, c) {
+  const [a, b, d, e] = edgeCurve(p, c)
+  return `M${a[0]},${a[1]} C${b[0]},${b[1]} ${d[0]},${d[1]} ${e[0]},${e[1]}`
+}
+
+// Point at s (0..1) along an edge's cubic curve, for the dots flowing outward from Vinod.
+function pointOnEdge(p, c, s) {
+  const [a, b, d, e] = edgeCurve(p, c)
+  const u = 1 - s
+  const at = (k) => u * u * u * a[k] + 3 * u * u * s * b[k] + 3 * u * s * s * d[k] + s * s * s * e[k]
+  return [at(0), at(1)]
+}
+
+// Gentle drift: each node orbits its layout spot by a few units; edges follow because they're
+// drawn from the drifted positions. The viewBox uses the still layout so the frame doesn't jitter.
+function drift(nodes, t) {
+  if (!t) return nodes
+  const moved = new Map()
+  for (const [i, item] of nodes.entries()) {
+    if (item.depth === 0) {
+      moved.set(item.n.id, item)
+      continue
+    }
+    const amp = item.depth === 1 ? 6 : 4
+    const seed = i * 1.7
+    moved.set(item.n.id, {
+      ...item,
+      x: item.x + Math.cos(t * 0.7 + seed) * amp,
+      y: item.y + Math.sin(t * 0.9 + seed) * amp,
+    })
+  }
+  return nodes.map((item) => {
+    const m = moved.get(item.n.id)
+    return item.parent ? { ...m, parent: moved.get(item.parent.n.id) } : m
+  })
+}
+
+// Animation clock (seconds) that only runs while the graph is on screen, the tab is visible,
+// nothing is being dragged, and the visitor hasn't asked for reduced motion.
+function useFloatClock(ref, paused) {
+  const [t, setT] = useState(0)
+  useEffect(() => {
+    const rm = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let raf = 0
+    let last = 0
+    let visible = true
+    const start = performance.now() - t * 1000
+    const tick = (now) => {
+      raf = requestAnimationFrame(tick)
+      if (now - last < 33) return // ~30fps is smooth enough for a slow drift
+      last = now
+      setT((now - start) / 1000)
+    }
+    const sync = () => {
+      cancelAnimationFrame(raf)
+      if (!paused && visible && !document.hidden && !rm.matches) raf = requestAnimationFrame(tick)
+      else if (rm.matches) setT(0)
+    }
+    const io = new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting
+      sync()
+    })
+    io.observe(ref.current)
+    document.addEventListener('visibilitychange', sync)
+    rm.addEventListener('change', sync)
+    sync()
+    return () => {
+      cancelAnimationFrame(raf)
+      io.disconnect()
+      document.removeEventListener('visibilitychange', sync)
+      rm.removeEventListener('change', sync)
+    }
+  }, [paused, ref])
+  return t
 }
 
 function Node({ item, selected, expanded, onActivate }) {
@@ -181,6 +255,7 @@ export default function GraphView({ large = false }) {
   const [view, setView] = useState({ k: 1, x: 0, y: 0 })
   const svgRef = useRef(null)
   const drag = useRef(null)
+  const [dragging, setDragging] = useState(false)
 
   const tree = useMemo(() => buildTree(groupBy), [groupBy])
   const nodes = useMemo(() => layout(tree, expanded), [tree, expanded])
@@ -239,6 +314,7 @@ export default function GraphView({ large = false }) {
   const onPointerDown = (e) => {
     if (e.target.closest('.gnode') || e.button !== 0) return
     drag.current = { px: e.clientX, py: e.clientY, s: unitsPerPx() }
+    setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e) => {
@@ -250,7 +326,19 @@ export default function GraphView({ large = false }) {
     d.py = e.clientY
     setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy }))
   }
-  const endDrag = () => (drag.current = null)
+  const endDrag = () => {
+    drag.current = null
+    setDragging(false)
+  }
+
+  const t = useFloatClock(svgRef, dragging)
+  const shown = useMemo(() => drift(nodes, t), [nodes, t])
+  // Dots flow along the edges out of Vinod and out of each open group.
+  const flows = t
+    ? shown
+        .filter((i) => i.parent && i.depth <= 2)
+        .map((i, k) => ({ id: i.n.id, pos: pointOnEdge(i.parent, i, (t / 3.2 + k * 0.37) % 1) }))
+    : []
 
   const onKeyDown = (e) => {
     const pan = 40
@@ -308,10 +396,13 @@ export default function GraphView({ large = false }) {
         onPointerCancel={endDrag}
       >
         <g transform={`translate(${cx + view.x},${cy + view.y}) scale(${view.k}) translate(${-cx},${-cy})`}>
-          {nodes.filter((i) => i.parent).map((i) => (
+          {shown.filter((i) => i.parent).map((i) => (
             <path key={`e-${i.n.id}`} className={`gedge gedge--d${i.depth}`} d={edgePath(i.parent, i)} />
           ))}
-          {nodes.map((i) => (
+          {flows.map((f) => (
+            <circle key={`f-${f.id}`} className="gflow" cx={f.pos[0]} cy={f.pos[1]} r="3.5" aria-hidden="true" />
+          ))}
+          {shown.map((i) => (
             <Node
               key={i.n.id}
               item={i}

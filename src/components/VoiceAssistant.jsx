@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { profile } from '../data.js'
 import { askAgent } from '../agent/askAgent.js'
 import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName } from '../agent/voice.js'
-import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps } from '../agent/vince.js'
+import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
 import RichText from './RichText.jsx'
 
 // VINCE, the voice assistant: a floating launcher that opens a HUD panel. VINCE introduces
 // himself, answers spoken or typed questions through the profile agent, reads the answers
 // aloud, then suggests what to ask next. He can also narrate a guided tour of the page.
+// The panel can be minimized to a small bar (the conversation carries on) or maximized to
+// a large, centered conversation view.
 // Other components open him with: window.dispatchEvent(new Event('vince:open')).
 
 const STATUS = { idle: 'Standing by', listening: 'Listening…', thinking: 'Accessing records…', speaking: 'Speaking' }
@@ -33,6 +35,15 @@ function store(key, on, storage = localStorage) {
   }
 }
 
+const Icon = ({ d }) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+    <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+const MINIMIZE = 'M5 18h14'
+const MAXIMIZE = 'M4 4h16v16H4z'
+const RESTORE = 'M8 4h12v12M4 8h12v12H4z'
+
 function MicIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -52,6 +63,7 @@ export default function VoiceAssistant() {
   const [touring, setTouring] = useState(false)
   const [input, setInput] = useState('')
   const [hint, setHint] = useState(false)
+  const [size, setSize] = useState('normal') // 'mini' | 'normal' | 'max'
 
   const energy = useRef(0) // pulses the orb on each spoken word
   const asked = useRef(new Set())
@@ -92,6 +104,7 @@ export default function VoiceAssistant() {
     setMode('speaking')
     speak(text, {
       onBoundary: () => (energy.current = 1),
+      onLevel: (level) => (energy.current = Math.max(energy.current, level)),
       onEnd: () => {
         setMode('idle')
         onDone?.()
@@ -136,9 +149,21 @@ export default function VoiceAssistant() {
     unlockSpeech()
     halt()
     setSuggestions([])
+    setSize((s) => (s === 'max' ? 'normal' : s)) // the tour scrolls the page, so it must be visible
     tour.current = { steps: tourSteps(), i: 0 }
     setTouring(true)
     runTour(0)
+  }
+
+  // Explains a domain-graph node from the graph data, then offers deeper questions about it.
+  const explain = (node) => {
+    unlockSpeech()
+    halt()
+    stopTour()
+    const text = explainNode(node)
+    setMessages((m) => [...m, { role: 'you', text: `Explain ${node.type === 'root' ? 'the domain graph' : node.label}` }, { role: 'vince', text }])
+    setSuggestions(nodeQuestions(node))
+    voice(toSpeech(text, 900), autoListen)
   }
 
   const ask = async (raw) => {
@@ -267,7 +292,8 @@ export default function VoiceAssistant() {
     if (!greeted.current) {
       greeted.current = true
       const text = introduction()
-      setMessages([{ role: 'vince', text }])
+      // Keep anything VINCE already said elsewhere (e.g. explanations in the graph dialog).
+      setMessages((m) => [...m, { role: 'vince', text }])
       setSuggestions(nextQuestions('', '', asked.current))
       voice(toSpeech(text, 2000))
     } else if (!tour.current) {
@@ -283,21 +309,47 @@ export default function VoiceAssistant() {
     setMode('idle')
     setInterim('')
     setOpen(false)
+    setSize('normal')
   }
 
+  // Maximized is modal: the page behind can't be reached or scrolled.
   useEffect(() => {
-    showRef.current = show
-  })
+    const page = document.querySelector('.wrap')
+    const max = open && size === 'max'
+    if (page) page.inert = max
+    document.body.style.overflow = max ? 'hidden' : ''
+    return () => {
+      if (page) page.inert = false
+      document.body.style.overflow = ''
+    }
+  }, [open, size])
 
   useEffect(() => {
-    const onOpen = () => showRef.current()
+    showRef.current = { show, explain, stopAll }
+  })
+
+  // Window events let other components drive VINCE: 'vince:open', 'vince:explain' (detail: a
+  // domain-graph node; used by the graph dialog) and 'vince:stop'.
+  useEffect(() => {
+    const onOpen = () => showRef.current.show()
+    const onExplain = (e) => showRef.current.explain(e.detail)
+    const onStop = () => showRef.current.stopAll()
     window.addEventListener('vince:open', onOpen)
+    window.addEventListener('vince:explain', onExplain)
+    window.addEventListener('vince:stop', onStop)
     return () => {
       window.removeEventListener('vince:open', onOpen)
+      window.removeEventListener('vince:explain', onExplain)
+      window.removeEventListener('vince:stop', onStop)
       halt()
       clearFocus()
     }
   }, [])
+
+  // Announces what VINCE is doing, so the graph dialog can show "speaking" and a Stop button.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('vince:mode', { detail: mode }))
+  }, [mode])
 
   // A one-time nudge per browser session, a few seconds after the page loads.
   useEffect(() => {
@@ -315,17 +367,17 @@ export default function VoiceAssistant() {
     return () => clearTimeout(id)
   }, [])
 
-  // Focus moves into the panel when it opens and back to the launcher when it closes.
+  // Focus moves into the panel when it opens or changes size, and back to the launcher when it closes.
   useEffect(() => {
     if (open) panelRef.current?.focus()
     else if (wasOpen.current) launcherRef.current?.focus()
     wasOpen.current = open
-  }, [open])
+  }, [open, size])
 
   useEffect(() => {
     const log = logRef.current
     if (log) log.scrollTop = log.scrollHeight
-  }, [messages, open])
+  }, [messages, open, size])
 
   const onSubmit = (e) => {
     e.preventDefault()
@@ -350,99 +402,137 @@ export default function VoiceAssistant() {
         </div>
       )}
 
+      {open && size === 'max' && <div className="vince-backdrop" onClick={() => setSize('normal')} aria-hidden="true" />}
+
       {open && (
         <section
           ref={panelRef}
-          className={`vince${touring ? ' vince--touring' : ''}`}
+          className={`vince vince--${size}${touring ? ' vince--touring' : ''}`}
           role="dialog"
+          aria-modal={size === 'max' || undefined}
           aria-labelledby="vince-title"
           aria-describedby="vince-sub"
           tabIndex={-1}
-          onKeyDown={(e) => e.key === 'Escape' && close()}
+          onKeyDown={(e) => e.key === 'Escape' && (size === 'max' ? setSize('normal') : close())}
         >
           <header className="vince__head">
-            <div>
+            {size === 'mini' && <span className={`vince__miniorb is-${mode}`} aria-hidden="true" />}
+            <div className="vince__id">
               <h2 id="vince-title" className="vince__title">{NAME}</h2>
-              <p id="vince-sub" className="vince__sub">{EXPANSION}</p>
+              {size === 'mini' ? (
+                <p id="vince-sub" className="vince__sub" role="status">{interim ? `“${interim}”` : STATUS[mode]}</p>
+              ) : (
+                <p id="vince-sub" className="vince__sub">{EXPANSION}</p>
+              )}
             </div>
             <div className="vince__tools">
+              {size === 'mini' && (mode !== 'idle' || touring) && (
+                <button type="button" className="vince__icon" onClick={stopAll} aria-label="Stop VINCE" title="Stop">
+                  <span aria-hidden="true">■</span>
+                </button>
+              )}
               {canSpeak && (
                 <button type="button" className="vince__icon" onClick={toggleMute} aria-pressed={!muted} aria-label="Voice" title={voiceName() ? `Voice: ${voiceName()}` : 'Voice'}>
                   <span aria-hidden="true">{muted ? '🔇' : '🔊'}</span>
                 </button>
               )}
-              <button type="button" className="vince__icon" onClick={close} aria-label="Close VINCE">
+              {size !== 'mini' && (
+                <button type="button" className="vince__icon" onClick={() => setSize('mini')} aria-label="Minimize VINCE" title="Minimize">
+                  <Icon d={MINIMIZE} />
+                </button>
+              )}
+              {size === 'mini' && (
+                <button type="button" className="vince__icon" onClick={() => setSize('normal')} aria-label="Restore VINCE" title="Restore">
+                  <Icon d={RESTORE} />
+                </button>
+              )}
+              {size === 'max' ? (
+                <button type="button" className="vince__icon" onClick={() => setSize('normal')} aria-label="Restore VINCE to a panel" title="Restore">
+                  <Icon d={RESTORE} />
+                </button>
+              ) : (
+                <button type="button" className="vince__icon" onClick={() => setSize('max')} aria-label="Maximize VINCE" title="Maximize">
+                  <Icon d={MAXIMIZE} />
+                </button>
+              )}
+              <button type="button" className="vince__icon" onClick={close} aria-label="Close VINCE" title="Close">
                 <span aria-hidden="true">✕</span>
               </button>
             </div>
           </header>
 
-          <div className="vince__stage">
-            <ArcOrb state={mode} energyRef={energy} />
-            <p className="vince__status" role="status">{interim ? `“${interim}”` : STATUS[mode]}</p>
-            {(mode !== 'idle' || touring) && (
-              <button type="button" className="vince__stop" onClick={stopAll} aria-label="Stop VINCE">
-                <span aria-hidden="true">■</span> Stop
-              </button>
-            )}
-          </div>
+          {size !== 'mini' && (
+            <div className="vince__body">
+              <div className="vince__main">
+                <div className="vince__stage">
+                  <ArcOrb state={mode} energyRef={energy} />
+                  <p className="vince__status" role="status">{interim ? `“${interim}”` : STATUS[mode]}</p>
+                  {(mode !== 'idle' || touring) && (
+                    <button type="button" className="vince__stop" onClick={stopAll} aria-label="Stop VINCE">
+                      <span aria-hidden="true">■</span> Stop
+                    </button>
+                  )}
+                </div>
 
-          <div className="vince__log" ref={logRef} role="log" aria-label="Conversation with VINCE">
-            {messages.map((m, i) => (
-              <div key={i} className={`vmsg vmsg--${m.role}`}>
-                <small>{m.role}</small>
-                {m.rich ? (
-                  m.text ? <RichText text={m.text} /> : <p className="vmsg__wait">Accessing records…</p>
+                <div className="vince__log" ref={logRef} role="log" aria-label="Conversation with VINCE">
+                  {messages.map((m, i) => (
+                    <div key={i} className={`vmsg vmsg--${m.role}`}>
+                      <small>{m.role}</small>
+                      {m.rich ? (
+                        m.text ? <RichText text={m.text} /> : <p className="vmsg__wait">Accessing records…</p>
+                      ) : (
+                        <p>{m.text}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {touring ? (
+                  <div className="vince__chips" role="group" aria-label="Tour controls">
+                    <button type="button" onClick={() => (halt(), runTour(tour.current.i + 1))}>Next stop ›</button>
+                    <button type="button" onClick={stopAll}>End tour</button>
+                  </div>
                 ) : (
-                  <p>{m.text}</p>
+                  <div className="vince__chips" role="group" aria-label="Suggested questions">
+                    {suggestions.map((q) => (
+                      <button key={q} type="button" onClick={() => (unlockSpeech(), ask(q))} disabled={mode === 'thinking'}>
+                        {q}
+                      </button>
+                    ))}
+                    <button type="button" className="vince__tourbtn" onClick={startTour} disabled={mode === 'thinking'}>
+                      ▶ Guided tour
+                    </button>
+                  </div>
                 )}
-              </div>
-            ))}
-          </div>
 
-          {touring ? (
-            <div className="vince__chips" role="group" aria-label="Tour controls">
-              <button type="button" onClick={() => (halt(), runTour(tour.current.i + 1))}>Next stop ›</button>
-              <button type="button" onClick={stopAll}>End tour</button>
-            </div>
-          ) : (
-            <div className="vince__chips" role="group" aria-label="Suggested questions">
-              {suggestions.map((q) => (
-                <button key={q} type="button" onClick={() => (unlockSpeech(), ask(q))} disabled={mode === 'thinking'}>
-                  {q}
-                </button>
-              ))}
-              <button type="button" className="vince__tourbtn" onClick={startTour} disabled={mode === 'thinking'}>
-                ▶ Guided tour
-              </button>
+                <form className="vince__form" onSubmit={onSubmit}>
+                  {canListen && (
+                    <button
+                      type="button"
+                      className={`vince__mic${mode === 'listening' ? ' is-on' : ''}`}
+                      onClick={toggleMic}
+                      aria-pressed={mode === 'listening'}
+                      aria-label={mode === 'listening' ? 'Stop listening' : 'Ask by voice'}
+                    >
+                      <MicIcon />
+                    </button>
+                  )}
+                  <label htmlFor="vince-input" className="sr-only">Ask VINCE about {FIRST}</label>
+                  <input
+                    id="vince-input"
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={canListen ? 'Speak or type a question…' : 'Type a question…'}
+                    maxLength={500}
+                    autoComplete="off"
+                  />
+                  <button type="submit" disabled={!input.trim() || mode === 'thinking'}>Send</button>
+                </form>
+                {canListen && <p className="vince__note">Voice input uses your browser's speech service.</p>}
+              </div>
             </div>
           )}
-
-          <form className="vince__form" onSubmit={onSubmit}>
-            {canListen && (
-              <button
-                type="button"
-                className={`vince__mic${mode === 'listening' ? ' is-on' : ''}`}
-                onClick={toggleMic}
-                aria-pressed={mode === 'listening'}
-                aria-label={mode === 'listening' ? 'Stop listening' : 'Ask by voice'}
-              >
-                <MicIcon />
-              </button>
-            )}
-            <label htmlFor="vince-input" className="sr-only">Ask VINCE about {FIRST}</label>
-            <input
-              id="vince-input"
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={canListen ? 'Speak or type a question…' : 'Type a question…'}
-              maxLength={500}
-              autoComplete="off"
-            />
-            <button type="submit" disabled={!input.trim() || mode === 'thinking'}>Send</button>
-          </form>
-          {canListen && <p className="vince__note">Voice input uses your browser's speech service.</p>}
         </section>
       )}
     </>

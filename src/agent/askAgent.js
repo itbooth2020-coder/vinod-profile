@@ -2,8 +2,9 @@ import { answerLocally } from './localAgent.js'
 
 // Streams an answer from the runtime agent at /api/ask (NDJSON), falling back to the
 // in-browser resume agent when the endpoint is missing or has no API credentials.
-// Callbacks: onStatus(text), onText(chunk), onSource('live' | 'local').
-export async function askAgent(question, history, { onStatus, onText, onSource, signal }) {
+// Callbacks: onStatus(text), onText(chunk), onSource('live' | 'local'). voice: true asks for a short,
+// speakable answer (used by the VINCE voice assistant).
+export async function askAgent(question, history, { onStatus, onText, onSource, signal, voice = false }) {
   const local = () => {
     onSource('local')
     onText(answerLocally(question))
@@ -14,7 +15,7 @@ export async function askAgent(question, history, { onStatus, onText, onSource, 
     res = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, history }),
+      body: JSON.stringify({ question, history, mode: voice ? 'voice' : undefined }),
       signal,
     })
   } catch (err) {

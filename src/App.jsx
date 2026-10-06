@@ -12,6 +12,7 @@ import Credentials from './components/Credentials.jsx'
 import Contact from './components/Contact.jsx'
 import Blogs from './components/Blogs.jsx'
 import Footer from './components/Footer.jsx'
+import VoiceAssistant from './components/VoiceAssistant.jsx'
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
         </main>
         <Footer />
       </div>
+      <VoiceAssistant />
     </>
   )
 }

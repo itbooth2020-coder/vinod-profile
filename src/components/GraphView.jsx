@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { graphDomains, graphProjects, profile } from '../data.js'
 
 // Radial tree: Vinod -> vertical | domain -> project -> technologies.
-const RADII = [0, 150, 290, 420]
+const RADII = [0, 180, 320, 450]
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 4
 const ZOOM_STEP = 1.25
@@ -61,10 +61,15 @@ function layout(root, expanded) {
 
 const labelWidth = (n) => n.label.length * (n.type === 'tech' ? 7 : 8.5) + 24
 
+// Group pills hold the label plus " +" / " −" in 15px monospace (about 9.2px per character),
+// with 16px of padding on each side.
+const PILL_PAD = 16
+const pillWidth = (n) => (n.label.length + (n.children.length ? 2 : 0)) * 9.2 + PILL_PAD * 2
+
 function bounds(nodes) {
   let [x0, y0, x1, y1] = [-120, -90, 120, 90]
-  for (const { n, x, y } of nodes) {
-    const w = labelWidth(n)
+  for (const { n, x, y, depth } of nodes) {
+    const w = depth === 1 ? pillWidth(n) : labelWidth(n)
     x0 = Math.min(x0, x - w)
     x1 = Math.max(x1, x + w)
     y0 = Math.min(y0, y - 30)
@@ -184,10 +189,10 @@ function Node({ item, selected, expanded, onActivate }) {
     )
   }
   if (item.depth === 1) {
-    const w = labelWidth(n)
+    const w = pillWidth(n)
     return (
       <g {...props}>
-        <rect x={-w / 2} y="-16" width={w} height="32" rx="16" />
+        <rect x={-w / 2} y="-17" width={w} height="34" rx="17" />
         <text dy="5" textAnchor="middle">{n.label}{hasKids && (expanded ? ' −' : ' +')}</text>
       </g>
     )

@@ -11,6 +11,9 @@ export default function Hero() {
       <Typing words={profile.domains} />
       <div className="actions">
         <a className="btn btn--primary" href="#console">Ask the profile agent</a>
+        <button type="button" className="btn btn--vince" onClick={() => window.dispatchEvent(new Event('vince:open'))}>
+          <span className="btn__orb" aria-hidden="true" /> Talk to VINCE
+        </button>
         <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
         <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
       </div>

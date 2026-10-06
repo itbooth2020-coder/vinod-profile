@@ -50,6 +50,11 @@ ${media.map((m) => `  - media:${m.id} (${m.kind}: ${m.label})`).join('\n')}
   - timeline, for dates and durations: {"type":"timeline","title":"...","data":[{"label":"Accenture","sub":"Engineering Manager","start":"2024-06","end":"present"}]} (dates as YYYY-MM)
   Only chart values stated in or directly derived from the sources, and say when a value is derived.`
 
+// Appended to the system prompt for questions asked through VINCE, whose answers are read aloud.
+const VOICE = `
+
+This question was asked through VINCE, the site's voice assistant, and your answer will be read aloud. Answer in 1-3 short, conversational sentences of plain prose. Use a table, chart or image only when the visitor asks to see one; then add one sentence saying what is on screen.`
+
 const client = new Anthropic()
 
 // Simple per-IP rate limit so a public deployment can't be used as a free Claude proxy.
@@ -152,7 +157,7 @@ export async function handleAsk(req, res) {
         model: MODEL,
         max_tokens: 8192,
         output_config: { effort: 'low' },
-        system: SYSTEM,
+        system: body.mode === 'voice' ? SYSTEM + VOICE : SYSTEM,
         messages,
         tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 1, allowed_domains: ['linkedin.com'] }],
         betas: ['server-side-fallback-2026-07-01'],

@@ -1,6 +1,6 @@
 // VINCE: the voice assistant's persona, its follow-up questions and the guided-tour script.
 // Everything here is built from src/data.js, so it stays in step with the resume.
-import { profile, highlights, experience, projects, skills, education, blogs } from '../data.js'
+import { profile, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
 
 export const NAME = 'V.I.N.C.E.'
 export const EXPANSION = 'Virtual Intelligence for Navigating Career Experience'
@@ -210,4 +210,37 @@ export function tourSteps() {
       text: `If you'd like to talk to ${FIRST}, his email and LinkedIn are right here. That concludes the tour. What would you like to know more about?`,
     },
   ]
+}
+
+// Domain graph nodes (see components/GraphView.jsx): a spoken explanation built from the graph
+// data, so it's instant and works offline, plus questions for the profile agent to go deeper.
+const list = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
+const count = (n, word) => (n === 1 ? `one ${word}` : `${n} ${word}s`)
+
+export function explainNode(n) {
+  if (n.type === 'root') {
+    const verticals = [...new Set(graphProjects.map((p) => p.vertical))]
+    return `This is ${FIRST}'s domain graph. It maps ${count(graphProjects.length, 'project')} across ${verticals.length} verticals, ${list(verticals)}, and the technologies behind each. Select any node and I'll explain it.`
+  }
+  if (n.type === 'project') {
+    const p = n.project
+    return `${p.name}: ${/^[aeiou]/i.test(p.vertical) ? 'an' : 'a'} ${p.vertical} project in ${list(p.domains)}. ${p.text}${p.tech.length ? ` Key technologies: ${list(p.tech)}.` : ''}`
+  }
+  if (n.type === 'tech') {
+    const used = graphProjects.filter((p) => p.tech.includes(n.label))
+    return `${n.label}. ${FIRST} has used it in ${count(used.length, 'project')}: ${list(used.map((p) => p.name))}.`
+  }
+  const work = n.children.map((c) => c.project)
+  const tech = [...new Set(work.flatMap((p) => p.tech))]
+  return (
+    `${n.label}. In this ${n.type}, ${FIRST} has delivered ${count(work.length, 'project')}: ${list(work.map((p) => p.name))}.` +
+    (tech.length ? ` The work draws on ${list(tech.slice(0, 6))}${tech.length > 6 ? ', among others' : ''}.` : '')
+  )
+}
+
+export function nodeQuestions(n) {
+  if (n.type === 'root') return [`Who is ${FIRST}?`, 'Show his career timeline', 'What impact has he had?']
+  if (n.type === 'project') return [`What was his role in ${n.project.short}?`, `What impact did ${n.project.short} have?`]
+  if (n.type === 'tech') return [`How has he used ${n.label}?`, `Which projects used ${n.label}?`]
+  return [`What has he built in ${n.label}?`, `Which technologies does he use for ${n.label}?`]
 }

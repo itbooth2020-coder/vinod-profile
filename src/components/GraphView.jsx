@@ -248,7 +248,9 @@ function Details({ node }) {
   )
 }
 
-export default function GraphView({ large = false }) {
+// onSelect(node) reports the selected node (null when the selection resets to Vinod), so the
+// dialog can offer "Ask VINCE" for it.
+export default function GraphView({ large = false, onSelect }) {
   const [groupBy, setGroupBy] = useState('vertical')
   const [expanded, setExpanded] = useState(() => new Set(['root']))
   const [selectedId, setSelectedId] = useState('root')
@@ -275,11 +277,13 @@ export default function GraphView({ large = false }) {
     setGroupBy(g)
     setExpanded(new Set(['root']))
     setSelectedId('root')
+    onSelect?.(null)
     resetView()
   }
 
   const onActivate = (n) => {
     setSelectedId(n.id)
+    onSelect?.(n)
     if (!n.children.length || n.type === 'root') return
     setExpanded((prev) => {
       if (prev.has(n.id)) {

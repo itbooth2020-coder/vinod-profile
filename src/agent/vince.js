@@ -21,14 +21,16 @@ const lowerFirst = (s) => (/^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() +
 const pick = (list) => list[Math.floor(Math.random() * list.length)]
 const shuffle = (list) => list.map((v) => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
 
+export const GREETINGS = ['Good morning', 'Good afternoon', 'Good evening']
 function greeting() {
   const h = new Date().getHours()
-  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
+  return GREETINGS[h < 12 ? 0 : h < 17 ? 1 : 2]
 }
 
-export function introduction() {
+// greet is the visitor's time-of-day greeting; the server passes each one to prepare the audio.
+export function introduction(greet = greeting()) {
   return (
-    `${greeting()}. I'm VINCE: ${EXPANSION}. Think of me as ${FIRST}'s own JARVIS. ` +
+    `${greet}. I'm VINCE: ${EXPANSION}. Think of me as ${FIRST}'s own JARVIS. ` +
     `I know his ${YEARS} years of work inside out. ` +
     `What would you like to know about ${FIRST}? His experience, his projects, his skills? Or shall I take you on a guided tour?`
   )
@@ -37,7 +39,8 @@ export function introduction() {
 export const welcomeBack = () => `Welcome back. How else may I help you with ${FIRST}'s profile?`
 
 // A brief, butler-like acknowledgement spoken before each answer.
-export const acknowledge = () => pick(['Certainly.', 'Of course.', 'Right away.', 'Very good.', 'Allow me.'])
+export const ACKNOWLEDGEMENTS = ['Certainly.', 'Of course.', 'Right away.', 'Very good.', 'Allow me.']
+export const acknowledge = () => pick(ACKNOWLEDGEMENTS)
 
 // Questions VINCE can suggest, grouped by topic.
 const QUESTIONS = {
@@ -119,14 +122,27 @@ export function nextQuestions(question = '', answer = '', asked = new Set()) {
 export const markAsked = (asked, q) => asked.add(norm(q))
 
 // The spoken invitation that ends each answer.
-export function followUpLine([a, b]) {
+// Each question ends with punctuation, so speech splits it into its own piece; with a fixed set of
+// phrases and questions, the server can prepare every piece of these lines in advance.
+const FOLLOW_UPS = [
+  (a, b) => `Shall I continue? You might ask: ${a} Or perhaps: ${b}`,
+  (a, b) => `Where would you like to go from here? Perhaps: ${a} Or: ${b}`,
+  (a, b) => `Is there anything else I can tell you? For instance: ${a} Or: ${b}`,
+]
+const ended = (q) => (/[.?!]$/.test(q) ? q : `${q}.`)
+
+export function followUpLine([a, b], template = pick(FOLLOW_UPS)) {
   if (!a) return `Is there anything else you'd like to know about ${FIRST}?`
-  if (!b) return `You might also ask: ${a}`
-  return pick([
-    `Shall I continue? You might ask: ${a} Or perhaps: ${b}`,
-    `Where would you like to go from here? Perhaps: ${a} Or: ${b}`,
-    `Is there anything else I can tell you? For instance: ${a} Or: ${b}`,
-  ])
+  if (!b) return `You might also ask: ${ended(a)}`
+  return template(ended(a), ended(b))
+}
+
+// Every spoken piece of a follow-up line, for the server to prepare.
+export function followUpPieces() {
+  const questions = [...new Set(Object.values(QUESTIONS).flat())].map(ended)
+  const [a, b] = questions
+  const lines = [...FOLLOW_UPS.map((t) => followUpLine([a, b], t)), followUpLine([a]), followUpLine([])]
+  return { lines, questions }
 }
 
 // Turns a Markdown answer into something worth hearing: visuals are mentioned, not read out,

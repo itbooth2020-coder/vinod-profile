@@ -1,9 +1,11 @@
 // Speech for the voice assistant.
-// VINCE's voice: ElevenLabs audio from /api/speak (server/voiceAgent.js), played through a
+// VINCE's voice: free Kokoro speech from /api/speak (server/voiceAgent.js), played through a
 // JARVIS-style Web Audio effect chain. When that isn't available (no key, quota used up,
 // static hosting), the browser's built-in speech takes over for the rest of the visit.
 // Listening: the browser's speech recognition. Everything here is optional; the assistant
 // still works by text without it.
+
+import { speechChunks } from './chunks.js'
 
 const hasWindow = typeof window !== 'undefined'
 const Recognition = hasWindow ? window.SpeechRecognition || window.webkitSpeechRecognition : null
@@ -137,10 +139,10 @@ if (hasSynthesis) whenVoicesReady()
 
 // ---------------------------------------------------------------------------------------------
 
-// 'unknown' until the first clip; 'on' once ElevenLabs has answered; 'off' after a failure.
-let cloud = AudioCtx ? 'unknown' : 'off'
+// 'unknown' until the first clip; 'on' once the server voice has answered; 'off' after a failure.
+let server = AudioCtx ? 'unknown' : 'off'
 
-export const voiceName = () => (cloud === 'on' ? 'ElevenLabs, with JARVIS-style processing' : pickVoice()?.name ?? '')
+export const voiceName = () => (server === 'on' ? 'Kokoro (British male), with JARVIS-style processing' : pickVoice()?.name ?? '')
 
 // Browsers only allow audio that starts inside a tap or click. Call this from click handlers
 // so answers spoken later (after a network round trip) are allowed too.
@@ -162,8 +164,7 @@ export function unlockSpeech() {
   }
 }
 
-// Speech is split into sentence-sized pieces: Chrome stops long utterances after ~15 seconds,
-// and ElevenLabs clips arrive sooner, so playback starts while later sentences are on the way.
+// Built-in voices get sentence-sized pieces, since Chrome stops long utterances after ~15 seconds.
 function sentences(text) {
   const parts = text.match(/[^.!?]+[.!?]+["”']?|[^.!?]+$/g) || [text]
   const out = []
@@ -194,14 +195,14 @@ export function stopSpeaking() {
   active.sources.clear()
 }
 
-// Speaks text, then calls onEnd. onLevel(0..1) follows the voice's loudness (ElevenLabs);
+// Speaks text, then calls onEnd. onLevel(0..1) follows the voice's loudness (server voice);
 // onBoundary fires on each word (built-in voices).
 export function speak(text, { onBoundary, onLevel, onEnd } = {}) {
   stopSpeaking()
   const mine = generation
   const done = () => mine === generation && onEnd?.()
   if (!text.trim()) return done()
-  if (cloud !== 'off' && audio()) return speakCloud(text, mine, done, { onBoundary, onLevel })
+  if (server !== 'off' && audio()) return speakServer(text, mine, done, { onBoundary, onLevel })
   speakBrowser(text, mine, done, onBoundary)
 }
 
@@ -212,7 +213,11 @@ async function fetchClip(text, signal) {
     body: JSON.stringify({ text }),
     signal,
   })
-  if (!res.ok || !(res.headers.get('content-type') || '').includes('audio')) throw new Error('voice unavailable')
+  if (!res.ok || !(res.headers.get('content-type') || '').includes('audio')) {
+    // warming: the model is still loading or busy, so only this line falls back to the browser voice.
+    const { warming = false } = await res.json().catch(() => ({}))
+    throw Object.assign(new Error('voice unavailable'), { warming })
+  }
   return ctx.decodeAudioData(await res.arrayBuffer())
 }
 
@@ -230,12 +235,13 @@ function play(buffer) {
   })
 }
 
-async function speakCloud(text, mine, done, { onBoundary, onLevel }) {
+async function speakServer(text, mine, done, { onBoundary, onLevel }) {
   if (ctx.state === 'suspended') ctx.resume()
   const ctrl = new AbortController()
   active.abort = ctrl
-  const parts = sentences(text)
-  // Request every sentence at once; each is usually ready before the one before it ends.
+  // Short first piece, then one sentence per piece (the same split the server prepares lines
+  // with). All are requested at once; the server generates them in order.
+  const parts = speechChunks(text)
   const clips = parts.map((p) => fetchClip(p, ctrl.signal))
   clips.forEach((c) => c.catch(() => {}))
 
@@ -255,15 +261,16 @@ async function speakCloud(text, mine, done, { onBoundary, onLevel }) {
     let buffer
     try {
       buffer = await clips[i]
-    } catch {
+    } catch (err) {
       if (mine !== generation) return
-      // ElevenLabs isn't available: use the browser's voice from here on.
-      cloud = 'off'
+      // Use the browser's voice for the rest of this line, and for the whole visit unless the
+      // server voice is only warming up.
+      if (!err.warming) server = 'off'
       ctrl.abort()
       return speakBrowser(parts.slice(i).join(' '), mine, done, onBoundary)
     }
     if (mine !== generation) return
-    cloud = 'on'
+    server = 'on'
     await play(buffer)
     if (mine !== generation) return
   }

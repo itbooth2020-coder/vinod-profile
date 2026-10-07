@@ -29,3 +29,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# VINCE voice: prepared lines (regenerated automatically)
+server/.voice-cache

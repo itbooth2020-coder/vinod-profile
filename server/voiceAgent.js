@@ -1,56 +1,168 @@
-// VINCE's voice: text-to-speech through ElevenLabs, mounted at /api/speak.
-// The browser posts one sentence at a time and plays the MP3 through its JARVIS-style effect
-// chain (src/agent/voice.js). The API key stays server-side. Without a key, or when a limit or
-// the ElevenLabs quota is reached, the endpoint answers 503 {fallback: true} and the browser
-// switches to its built-in voice.
+// VINCE's voice: free, open-source text-to-speech with Kokoro (Apache-2.0), mounted at /api/speak.
+// Runs on this server's CPU: no API key, no quota, no cost. The model (~160 MB at fp16) downloads
+// from Hugging Face on first start and is cached; it loads in the background when the server
+// starts. The browser posts one sentence at a time and plays the WAV through its JARVIS-style
+// effect chain (src/agent/voice.js). While the model is loading, or if the voice is turned off,
+// the endpoint answers 503 and the browser uses its built-in voice instead.
 //
-// Environment (.env):
-//   ELEVENLABS_API_KEY            required to enable the voice
-//   ELEVENLABS_VOICE_ID           optional; defaults to George (warm, distinguished British male).
-//                                 Daniel, deeper and more authoritative: onwK4e9ZLuTAKqWW03F9
-//   ELEVENLABS_MODEL              optional; defaults to eleven_multilingual_v2
-//   ELEVENLABS_DAILY_CHAR_LIMIT   optional; characters per day across all visitors (default 10000)
+// Environment (.env), all optional:
+//   VINCE_VOICE=off   turn the server voice off (the browser voice is used)
+//   KOKORO_VOICE      default bm_george (British male); bm_fable is a lighter alternative
+//   KOKORO_DTYPE      default fp16; fp32 is slightly larger, q8 is smaller but slower on CPU
+//   KOKORO_SPEED      default 1.0
 
-const API = 'https://api.elevenlabs.io/v1/text-to-speech'
-const DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb' // George (premade)
-const DEFAULT_MODEL = 'eleven_multilingual_v2'
+import { createHash } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+
+const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX'
+// Prepared fixed lines are saved here, so a restart doesn't have to generate them again.
+const DISK_CACHE = path.join(path.dirname(fileURLToPath(import.meta.url)), '.voice-cache')
 const MAX_TEXT = 400
+const MAX_QUEUE = 24
 
-// Calm and measured, like a butler: steadier than default, a little style, natural pace.
-const VOICE_SETTINGS = { stability: 0.6, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true, speed: 1.0 }
-
-// Limits, so a public deployment can't be used as a free text-to-speech service.
+// Limits, so a public deployment's CPU can't be used as a free text-to-speech service.
 const WINDOW_MS = 10 * 60 * 1000
 const MAX_CHARS_PER_IP = 4000
 const perIp = new Map()
-let day = ''
-let dayChars = 0
-let pausedUntil = 0 // set after an auth or quota error, to stop retrying for a while
 
 function overBudget(ip, n) {
   const now = Date.now()
-  const today = new Date().toISOString().slice(0, 10)
-  if (today !== day) {
-    day = today
-    dayChars = 0
-  }
-  const dailyLimit = Number(process.env.ELEVENLABS_DAILY_CHAR_LIMIT) || 10000
   const recent = (perIp.get(ip) || []).filter((e) => now - e.t < WINDOW_MS)
   const used = recent.reduce((sum, e) => sum + e.n, 0)
   perIp.set(ip, recent)
-  if (used + n > MAX_CHARS_PER_IP || dayChars + n > dailyLimit) return true
+  if (used + n > MAX_CHARS_PER_IP) return true
   recent.push({ t: now, n })
-  dayChars += n
   return false
 }
 
-// Repeated lines (the introduction, tour stops, acknowledgements) are served from memory and
-// don't count against the limits.
+const enabled = () => process.env.VINCE_VOICE !== 'off'
+const voice = () => process.env.KOKORO_VOICE || 'bm_george'
+const speed = () => Number(process.env.KOKORO_SPEED) || 1.0
+const keyFor = (text) => `${voice()}|${speed()}|${text}`
+
+// Generated lines are kept in memory. VINCE's fixed lines, prepared at start-up, are kept for
+// good; other lines are dropped oldest-first.
+const fixed = new Map()
 const cache = new Map()
 const CACHE_MAX = 200
+const cached = (key) => fixed.get(key) ?? cache.get(key)
+const diskPath = (key) => path.join(DISK_CACHE, createHash('sha1').update(key).digest('hex') + '.wav')
 function remember(key, audio) {
   cache.set(key, audio)
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value)
+}
+
+// One sentence at a time, since the CPU is the bottleneck. Visitors' requests always go first
+// and run in arrival order, so a line's first sentence is ready first; preparing fixed lines
+// only uses the time in between.
+const jobs = { visitor: [], prepare: [] }
+let busy = false
+const pending = () => jobs.visitor.length
+
+function synthesize(text, { prepare = false, cancelled = () => false } = {}) {
+  return new Promise((resolve, reject) => {
+    jobs[prepare ? 'prepare' : 'visitor'].push({ text, prepare, cancelled, resolve, reject })
+    pump()
+  })
+}
+
+async function pump() {
+  if (busy) return
+  const job = jobs.visitor.shift() || jobs.prepare.shift()
+  if (!job) return
+  busy = true
+  try {
+    const key = keyFor(job.text)
+    if (job.cancelled()) job.resolve(null) // the visitor pressed Stop or moved on: skip it
+    else if (cached(key)) job.resolve(cached(key))
+    else {
+      const out = await tts.generate(job.text, { voice: voice(), speed: speed() })
+      const audio = wav16(out.audio, out.sampling_rate)
+      if (job.prepare) {
+        fixed.set(key, audio)
+        await writeFile(diskPath(key), audio).catch(() => {})
+      } else remember(key, audio)
+      job.resolve(audio)
+    }
+  } catch (err) {
+    job.reject(err)
+  } finally {
+    busy = false
+    pump()
+  }
+}
+
+// VINCE's fixed lines, split exactly as the browser will ask for them, so they play without any
+// wait. Ordered by how soon a visitor is likely to hear them: acknowledgements, the introduction
+// for each time of day, the follow-up phrases and suggested questions, then the tour.
+async function prepareFixedLines() {
+  const { GREETINGS, ACKNOWLEDGEMENTS, introduction, welcomeBack, tourSteps, toSpeech, followUpPieces } = await import('../src/agent/vince.js')
+  const { speechChunks } = await import('../src/agent/chunks.js')
+  const followUps = followUpPieces()
+  const lines = [
+    ...ACKNOWLEDGEMENTS,
+    ...GREETINGS.map((g) => toSpeech(introduction(g), 2000)),
+    ...followUps.lines,
+    ...followUps.questions,
+    welcomeBack(),
+    ...tourSteps().map((s) => toSpeech(s.text, 2000)),
+  ]
+  const chunks = [...new Set(lines.flatMap(speechChunks))]
+
+  // Lines saved by an earlier run load straight away, even before the model is ready.
+  await mkdir(DISK_CACHE, { recursive: true })
+  const missing = []
+  for (const c of chunks) {
+    const saved = await readFile(diskPath(keyFor(c))).catch(() => null)
+    if (saved) fixed.set(keyFor(c), saved)
+    else missing.push(c)
+  }
+  if (!missing.length) return console.log(`[voice-agent] ${chunks.length} fixed lines loaded from disk`)
+
+  await loadModel()
+  if (!tts) return
+  const started = Date.now()
+  await Promise.all(missing.map((c) => synthesize(c, { prepare: true }).catch(() => {})))
+  console.log(`[voice-agent] prepared ${missing.length} of ${chunks.length} fixed lines in ${Math.round((Date.now() - started) / 1000)}s`)
+}
+
+// The model loads once, in the background, as soon as the server starts.
+let tts = null
+let loading = null
+function loadModel() {
+  if (!loading && enabled()) {
+    loading = import('kokoro-js')
+      .then(({ KokoroTTS }) => KokoroTTS.from_pretrained(MODEL, { dtype: process.env.KOKORO_DTYPE || 'fp16', device: 'cpu' }))
+      .then((model) => {
+        tts = model
+        console.log('[voice-agent] Kokoro voice ready')
+      })
+      .catch((err) => console.error('[voice-agent] Kokoro failed to load:', err?.message ?? err))
+  }
+  return loading
+}
+
+// 16-bit PCM WAV: half the size of the float WAV Kokoro produces, and plays everywhere.
+function wav16(samples, rate) {
+  const buf = Buffer.alloc(44 + samples.length * 2)
+  buf.write('RIFF', 0)
+  buf.writeUInt32LE(36 + samples.length * 2, 4)
+  buf.write('WAVEfmt ', 8)
+  buf.writeUInt32LE(16, 16)
+  buf.writeUInt16LE(1, 20) // PCM
+  buf.writeUInt16LE(1, 22) // mono
+  buf.writeUInt32LE(rate, 24)
+  buf.writeUInt32LE(rate * 2, 28)
+  buf.writeUInt16LE(2, 32)
+  buf.writeUInt16LE(16, 34)
+  buf.write('data', 36)
+  buf.writeUInt32LE(samples.length * 2, 40)
+  for (let i = 0; i < samples.length; i++) {
+    buf.writeInt16LE(Math.round(Math.max(-1, Math.min(1, samples[i])) * 32767), 44 + i * 2)
+  }
+  return buf
 }
 
 async function readJson(req) {
@@ -63,9 +175,10 @@ async function readJson(req) {
   return JSON.parse(raw || '{}')
 }
 
-const fallback = (res, status, reason) => {
+// warming: true tells the browser to use its own voice for now but try again on the next line.
+const fallback = (res, status, error, warming = false) => {
   res.writeHead(status, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify({ fallback: true, error: reason }))
+  res.end(JSON.stringify({ fallback: true, warming, error }))
 }
 
 // Node-style (req, res) handler, usable from Vite middleware or any Node HTTP server.
@@ -82,48 +195,36 @@ export async function handleSpeak(req, res) {
   }
   const text = typeof body.text === 'string' ? body.text.trim() : ''
   if (!text || text.length > MAX_TEXT) return fallback(res, 400, 'Text must be 1-400 characters')
-
-  const key = process.env.ELEVENLABS_API_KEY
-  if (!key || Date.now() < pausedUntil) return fallback(res, 503, 'Voice service not available')
-
-  const voice = process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE
-  const model = process.env.ELEVENLABS_MODEL || DEFAULT_MODEL
-  const cacheKey = `${voice}|${model}|${text}`
-  const headers = { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' }
-  if (cache.has(cacheKey)) {
+  if (!enabled()) return fallback(res, 503, 'Server voice is turned off')
+  const headers = { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' }
+  const ready = cached(keyFor(text))
+  if (ready) {
     res.writeHead(200, headers)
-    return res.end(cache.get(cacheKey))
+    return res.end(ready)
   }
+  if (!tts) {
+    loadModel()
+    return fallback(res, 503, 'Voice is still loading', true)
+  }
+  if (pending() >= MAX_QUEUE) return fallback(res, 503, 'Voice is busy', true)
   if (overBudget(req.socket?.remoteAddress || 'unknown', text.length)) return fallback(res, 429, 'Voice limit reached')
 
-  const ctrl = new AbortController()
-  res.on('close', () => ctrl.abort())
+  let gone = false
+  res.on('close', () => (gone = true))
   try {
-    const upstream = await fetch(`${API}/${voice}/stream?output_format=mp3_44100_128`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'xi-api-key': key },
-      body: JSON.stringify({ text, model_id: model, voice_settings: VOICE_SETTINGS }),
-      signal: ctrl.signal,
-    })
-    if (!upstream.ok || !upstream.body) {
-      const detail = (await upstream.text().catch(() => '')).slice(0, 300)
-      console.error('[voice-agent]', upstream.status, detail)
-      // Bad key or used-up quota: stop calling ElevenLabs for 10 minutes.
-      if (upstream.status === 401 || upstream.status === 402 || /quota/i.test(detail)) pausedUntil = Date.now() + 10 * 60 * 1000
-      return fallback(res, 503, 'Voice service unavailable')
-    }
+    const audio = await synthesize(text, { cancelled: () => gone })
+    if (!audio || gone) return
     res.writeHead(200, headers)
-    const chunks = []
-    for await (const chunk of upstream.body) {
-      chunks.push(chunk)
-      res.write(chunk)
-    }
-    res.end()
-    remember(cacheKey, Buffer.concat(chunks))
+    res.end(audio)
   } catch (err) {
-    if (ctrl.signal.aborted) return
     console.error('[voice-agent]', err?.message ?? err)
-    if (!res.headersSent) fallback(res, 503, 'Voice service unavailable')
-    else res.end()
+    if (!res.headersSent) fallback(res, 503, 'Voice unavailable')
   }
+}
+
+// Start as soon as the server imports this module, so the voice is ready by the time a visitor
+// opens VINCE: load saved fixed lines, then the model, then prepare any lines still missing.
+if (enabled()) {
+  loadModel()
+  prepareFixedLines().catch((err) => console.error('[voice-agent] preparing lines failed:', err?.message ?? err))
 }

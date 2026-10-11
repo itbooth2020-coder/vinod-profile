@@ -10,6 +10,12 @@ import MediaTile from './MediaTile.jsx'
 const lead = (name) => name.split(' – ')[0]
 const graphFor = (p) => graphProjects.find((g) => lead(g.name) === lead(p.name))
 
+// Approach items may start with a short label ("Architecture: ..."), shown in bold.
+function ApproachItem({ text }) {
+  const m = text.match(/^([^:.]{1,40}):\s+(.*)$/)
+  return <li>{m ? <><b>{m[1]}:</b> {m[2]}</> : text}</li>
+}
+
 const fmt = (n, unit) => `${n}${unit === '%' ? '%' : ` ${unit}`}`
 const signed = (n, unit) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmt(Math.abs(n), unit)}`
 
@@ -82,7 +88,12 @@ export default function CaseStudy({ project: p, titleId, onClose }) {
         <div className="case__title">
           <span className="tag">{p.tag}</span>
           <h2 id={titleId}>{p.name}</h2>
-          {job && <p className="case__meta">{job.company} &middot; {job.role} &middot; {job.period}</p>}
+          {(job || cs.client) && (
+            <p className="case__meta">
+              {cs.client && <>Client: {cs.client}{job && <> &middot; </>}</>}
+              {job && <>{job.company} &middot; {job.role} &middot; {job.period}</>}
+            </p>
+          )}
         </div>
         <div className="gdialog__tools">
           {node && (
@@ -109,7 +120,7 @@ export default function CaseStudy({ project: p, titleId, onClose }) {
       )}
 
       <div className="case__body">
-        <p className="case__summary">{p.text}</p>
+        {cs.context !== p.text && <p className="case__summary">{p.text}</p>}
 
         {cs.context && (
           <section className="case__sec" aria-labelledby={`${titleId}-ctx`}>
@@ -126,7 +137,7 @@ export default function CaseStudy({ project: p, titleId, onClose }) {
         {cs.approach?.length > 0 && (
           <section className="case__sec" aria-labelledby={`${titleId}-appr`}>
             <h3 id={`${titleId}-appr`}>Approach</h3>
-            <ul>{cs.approach.map((a) => <li key={a}>{a}</li>)}</ul>
+            <ul>{cs.approach.map((a) => <ApproachItem key={a} text={a} />)}</ul>
           </section>
         )}
         {cs.outcomes?.length > 0 && (

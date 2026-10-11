@@ -11,7 +11,7 @@
 //    'Azure DevOps' isn't also 'Azure'. The same scan finds terms in the JD and evidence in the data.
 // 4. A JD term with evidence is a strong match; without evidence but with an evidenced `related`
 //    term it's related experience; otherwise it's "not evident in the profile". No score, no verdict.
-import { profile, stats, highlights, experience, projects, graphProjects, graphDomains, otherProjects, skills, certifications } from '../data.js'
+import { profile, stats, availability, highlights, experience, projects, graphProjects, graphDomains, otherProjects, skills, certifications } from '../data.js'
 import { LEXICON } from './fitLexicon.js'
 
 export const MIN_WORDS = 20
@@ -38,9 +38,13 @@ function compile(entry) {
 
 // Skills and technologies named in data.js, split into single terms:
 // 'Android (Kotlin, Java, Jetpack Compose)' -> Android, Kotlin, Java, Jetpack Compose; 'Agile/Scrum' -> Agile, Scrum.
+// Split-off words that aren't terms on their own ('Tool/Function Calling' -> 'Tool',
+// 'Prompt Evaluation & Iteration' -> 'Iteration'); they'd match any JD that says "tools".
+const FRAGMENTS = new Set(['tool', 'iteration'])
+
 function dataTerms() {
   const out = []
-  const add = (t, cat) => t && out.push({ label: t.trim(), cat })
+  const add = (t, cat) => t && !FRAGMENTS.has(norm(t)) && out.push({ label: t.trim(), cat })
   for (const s of skills) {
     for (const item of s.items) {
       const m = item.match(/^(.*?)\s*\((.*)\)$/)
@@ -95,6 +99,7 @@ function buildCorpus() {
   return [
     ...experience.flatMap((e) => e.points.map((text) => ({ text, where: `${e.company} · ${e.period}`, priority: 3 }))),
     ...projects.map((p) => ({ text: p.text, where: p.name, priority: 3 })),
+    ...projects.flatMap((p) => (p.caseStudy?.approach || []).map((text) => ({ text, where: p.name, priority: 3 }))),
     ...graphProjects
       .filter((g) => !projectHeads.has(g.name.split(' – ')[0]))
       .map((g) => ({ text: g.text, where: g.name, priority: 2 })),
@@ -141,12 +146,18 @@ const SIGNALS = [
   ['hiring', /\b(?:hiring|hire|recruit\w*)\b/i],
   ['mentoring', /\b(?:mentor\w*|coach\w*)\b/i],
   ['budget', /\bbudget\w*\b/i],
+  ['OKRs', /\bOKRs?\b|\bobjectives and key results\b/i],
+  ['attrition', /\b(?:attrition|retention|retain)\b/i],
 ]
+// The manager metrics ("At a glance") as an evidence line, e.g. "35+ engineers led in a budget-owning org".
+const stat = (i) => ({ text: `${stats[i].sr || stats[i].value} ${stats[i].label.charAt(0).toLowerCase()}${stats[i].label.slice(1)}`, where: 'At a glance' })
+const SENIOR = ['manage', 'lead', 'director', 'head of', 'team of', 'direct reports']
 const LEAD_EVIDENCE = [
   { when: () => true, find: () => ({ text: highlights[0].text, where: `Highlight · ${highlights[0].title}` }) },
-  { when: () => true, find: () => ({ text: `${stats[0].value} ${stats[0].label.toLowerCase()}`, where: 'At a glance' }) },
-  { when: (s) => s.some((x) => ['manage', 'lead', 'director', 'head of', 'team of', 'direct reports'].includes(x)), re: /managing a team of/i },
-  { when: (s) => s.includes('hiring'), re: /\bhiring\b/i },
+  { when: () => true, find: () => stat(0) },
+  { when: (s) => s.some((x) => SENIOR.includes(x)), re: /managing a team of/i },
+  { when: (s) => s.some((x) => ['director', 'head of'].includes(x)), find: () => stat(1) },
+  { when: (s) => s.some((x) => ['hiring', 'OKRs', 'attrition'].includes(x)), re: /\bhiring\b/i },
   { when: (s) => s.includes('stakeholders'), re: /\bstakeholder/i },
   { when: (s) => s.includes('mentoring'), re: /\bmentored\b/i },
   { when: (s) => s.includes('budget'), re: /\bbudget\b/i },
@@ -211,9 +222,16 @@ export function matchRole(jd) {
   return { tooShort: false, words, strong, related, gaps, leadership, summary }
 }
 
+/** One-line availability note (data.js `availability`), or '' when he isn't looking. */
+export const availabilityNote = () =>
+  availability.open
+    ? [`notice ${availability.notice}`, availability.relocation && 'open to relocation', availability.workModes.join(' / ').toLowerCase()].filter(Boolean).join(' · ')
+    : ''
+
 /** Plain-text summary for the clipboard. */
 export function fitSummaryText(result, resumeUrl = '') {
   const lines = [`Role fit notes for ${profile.name} (${profile.role}, ${profile.company})`, result.summary, '']
+  if (availabilityNote()) lines.splice(2, 0, `Availability: ${availabilityNote()}`)
   if (result.strong.length) {
     lines.push('Matched with evidence:')
     for (const m of result.strong) {

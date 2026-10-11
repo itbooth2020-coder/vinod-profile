@@ -1,6 +1,6 @@
 // VINCE: the voice assistant's persona, its follow-up questions and the guided-tour script.
 // Everything here is built from src/data.js, so it stays in step with the resume.
-import { profile, profileCard, stats, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
+import { profile, profileCard, stats, availability, leadership, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
 
 export const NAME = 'V.I.N.C.E.'
 export const EXPANSION = 'Virtual Intelligence for Navigating Career Experience'
@@ -17,6 +17,7 @@ const when = (s) =>
 const yearsIn = (period) => Math.round(when(period.split('–')[1]) - when(period.split('–')[0]))
 const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 const YEARS = profile.tagline.match(/\d+\+?/)[0] // e.g. '14+'
+const firstSentence = (s) => s.split(/\.(?:\s|$)/)[0] // without its full stop; keeps "99.9%"
 const lowerFirst = (s) => (/^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1)) // keeps acronyms like "AI"
 const pick = (list) => list[Math.floor(Math.random() * list.length)]
 const shuffle = (list) => list.map((v) => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
@@ -53,6 +54,7 @@ const QUESTIONS = {
   skills: skills.filter((s) => !/librar|method|architect/i.test(s.area)).map((s) => `What ${s.area} skills does he have?`),
   impact: ['What impact has he had?', 'What measurable results has he delivered?'],
   leadership: ['How large are the teams he has led?', 'How does he hire and mentor engineers?'],
+  availability: ['Is he open to new roles?', 'What is his notice period?'],
   education: ['Where did he study?'],
   certs: ['Which certifications does he hold?'],
   blogs: ['Does he write any blogs?'],
@@ -70,7 +72,8 @@ const RELATED = {
   ai: ['project', 'skills', 'certs'],
   skills: ['project', 'ai', 'certs'],
   impact: ['leadership', 'project', 'role'],
-  leadership: ['impact', 'role', 'contact'],
+  leadership: ['impact', 'role', 'availability'],
+  availability: ['contact', 'location', 'leadership'],
   education: ['certs', 'skills', 'timeline'],
   certs: ['ai', 'education', 'skills'],
   blogs: ['ai', 'skills', 'contact'],
@@ -81,12 +84,13 @@ const RELATED = {
 const names = (list) => list.map((s) => s.toLowerCase().split(/[\s.(]/)[0]).join('|')
 // First match wins, so the more specific topics come first.
 const DETECT = [
+  ['availability', /availab|notice|relocat|remote|hybrid|onsite|open to (work|new|roles?|opportunit)|join(ing)? date|when can he (start|join)/],
   ['contact', /contact|reach|e-?mail|linkedin|facebook|twitter|social|hire him|get in touch/],
   ['blogs', /blog|comic|batman|writes?\b|writing/],
   ['education', /stud(y|ied)|educat|degree|college|universit|mca|b\.?sc/],
   ['certs', /certif|course/],
   ['location', /\bbased\b|located|location|where (is|does) he live|city/],
-  ['ai', /\bai\b|agent|claude|copilot|generative|llm|machine learning/],
+  ['ai', /\bai\b|agent|claude|copilot|generative|llm|machine learning|prompt|few-?shot/],
   ['project', new RegExp(`project|portfolio|${names(projects.map((p) => p.name))}`)],
   ['leadership', /team|lead|mentor|hiring|manag/],
   ['impact', /impact|result|metric|achiev|improv|numbers/],
@@ -202,12 +206,16 @@ export function tourSteps() {
       text: `At a glance: he has ${highlights.slice(0, 3).map((h) => lowerFirst(h.text)).join(', ').replace(/, ([^,]*)$/, ', and $1')}.`,
     },
     {
+      target: 'lead',
+      text: `How he leads covers ${list(leadership.map((l) => l.title.toLowerCase()))}. For instance, he ${lowerFirst(leadership[0].points[0])}, and ${lowerFirst(leadership[0].points[2])}.`,
+    },
+    {
       target: 'experience',
       text: `His journey spans ${experience.length} companies. It began at ${company(first.company)} in ${startYear(first.period)}, ran through ${NUMBERS[yearsIn(experience[1].period)] || yearsIn(experience[1].period)} years at ${company(experience[1].company)}, and continues today at ${experience[0].company}, where he leads as ${experience[0].role}.`,
     },
     {
       target: 'projects',
-      text: `Among his key projects: ${project(p1)}, an ${lowerFirst(p1.text.split('. ')[0])}. And ${project(p2)}, a ${lowerFirst(p2.text.split('. ')[0])}.`,
+      text: `Among his key projects: ${project(p1)}, an ${lowerFirst(firstSentence(p1.text))}. And ${project(p2)}, a ${lowerFirst(firstSentence(p2.text))}.`,
     },
     {
       target: 'skills',
@@ -273,17 +281,38 @@ const spoken = (text) =>
     .replace(/\b([A-Z])([A-Z]{4,})\b/g, (_, a, b) => a + b.toLowerCase()) // PRESTO is a name, not letters
     .replace(/([a-z])([A-Z])/g, '$1 $2') // VusionGroup → Vusion Group
 
+// Short narration of each stat (keyed by stats[].value): [shown text, spoken form]. A stat without an
+// entry falls back to "value label". The whole brief stays at about 90 words.
+const STAT_LINES = {
+  '35+': ['35+ engineers led', 'thirty-five plus engineers led'],
+  '100%': ['100% on-time milestones', 'a hundred percent on-time milestones'],
+  '3 wk → 5 days': ['release cycles cut from 3 weeks to 5 days', 'release cycles cut from three weeks to five days'],
+  '8': ['8 senior engineers hired', 'eight senior engineers hired'],
+}
+const NUMBER_WORDS = { 3: 'three' } // e.g. availability.notice '3 months' -> 'three-month'
+
 export function briefNarration() {
   const card = Object.fromEntries(profileCard)
   const an = (word) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
-  const proof = stats.map((s, i) => `${i === 0 ? 'In numbers: ' : i === stats.length - 1 ? 'and ' : ''}${s.value} ${lowerFirst(s.label)}${i === stats.length - 1 ? '.' : ','}`)
+  const proof = stats.map((s, i) => {
+    const [text, speech] = STAT_LINES[s.value] || [`${s.value} ${lowerFirst(s.label)}`]
+    const pre = i === 0 ? 'In numbers: ' : i === stats.length - 1 ? 'and ' : ''
+    const end = i === stats.length - 1 ? '.' : ','
+    return { text: pre + text + end, speech: speech && pre + speech + end }
+  })
+  const [n, unit] = availability.notice.split(' ') // '3 months'
+  const notice = `${NUMBER_WORDS[n] || n}-${unit.replace(/s$/, '')}` // 'three-month'
   const segments = [
     { target: 'name', text: `Allow me. ${profile.name} is ${an(profile.role)} ${profile.role} at ${profile.company}.` },
-    { target: 'signals', text: `He brings ${card.experience} of experience and leads teams of ${card['team scale']}.` },
-    ...proof.map((text, i) => ({ target: `stat-${i}`, text })),
+    availability.open && {
+      target: 'availability',
+      text: `He's open to ${list(availability.roles)} roles, with a ${notice} notice period${availability.relocation ? ', and is open to relocation' : ''}.`,
+    },
+    { target: 'signals', text: `He brings ${card.experience} of experience.` },
+    ...proof.map((p, i) => ({ target: `stat-${i}`, ...p })),
     { target: 'projects', text: `Top projects: ${list(projects.slice(0, 3).map(project))}.` },
     { target: 'domains', text: `Core domains: ${list(profile.domains)}.` },
-    { target: 'actions', text: 'You can download his résumé, or check role fit against your job description.' },
-  ]
-  return segments.map((s) => ({ ...s, speech: spoken(s.text) }))
+    { target: 'actions', text: 'Download his résumé, or check role fit.' },
+  ].filter(Boolean)
+  return segments.map((s) => ({ ...s, speech: s.speech ? spoken(s.speech) : spoken(s.text) }))
 }

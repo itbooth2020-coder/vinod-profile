@@ -95,6 +95,9 @@ export default function ProfileDialog({ titleId }) {
           <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">
             LinkedIn ↗<span className="sr-only"> (opens in a new tab)</span>
           </a>
+          <a className="btn" href={profile.github} target="_blank" rel="noopener noreferrer">
+            GitHub ↗<span className="sr-only"> (opens in a new tab)</span>
+          </a>
           <a className="btn" href={profile.facebook} target="_blank" rel="noopener noreferrer">
             Facebook ↗<span className="sr-only"> (opens in a new tab)</span>
           </a>

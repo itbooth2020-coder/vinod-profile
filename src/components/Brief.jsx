@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { profile, profileCard, stats, projects } from '../data.js'
 import Avatar from './Avatar.jsx'
+import Availability from './Availability.jsx'
 
 // "30-second brief": a one-screen summary for recruiters. Shown while <html data-mode="brief">
 // (see App.jsx); styles.css hides the rest of the page so nothing else unmounts.
@@ -123,6 +124,8 @@ export default function Brief({ headingRef, onClose }) {
         </button>
       </div>
 
+      <Availability data-brief="availability" />
+
       <dl className="brief__signals" data-brief="signals">
         {signals.map(([k, v]) => (
           <div key={k}>
@@ -137,8 +140,8 @@ export default function Brief({ headingRef, onClose }) {
           <h2 className="brief__label">Proof points</h2>
           <dl className="brief__stats">
             {stats.map((s, i) => (
-              <div key={s.label} data-brief={`stat-${i}`}>
-                <dt>{s.value}</dt>
+              <div key={s.label} data-brief={`stat-${i}`} className={s.value.length > 6 ? 'stat--long' : undefined}>
+                <dt>{s.sr ? <><span aria-hidden="true">{s.value}</span><span className="sr-only">{s.sr}</span></> : s.value}</dt>
                 <dd>{s.label}</dd>
               </div>
             ))}

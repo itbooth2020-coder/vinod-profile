@@ -1,6 +1,6 @@
 // VINCE: the voice assistant's persona, its follow-up questions and the guided-tour script.
 // Everything here is built from src/data.js, so it stays in step with the resume.
-import { profile, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
+import { profile, profileCard, stats, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
 
 export const NAME = 'V.I.N.C.E.'
 export const EXPANSION = 'Virtual Intelligence for Navigating Career Experience'
@@ -259,4 +259,31 @@ export function nodeQuestions(n) {
   if (n.type === 'project') return [`What was his role in ${n.project.short}?`, `What impact did ${n.project.short} have?`]
   if (n.type === 'tech') return [`How has he used ${n.label}?`, `Which projects used ${n.label}?`]
   return [`What has he built in ${n.label}?`, `Which technologies does he use for ${n.label}?`]
+}
+
+// The 30-second brief (components/Brief.jsx), narrated one segment at a time. Each segment's
+// target matches a data-brief="…" element in the brief, which VINCE highlights as he speaks it.
+// text is shown in VINCE's log; speech is what he says (toSpeech, plus acronyms spelled out,
+// handled here so lines toSpeech already prepares for the server stay unchanged).
+const spoken = (text) =>
+  toSpeech(text)
+    .replace(/\bIoT\b/g, 'I O T')
+    .replace(/\b(MDM|EMM)\b/g, (m) => m.split('').join(' '))
+    .replace(/\s\/\s/g, ' and ')
+    .replace(/\b([A-Z])([A-Z]{4,})\b/g, (_, a, b) => a + b.toLowerCase()) // PRESTO is a name, not letters
+    .replace(/([a-z])([A-Z])/g, '$1 $2') // VusionGroup → Vusion Group
+
+export function briefNarration() {
+  const card = Object.fromEntries(profileCard)
+  const an = (word) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
+  const proof = stats.map((s, i) => `${i === 0 ? 'In numbers: ' : i === stats.length - 1 ? 'and ' : ''}${s.value} ${lowerFirst(s.label)}${i === stats.length - 1 ? '.' : ','}`)
+  const segments = [
+    { target: 'name', text: `Allow me. ${profile.name} is ${an(profile.role)} ${profile.role} at ${profile.company}.` },
+    { target: 'signals', text: `He brings ${card.experience} of experience and leads teams of ${card['team scale']}.` },
+    ...proof.map((text, i) => ({ target: `stat-${i}`, text })),
+    { target: 'projects', text: `Top projects: ${list(projects.slice(0, 3).map(project))}.` },
+    { target: 'domains', text: `Core domains: ${list(profile.domains)}.` },
+    { target: 'actions', text: 'You can download his résumé, or check role fit against your job description.' },
+  ]
+  return segments.map((s) => ({ ...s, speech: spoken(s.text) }))
 }

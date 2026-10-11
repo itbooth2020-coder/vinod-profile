@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { profile } from '../data.js'
 import { askAgent } from '../agent/askAgent.js'
 import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName } from '../agent/voice.js'
-import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions } from '../agent/vince.js'
+import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
 import RichText from './RichText.jsx'
 
@@ -12,6 +12,7 @@ import RichText from './RichText.jsx'
 // The panel can be minimized to a small bar (the conversation carries on) or maximized to
 // a large, centered conversation view.
 // Other components open him with: window.dispatchEvent(new Event('vince:open')).
+// The 30-second brief asks him to narrate it with 'vince:brief'.
 
 const STATUS = { idle: 'Standing by', listening: 'Listening…', thinking: 'Accessing records…', speaking: 'Speaking' }
 const MUTE_KEY = 'vince-muted'
@@ -64,6 +65,7 @@ export default function VoiceAssistant() {
   const [input, setInput] = useState('')
   const [hint, setHint] = useState(false)
   const [size, setSize] = useState('normal') // 'mini' | 'normal' | 'max'
+  const [briefing, setBriefing] = useState(false) // narrating the 30-second brief
 
   const energy = useRef(0) // pulses the orb on each spoken word
   const asked = useRef(new Set())
@@ -73,6 +75,7 @@ export default function VoiceAssistant() {
   const stopListening = useRef(null)
   const abort = useRef(null)
   const tour = useRef(null)
+  const brief = useRef(null) // the brief narration: { steps, i }
   const timer = useRef(0)
   const mutedRef = useRef(muted)
   const showRef = useRef(null)
@@ -84,8 +87,10 @@ export default function VoiceAssistant() {
 
   const addVince = (text) => setMessages((m) => [...m, { role: 'vince', text }])
 
-  // Stops whatever VINCE is doing: speaking, waiting, listening or fetching an answer.
+  // Stops whatever VINCE is doing: speaking, waiting, listening, fetching an answer or
+  // narrating the brief.
   const halt = () => {
+    stopBrief()
     stopSpeaking()
     clearTimeout(timer.current)
     stopListening.current?.()
@@ -117,7 +122,7 @@ export default function VoiceAssistant() {
     if (handsFree.current && canListen && !mutedRef.current) startListening()
   }
 
-  const clearFocus = () => document.querySelector('.tour-focus')?.classList.remove('tour-focus')
+  const clearFocus = () => document.querySelectorAll('.tour-focus').forEach((el) => el.classList.remove('tour-focus'))
 
   const stopTour = () => {
     if (!tour.current) return
@@ -155,6 +160,53 @@ export default function VoiceAssistant() {
     tour.current = { steps: tourSteps(), i: 0 }
     setTouring(true)
     runTour(0)
+  }
+
+  // The 30-second brief: VINCE narrates it from the minimized bar, one segment at a time,
+  // highlighting each part of the brief (data-brief="…") as he speaks it. halt() ends it.
+  function stopBrief() {
+    if (!brief.current) return
+    brief.current = null
+    clearFocus()
+    setBriefing(false)
+  }
+
+  const runBrief = (i) => {
+    const steps = brief.current?.steps
+    if (!steps) return
+    clearFocus()
+    if (i >= steps.length) {
+      brief.current = null
+      setBriefing(false)
+      setSuggestions(nextQuestions('', '', asked.current))
+      return
+    }
+    brief.current.i = i
+    const el = document.querySelector(`[data-brief="${steps[i].target}"]`)
+    if (el) {
+      const r = el.getBoundingClientRect()
+      if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' })
+      el.classList.add('tour-focus')
+    }
+    voice(steps[i].speech, () => brief.current && runBrief(i + 1))
+  }
+
+  const startBrief = () => {
+    unlockSpeech()
+    halt()
+    stopTour()
+    setInterim('')
+    setSuggestions([])
+    setHint(false)
+    // Minimized, so the brief stays readable; focus stays on the brief's button.
+    if (!open || size !== 'mini') keepFocus.current = true
+    setOpen(true)
+    setSize('mini')
+    const steps = briefNarration()
+    addVince(steps.map((s) => s.text).join(' '))
+    brief.current = { steps, i: 0 }
+    setBriefing(true)
+    runBrief(0)
   }
 
   // Explains a domain-graph node from the graph data, then offers deeper questions about it.
@@ -284,6 +336,10 @@ export default function VoiceAssistant() {
         const i = tour.current.i
         timer.current = setTimeout(() => tour.current && runTour(i + 1), 1500)
       }
+      if (brief.current) {
+        const i = brief.current.i
+        timer.current = setTimeout(() => brief.current && runBrief(i + 1), 1500)
+      }
     }
   }
 
@@ -298,7 +354,7 @@ export default function VoiceAssistant() {
       setMessages((m) => [...m, { role: 'vince', text }])
       setSuggestions(nextQuestions('', '', asked.current))
       voice(toSpeech(text, 2000))
-    } else if (!tour.current) {
+    } else if (!tour.current && !brief.current) {
       const text = welcomeBack()
       addVince(text)
       voice(text)
@@ -327,7 +383,7 @@ export default function VoiceAssistant() {
   }, [open, size])
 
   useEffect(() => {
-    showRef.current = { show, explain, stopAll, close }
+    showRef.current = { show, explain, stopAll, close, startBrief, briefing: () => Boolean(brief.current) }
   })
 
   // In the normal panel (including during the tour), pressing anywhere else on the page closes
@@ -351,17 +407,22 @@ export default function VoiceAssistant() {
   }, [open, size])
 
   // Window events let other components drive VINCE: 'vince:open', 'vince:explain' (detail: a
-  // domain-graph node; used by the graph dialog) and 'vince:stop'.
+  // domain-graph node; used by the graph dialog), 'vince:brief' (narrate the 30-second brief) and
+  // 'vince:stop'. A 'vince:stop' with detail 'brief' (the brief closing) only stops the narration,
+  // so it can't cut off something the visitor started since, like the tour.
   useEffect(() => {
     const onOpen = () => showRef.current.show()
     const onExplain = (e) => showRef.current.explain(e.detail)
-    const onStop = () => showRef.current.stopAll()
+    const onBrief = () => showRef.current.startBrief()
+    const onStop = (e) => (e.detail !== 'brief' || showRef.current.briefing()) && showRef.current.stopAll()
     window.addEventListener('vince:open', onOpen)
     window.addEventListener('vince:explain', onExplain)
+    window.addEventListener('vince:brief', onBrief)
     window.addEventListener('vince:stop', onStop)
     return () => {
       window.removeEventListener('vince:open', onOpen)
       window.removeEventListener('vince:explain', onExplain)
+      window.removeEventListener('vince:brief', onBrief)
       window.removeEventListener('vince:stop', onStop)
       halt()
       clearFocus()
@@ -372,6 +433,11 @@ export default function VoiceAssistant() {
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('vince:mode', { detail: mode }))
   }, [mode])
+
+  // Tells the brief whether VINCE is narrating it, so its button can offer Stop.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('vince:briefing', { detail: briefing }))
+  }, [briefing])
 
   // A one-time nudge per browser session, a few seconds after the page loads.
   useEffect(() => {
@@ -390,9 +456,10 @@ export default function VoiceAssistant() {
   }, [])
 
   // Focus moves into the panel when it opens or changes size, and back to the launcher when it
-  // closes, unless it closed because the visitor clicked elsewhere: then focus stays there.
+  // closes, unless it closed because the visitor clicked elsewhere, or it opened minimized to
+  // narrate the brief: then focus stays where it is.
   useEffect(() => {
-    if (open) panelRef.current?.focus()
+    if (open && !keepFocus.current) panelRef.current?.focus()
     else if (wasOpen.current && !keepFocus.current) launcherRef.current?.focus()
     keepFocus.current = false
     wasOpen.current = open
@@ -450,7 +517,7 @@ export default function VoiceAssistant() {
               )}
             </div>
             <div className="vince__tools">
-              {size === 'mini' && (mode !== 'idle' || touring) && (
+              {size === 'mini' && (mode !== 'idle' || touring || briefing) && (
                 <button type="button" className="vince__icon" onClick={stopAll} aria-label="Stop VINCE" title="Stop">
                   <span aria-hidden="true">■</span>
                 </button>
@@ -491,7 +558,7 @@ export default function VoiceAssistant() {
                 <div className="vince__stage">
                   <ArcOrb state={mode} energyRef={energy} />
                   <p className="vince__status" role="status">{interim ? `“${interim}”` : STATUS[mode]}</p>
-                  {(mode !== 'idle' || touring) && (
+                  {(mode !== 'idle' || touring || briefing) && (
                     <button type="button" className="vince__stop" onClick={stopAll} aria-label="Stop VINCE">
                       <span aria-hidden="true">■</span> Stop
                     </button>

@@ -142,17 +142,28 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
   .hero__photo .avatar img, .hero__photo .avatar__fallback { width: 200px; height: 200px; border-width: 3px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent2) 12%, transparent); }
 }
 .hero__top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
-.brief-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
-.brief-toggle:hover { border-color: var(--accent); }
-.brief-toggle__dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent2); }
-.brief-toggle[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.brief-toggle[aria-pressed='true'] .brief-toggle__dot { background: currentColor; border-color: currentColor; }
+/* Brief switch (Hero.jsx): label + pill track with a sliding thumb; the whole pill is the button (44px tall). */
+.brief-switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 8px 4px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
+.brief-switch:hover { border-color: var(--accent); }
+.brief-switch:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+/* Off: --muted edge and thumb (text-level contrast in every palette). */
+.brief-switch__track { position: relative; flex: none; box-sizing: border-box; width: 46px; height: 26px; border: 2px solid var(--muted); border-radius: 999px; background: var(--panel2); transition: background-color 0.18s, border-color 0.18s; }
+.brief-switch__thumb { position: absolute; top: 2px; left: 2px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); color: var(--accent); transition: transform 0.18s ease, background-color 0.18s; }
+.brief-switch__thumb svg { display: block; opacity: 0; transition: opacity 0.18s; }
+/* On: accent track whose edge is mixed toward --text so custom accents still stand off the page;
+   --accent-ink thumb (ThemePicker picks it to contrast with any accent) with an accent check. */
+.brief-switch[aria-checked='true'] { border-color: var(--accent); }
+.brief-switch[aria-checked='true'] .brief-switch__track { background: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, var(--text)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.brief-switch[aria-checked='true'] .brief-switch__thumb { transform: translateX(20px); background: var(--accent-ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.35); }
+.brief-switch[aria-checked='true'] .brief-switch__thumb svg { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .brief-switch__track, .brief-switch__thumb, .brief-switch__thumb svg { transition: none; } }
+@media print { .brief-switch { display: none; } }
 .social { display: flex; gap: 8px; list-style: none; margin: 12px 0 0; padding: 0; }
 .social a { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 50%; background: var(--panel); color: var(--text); }
 .social a:hover { border-color: var(--accent); color: var(--accent); }
 .social svg { display: block; }
 
-/* 30-second brief (Brief.jsx): <html data-mode="brief"> hides the rest of the page, keeping the header and the toggle. */
+/* 30-second brief (Brief.jsx): <html data-mode="brief"> hides the rest of the page, keeping the header and the brief switch. */
 :root[data-mode='brief'] main > :not(.hero, .brief),
 :root[data-mode='brief'] .footer,
 :root[data-mode='brief'] .hero__text > :not(.hero__top),
@@ -193,12 +204,18 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .brief__x { justify-content: center; min-width: 44px; min-height: 44px; padding: 0; font-size: 16px; transition: border-color 0.15s; }
 .brief__back:focus-visible, .brief__x:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
 .brief__print { display: none; }
+/* Ask VINCE (narrates the brief); the parts he's speaking about get .tour-focus, ringed with a little room. */
+.brief__head { grid-template-columns: auto minmax(0, 1fr) auto; }
+.brief__ask { align-self: start; min-height: 44px; padding: 4px 14px 4px 10px; font-size: 13.5px; }
+.brief__stop { width: 16px; margin-right: 6px; text-align: center; font-size: 12px; }
+.brief .tour-focus { border-radius: 10px; box-shadow: 0 0 0 6px color-mix(in srgb, #ff9a3c 12%, transparent), 0 0 0 8px rgb(255 150 60 / 0.65); }
+@media (max-width: 640px) { .brief__ask { grid-column: 1 / -1; justify-self: start; } }
 @media (max-width: 420px) {
   .brief { padding: 16px; }
   .brief__head { grid-template-columns: 1fr; gap: 8px; }
   .brief__head .avatar img, .brief__head .avatar__fallback { width: 72px; height: 72px; }
 }
-@media (prefers-reduced-motion: reduce) { .brief { animation: none; } .brief__back, .brief__x { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .brief { animation: none; } .brief__back, .brief__x, .brief .tour-focus { transition: none; } }
 /* Printing in brief mode gives a clean one-page summary in black on white. */
 @media print {
   :root[data-mode='brief'] {
@@ -209,7 +226,8 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
   :root[data-mode='brief'] .hero, :root[data-mode='brief'] .progress, :root[data-mode='brief'] .skip { display: none; }
   .brief { animation: none; margin: 0; border: 0; padding: 0; gap: 14px; break-inside: avoid; }
   .brief__print { display: block; margin: 0; font: 13px var(--mono); }
-  .brief__bar { display: none; }
+  .brief__bar, .brief__ask { display: none; }
+  .tour-focus, .brief .tour-focus { box-shadow: none; }
   @page { margin: 14mm; }
 }
 

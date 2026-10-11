@@ -27,8 +27,16 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
       <div className="hero__text">
         <div className="hero__top">
           <p className="badge">{profile.role} &middot; {profile.company}</p>
-          <button ref={toggleRef} type="button" className="brief-toggle" aria-pressed={brief} onClick={onToggleBrief}>
-            <span className="brief-toggle__dot" aria-hidden="true" /> 30-second brief
+          {/* Switches between the full profile and the brief. The label text is the accessible name. */}
+          <button ref={toggleRef} type="button" role="switch" className="brief-switch" aria-checked={brief} onClick={onToggleBrief}>
+            <span className="brief-switch__label">30-second brief</span>
+            <span className="brief-switch__track" aria-hidden="true">
+              <span className="brief-switch__thumb">
+                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false">
+                  <path d="M2.5 6.2 5 8.5l4.5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+            </span>
           </button>
         </div>
         <h1>{profile.firstName} <em>{profile.lastName}</em></h1>

@@ -481,7 +481,8 @@ export default function VoiceAssistant() {
       {!open && (
         <div className="vince-dock">
           {hint && (
-            <p className="vince-hint" role="status">
+            // No live role: a timed nudge shouldn't interrupt screen-reader users; it's read in DOM order next to the launcher.
+            <p className="vince-hint">
               Hi, I'm VINCE. Ask me anything about {FIRST}, out loud or by typing.
               <button type="button" onClick={() => setHint(false)} aria-label="Dismiss">✕</button>
             </p>

@@ -179,6 +179,9 @@ export function toSpeech(md, max = 480) {
     .replace(/(\d%?|thousand)\+/g, '$1 plus')
     .replace(/(\w)\/(\w)/g, '$1 and $2')
     .replace(/&/g, ' and ')
+    // The page says "resume"; voices read that as the verb (re-ZOOM), so speech uses the accented
+    // noun (é = e-acute), which both Kokoro and browser voices say as REZ-oo-may.
+    .replace(/\b([Rr])esume(s?)\b/g, (_, r, s) => `${r}ésumé${s}`)
     .replace(/\s*\n+\s*/g, ' ')
     .replace(/\.\s*\./g, '.')
     .replace(/\s{2,}/g, ' ')
@@ -210,12 +213,12 @@ export function tourSteps() {
       text: `How he leads covers ${list(leadership.map((l) => l.title.toLowerCase()))}. For instance, he ${lowerFirst(leadership[0].points[0])}, and ${lowerFirst(leadership[0].points[2])}.`,
     },
     {
-      target: 'experience',
-      text: `His journey spans ${experience.length} companies. It began at ${company(first.company)} in ${startYear(first.period)}, ran through ${NUMBERS[yearsIn(experience[1].period)] || yearsIn(experience[1].period)} years at ${company(experience[1].company)}, and continues today at ${experience[0].company}, where he leads as ${experience[0].role}.`,
-    },
-    {
       target: 'projects',
       text: `Among his key projects: ${project(p1)}, an ${lowerFirst(firstSentence(p1.text))}. And ${project(p2)}, a ${lowerFirst(firstSentence(p2.text))}.`,
+    },
+    {
+      target: 'experience',
+      text: `His journey spans ${experience.length} companies. It began at ${company(first.company)} in ${startYear(first.period)}, ran through ${NUMBERS[yearsIn(experience[1].period)] || yearsIn(experience[1].period)} years at ${company(experience[1].company)}, and continues today at ${experience[0].company}, where he leads as ${experience[0].role}.`,
     },
     {
       target: 'skills',
@@ -312,7 +315,7 @@ export function briefNarration() {
     ...proof.map((p, i) => ({ target: `stat-${i}`, ...p })),
     { target: 'projects', text: `Top projects: ${list(projects.slice(0, 3).map(project))}.` },
     { target: 'domains', text: `Core domains: ${list(profile.domains)}.` },
-    { target: 'actions', text: 'Download his résumé, or check role fit.' },
+    { target: 'actions', text: 'Download his resume, or check role fit.' },
   ].filter(Boolean)
   return segments.map((s) => ({ ...s, speech: s.speech ? spoken(s.speech) : spoken(s.text) }))
 }

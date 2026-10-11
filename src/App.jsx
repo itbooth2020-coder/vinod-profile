@@ -99,23 +99,24 @@ export default function App() {
         <main id="main">
           <Hero brief={brief} onToggleBrief={() => showBrief(!brief)} toggleRef={toggleRef} />
           {brief && <Brief headingRef={headingRef} onClose={(opts) => showBrief(false, opts)} />}
+          {/* Keep Header.jsx nav and VINCE's tour (agent/vince.js tourSteps) in this order. */}
+          <Impact />
+          <Leadership />
+          <Projects />
+          <Experience />
+          <RoleFit />
           <div className="layout">
-            <h2 className="sr-only">Explore the profile</h2>
+            <h2 className="sr-only">Ask the AI about the profile</h2>
             <PromptConsole />
             <div className="side">
               <ProfileCard />
               <DomainGraph />
             </div>
           </div>
-          <Impact />
-          <Leadership />
-          <RoleFit />
-          <Experience />
-          <Projects />
           <Skills />
           <Credentials />
-          <Contact />
           <Blogs />
+          <Contact />
         </main>
         <Footer />
       </div>

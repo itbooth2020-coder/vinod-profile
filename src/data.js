@@ -11,9 +11,12 @@ export const profile = {
     'Engineering Manager with 14+ years leading teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered and web platforms at scale.',
   // Hero lede: a one-sentence pitch from the Accenture bullets in the resume ("managing a team of 35+
   // engineers", "budget … for a 35-engineer org", "100% on-time milestone delivery", "release cycle time
-  // from 3 weeks to 5 days", "reducing team attrition by 20%"). The tagline above is still VINCE's intro.
+  // from 3 weeks to 5 days", "reducing team attrition by 20%"). The second sentence is from the Darwin
+  // bullets: "Led the Darwin Portal program for Syngenta, … AI assistant routes requests to specialist
+  // Claude AI agents" and "Used Claude Code agents to build the project … under engineer oversight".
+  // The tagline above is still VINCE's intro. Keep index.html's static fallback in sync.
   pitch:
-    'Engineering Manager leading a 35+ engineer, budget-owning org at Accenture: 100% on-time milestones, release cycles cut from 3 weeks to 5 days, and attrition down 20%.',
+    "Engineering Manager leading a 35+ engineer, budget-owning org at Accenture: 100% on-time milestones, release cycles cut from 3 weeks to 5 days, and attrition down 20%. Led Syngenta's Darwin Portal, whose AI assistant routes requests to specialist Claude AI agents, built with Claude Code agents under engineer oversight.",
   role: 'Custom Software Engineering Manager',
   company: 'Accenture',
   location: 'Bengaluru, Karnataka',

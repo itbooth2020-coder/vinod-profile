@@ -81,7 +81,7 @@ const RELATED = {
 const names = (list) => list.map((s) => s.toLowerCase().split(/[\s.(]/)[0]).join('|')
 // First match wins, so the more specific topics come first.
 const DETECT = [
-  ['contact', /contact|reach|e-?mail|linkedin|hire him|get in touch/],
+  ['contact', /contact|reach|e-?mail|linkedin|facebook|twitter|social|hire him|get in touch/],
   ['blogs', /blog|comic|batman|writes?\b|writing/],
   ['education', /stud(y|ied)|educat|degree|college|universit|mca|b\.?sc/],
   ['certs', /certif|course/],

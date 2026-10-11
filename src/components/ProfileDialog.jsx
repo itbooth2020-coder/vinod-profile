@@ -95,6 +95,12 @@ export default function ProfileDialog({ titleId }) {
           <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">
             LinkedIn ↗<span className="sr-only"> (opens in a new tab)</span>
           </a>
+          <a className="btn" href={profile.facebook} target="_blank" rel="noopener noreferrer">
+            Facebook ↗<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          <a className="btn" href={profile.x} target="_blank" rel="noopener noreferrer">
+            X ↗<span className="sr-only"> (Twitter, opens in a new tab)</span>
+          </a>
           <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Resume (PDF)</a>
         </div>
       </div>

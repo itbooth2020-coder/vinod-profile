@@ -4,6 +4,9 @@ import { useEffect, useRef } from 'react'
 // It breathes slowly while idle and reacts to state: ripples while listening, a fast scanning
 // arc while thinking, and a voice waveform while speaking (energyRef pulses on each word).
 // Visitors who prefer reduced motion get a still frame that changes only with the state.
+// Colours come from the site theme (--accent, --accent2, --bg) and update live when it changes.
+// Dark pages blend additively for a glow; light pages paint normally with deeper shades and
+// slightly stronger alphas, since additive light washes out on a light background.
 
 const STATES = {
   idle: { spin: 0.12, ring: 0.35, glow: 0.55, jitter: 0.015 },
@@ -24,6 +27,31 @@ function spherePoints(n) {
   return pts
 }
 
+// '#rgb', '#rrggbb' or 'rgb()/rgba()' (comma or space syntax) -> [r, g, b]. Anything else (e.g.
+// a named colour) is normalised by the canvas itself; null if it still can't be read.
+function parseColor(value, ctx) {
+  let v = value.trim()
+  if (!v) return null
+  if (!/^(#|rgba?\()/i.test(v)) {
+    ctx.fillStyle = '#000'
+    ctx.fillStyle = v
+    v = String(ctx.fillStyle)
+  }
+  let m = v.match(/^#([0-9a-f]{3,8})$/i)
+  if (m) {
+    const hx = m[1].length < 6 ? [...m[1].slice(0, 3)].map((c) => c + c).join('') : m[1]
+    return [0, 2, 4].map((i) => parseInt(hx.slice(i, i + 2), 16))
+  }
+  m = v.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i)
+  return m ? [m[1], m[2], m[3]].map((n) => Math.round(Math.min(255, +n))) : null
+}
+
+const mixRGB = (a, b, t) => a.map((c, i) => Math.round(c + (b[i] - c) * t)) // t = share of b
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${Math.min(1, a)})`
+const WHITE = [255, 255, 255]
+const BLACK = [0, 0, 0]
+const luminance = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+
 export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
   const canvasRef = useRef(null)
   const stateRef = useRef(state)
@@ -43,6 +71,37 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
     let last = performance.now()
     let t = 0
 
+    // Theme colours, re-read whenever the page theme changes.
+    const c = {}
+    const readColors = () => {
+      const cs = getComputedStyle(canvas)
+      const a = parseColor(cs.getPropertyValue('--accent'), ctx) || [255, 166, 77]
+      const b = parseColor(cs.getPropertyValue('--accent2'), ctx) || a
+      const bg = parseColor(cs.getPropertyValue('--bg'), ctx)
+      c.light = bg ? luminance(bg) > 0.5 : document.documentElement.dataset.theme === 'light'
+      c.halo = a
+      c.mid = b
+      if (c.light) {
+        c.op = 'source-over'
+        c.k = 1.3 // alpha boost
+        c.ring = mixRGB(a, BLACK, 0.25)
+        c.core = mixRGB(a, WHITE, 0.7)
+        c.back = a
+        c.front = mixRGB(b, BLACK, 0.2)
+        c.wave = c.ring
+        c.spark = b
+      } else {
+        c.op = 'lighter'
+        c.k = 1
+        c.ring = a
+        c.core = mixRGB(a, WHITE, 0.85)
+        c.back = a
+        c.front = mixRGB(b, WHITE, 0.3)
+        c.wave = c.front
+        c.spark = mixRGB(b, WHITE, 0.2)
+      }
+    }
+
     const resize = () => {
       const r = canvas.getBoundingClientRect()
       dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -57,7 +116,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
       ctx.beginPath()
       ctx.arc(w / 2, h / 2, r, a0, a1)
       ctx.lineWidth = width
-      ctx.strokeStyle = `rgba(255,170,70,${alpha})`
+      ctx.strokeStyle = rgba(c.ring, alpha * c.k)
       ctx.stroke()
     }
 
@@ -76,18 +135,18 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
+      ctx.globalCompositeOperation = c.op
 
       // Halo and molten core.
       let g = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 2)
-      g.addColorStop(0, `rgba(255,140,40,${0.3 * p.glow + breath * 0.08})`)
-      g.addColorStop(1, 'rgba(255,100,20,0)')
+      g.addColorStop(0, rgba(c.halo, 0.3 * p.glow + breath * 0.08))
+      g.addColorStop(1, rgba(c.halo, 0))
       ctx.fillStyle = g
       ctx.fillRect(0, 0, w, h)
       g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.6)
-      g.addColorStop(0, `rgba(255,248,225,${0.85 + energy * 0.15})`)
-      g.addColorStop(0.3, `rgba(255,196,100,${0.55 + breath * 0.2})`)
-      g.addColorStop(1, 'rgba(255,110,20,0)')
+      g.addColorStop(0, rgba(c.core, 0.85 + energy * 0.15))
+      g.addColorStop(0.3, rgba(c.mid, (0.55 + breath * 0.2) * c.k))
+      g.addColorStop(1, rgba(c.halo, 0))
       ctx.fillStyle = g
       ctx.beginPath()
       ctx.arc(cx, cy, R * 0.6, 0, Math.PI * 2)
@@ -103,6 +162,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
       const ay = t * p.spin
       const ax = 0.45 + Math.sin(t * 0.2) * 0.15
       const [sy, cyA, sx, cxA] = [Math.sin(ay), Math.cos(ay), Math.sin(ax), Math.cos(ax)]
+      const [b0, b1] = [c.back, c.front] // back-to-front particle tint
       for (const q of pts) {
         const x1 = q.x * cyA + q.z * sy
         const z1 = -q.x * sy + q.z * cyA
@@ -111,7 +171,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
         const rr = R * (1 + (p.jitter + energy * 0.05) * Math.sin(q.seed * 13 + t * 3))
         const depth = (z2 + 1) / 2
         const size = 0.6 + depth * 1.5
-        ctx.fillStyle = `rgba(255,${(150 + depth * 70) | 0},${(50 + depth * 60) | 0},${0.12 + depth * 0.7})`
+        ctx.fillStyle = `rgba(${(b0[0] + (b1[0] - b0[0]) * depth) | 0},${(b0[1] + (b1[1] - b0[1]) * depth) | 0},${(b0[2] + (b1[2] - b0[2]) * depth) | 0},${Math.min(1, (0.12 + depth * 0.7) * c.k)})`
         ctx.fillRect(cx + x1 * rr - size / 2, cy + y2 * rr - size / 2, size, size)
       }
 
@@ -124,7 +184,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
           ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
         }
         ctx.lineWidth = 1.5
-        ctx.strokeStyle = `rgba(255,200,120,${0.4 + energy * 0.5})`
+        ctx.strokeStyle = rgba(c.wave, (0.4 + energy * 0.5) * c.k)
         ctx.stroke()
       }
 
@@ -134,7 +194,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
       arc(R * 1.28, 0, Math.PI * 2, 2, 0.5)
       ctx.setLineDash([])
       const tick = -t * 0.15 * p.ring
-      ctx.strokeStyle = 'rgba(255,170,70,0.45)'
+      ctx.strokeStyle = rgba(c.ring, 0.45 * c.k)
       ctx.lineWidth = 1
       ctx.beginPath()
       for (let i = 0; i < 90; i++) {
@@ -175,7 +235,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
         }
         const r0 = R * (1 + sp.r * 0.9)
         const r1 = r0 + R * 0.08
-        ctx.strokeStyle = `rgba(255,190,110,${0.7 * (1 - sp.r)})`
+        ctx.strokeStyle = rgba(c.spark, 0.7 * (1 - sp.r) * c.k)
         ctx.beginPath()
         ctx.moveTo(cx + Math.cos(sp.a) * r0, cy + Math.sin(sp.a) * r0)
         ctx.lineTo(cx + Math.cos(sp.a + 0.05) * r1, cy + Math.sin(sp.a + 0.05) * r1)
@@ -217,6 +277,18 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
           })
         : null
     io?.observe(canvas)
+
+    // Follow theme changes live: light/dark toggle, palette, custom accent (inline style on <html>).
+    const onTheme = () => {
+      readColors()
+      if (reduce.matches) draw(1)
+    }
+    const mo = new MutationObserver(onTheme)
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme', 'data-palette'] })
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    scheme.addEventListener('change', onTheme)
+
+    readColors()
     resize()
     reduce.addEventListener('change', start)
     start()
@@ -224,6 +296,8 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       io?.disconnect()
+      mo.disconnect()
+      scheme.removeEventListener('change', onTheme)
       reduce.removeEventListener('change', start)
     }
   }, [energyRef])

@@ -10,7 +10,8 @@ The user's step-by-step guide is at `d:\Project-Doc\Vinod-Profile\deploy-vinodya
 
 ## What this project is
 
-- Vite build: `npm ci && npm run build` writes to `dist/`. The app is a single page with no client-side router, but still set up the SPA error responses (403/404 → `/index.html`, 200).
+- Vite build: `npm ci && npm run build` writes to `dist/`. The app is a single page with **no client-side routes**: deep links use `#case-…` hashes and `?brief=1`, which both resolve to `/`. So unknown paths get a real 404 page (`dist/404.html`, from `public/404.html`), not an SPA fallback to `index.html`.
+- The production build is static: leave `VITE_LIVE_AGENT` unset (or `false`), so the app makes **no `/api` calls** (see `src/agent/askAgent.js`). Set it to `true` only once Phase 2 serves `/api/*`.
 - `public/resume.pdf` and other `public/` files ship as static assets.
 - Server endpoints exist only in the Vite dev/preview server (`vite.config.js` mounts them):
   - `/api/ask` → `server/profileAgent.js` (Claude; needs `ANTHROPIC_API_KEY`, streams NDJSON)
@@ -49,17 +50,20 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
    - origin `vinodyadav-com-site.s3.ap-south-1.amazonaws.com` with the OAC and an empty `S3OriginConfig.OriginAccessIdentity`
    - `ViewerProtocolPolicy: redirect-to-https`, GET/HEAD, `Compress: true`, managed CachingOptimized policy `658327ea-f89d-4fab-a63d-7e88639e58f6`
    - aliases for both domains, the ACM cert with `sni-only` and `TLSv1.2_2021`, `DefaultRootObject: index.html`, `HttpVersion: http2and3`, IPv6 on, price class `PriceClass_200` unless the user picks otherwise
-   - custom error responses 403 and 404 → `/index.html`, response code 200
+   - custom error responses: 403 and 404 → `ResponsePagePath: /404.html`, `ResponseCode: 404`, `ErrorCachingMinTTL: 60` (the private bucket answers 403 for missing keys, so both must map to the 404 page)
+   - response headers policy: the AWS-managed **SecurityHeadersPolicy** (`67f7725c-6f97-4210-82d7-5512b31e9d03`; confirm with `aws cloudfront list-response-headers-policies --type managed`) on the default behavior
 6. **Bucket policy:** allow `s3:GetObject` to principal `cloudfront.amazonaws.com`, with the condition `AWS:SourceArn` = the distribution ARN.
 7. **Apex → www redirect:** create, publish and associate the CloudFront Function from the guide (viewer-request) on the default behavior.
 8. **DNS:** add A and AAAA alias records for both names. Use the distribution domain and the CloudFront hosted zone ID `Z2FDTNDATAQYW2`.
-9. **Upload** (cache-friendly):
+9. **Upload** (cache-friendly). Only Vite's hashed `/assets/*` files are immutable for a year; everything else in `dist/` keeps a fixed name (`index.html`, `404.html`, `resume.pdf`, `sitemap.xml`, `robots.txt`, `og-image.jpg`, `profile*.{png,webp}`, the favicons and `apple-touch-icon.png`), so it gets a short TTL:
    ```bash
-   aws s3 sync dist/ s3://vinodyadav-com-site --delete --exclude "index.html" --cache-control "public,max-age=31536000,immutable"
-   aws s3 cp dist/index.html s3://vinodyadav-com-site/index.html --cache-control "no-cache,no-store,must-revalidate"
-   aws cloudfront create-invalidation --distribution-id <ID> --paths "/index.html"
+   aws s3 sync dist/assets s3://vinodyadav-com-site/assets --delete --cache-control "public,max-age=31536000,immutable"
+   aws s3 sync dist/ s3://vinodyadav-com-site --delete --exclude "assets/*" --cache-control "public,max-age=300"
+   aws s3 cp dist/index.html s3://vinodyadav-com-site/index.html --cache-control "no-cache"
+   aws s3 cp dist/404.html s3://vinodyadav-com-site/404.html --cache-control "no-cache"
+   aws cloudfront create-invalidation --distribution-id <ID> --paths "/index.html" "/404.html" "/resume.pdf"
    ```
-   `public/resume.pdf` keeps its file name, so it is not hashed. Upload it with `no-cache` too, or invalidate `/resume.pdf` whenever it changes.
+   Invalidate `/index.html`, `/404.html` and `/resume.pdf` on **every** deploy. (`aws s3 sync` only uploads changed files, so a re-run doesn't refresh `Cache-Control` on unchanged objects; when changing cache headers, add `--exact-timestamps` or copy the objects again.)
 10. **Wait** with `aws cloudfront wait distribution-deployed --id <ID>`, then run the verification below.
 
 ## Phase 2 (optional, ask first): live Claude agent and Kokoro voice
@@ -71,6 +75,7 @@ Offer this only after Phase 1 is live, and explain the extra cost first (about $
 - Store `ANTHROPIC_API_KEY` in SSM Parameter Store as a SecureString, and have the instance load it at startup through an instance role.
 - Add a second CloudFront origin (the instance, HTTPS or HTTP-only from CloudFront) and an ordered cache behavior for `/api/*`: all methods, managed `CachingDisabled` policy, and the `AllViewerExceptHostHeader` origin request policy. Restrict the instance's security group to the CloudFront managed prefix list.
 - Check that streaming works through CloudFront: `curl -N -X POST https://www.vinodyadav.com/api/ask ...`.
+- Then rebuild with `VITE_LIVE_AGENT=true` (for example in the workflow env) so the frontend starts calling `/api/*`.
 
 ## CI/CD (GitHub Actions)
 
@@ -85,10 +90,16 @@ The repo is `github.com/itbooth2020-coder/vinod-profile` and deploys from `main`
 curl -sI https://www.vinodyadav.com | head -5            # 200, served by CloudFront
 curl -sI http://www.vinodyadav.com | head -3             # 301 to https
 curl -sI https://vinodyadav.com | head -3                # 301 to https://www.vinodyadav.com
-curl -sI https://www.vinodyadav.com/does-not-exist       # 200 (SPA fallback)
+curl -sI https://www.vinodyadav.com/does-not-exist       # 404 (not 200), served by CloudFront
+curl -s https://www.vinodyadav.com/does-not-exist | grep -o "<title>[^<]*"   # <title>Page not found · Vinod Pyarelal Yadav
+curl -sI "https://www.vinodyadav.com/?brief=1" | head -1 # 200 (index.html)
+curl -sI https://www.vinodyadav.com/404.html | head -1   # 200 when requested directly
+curl -sI https://www.vinodyadav.com | grep -i "strict-transport-security\|x-content-type-options\|x-frame-options"  # SecurityHeadersPolicy
+curl -sI https://www.vinodyadav.com/index.html | grep -i cache-control   # no-cache
 curl -sI https://vinodyadav-com-site.s3.ap-south-1.amazonaws.com/index.html  # 403: bucket not public
 curl -sI https://www.vinodyadav.com/resume.pdf           # 200
 ```
+The built JS should make no `/api` requests: open the live site with DevTools > Network filtered to `/api` and ask the console a question; nothing should appear.
 
 ## Redeploy (the common case)
 

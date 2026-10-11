@@ -1,5 +1,20 @@
 import { answerLocally } from './localAgent.js'
 
+// VITE_LIVE_AGENT (build-time flag): whether the site has a server with /api/ask and /api/speak.
+// Production builds call them only when it is 'true'. The static site (S3 + CloudFront) leaves it
+// unset, so the console uses the local agent and VINCE the browser voice, with no /api requests.
+// `npm run dev` mounts the endpoints (vite.config.js), so dev tries them unless it is 'false'.
+const flag = import.meta.env.VITE_LIVE_AGENT
+export const liveAgent = import.meta.env.DEV ? flag !== 'false' : flag === 'true'
+
+// After one failed /api call (network error, non-2xx, or a server without credentials), skip
+// /api for the rest of the visit. Shared with voice.js.
+let apiDown = false
+export const apiAvailable = () => liveAgent && !apiDown
+export const markApiDown = () => {
+  apiDown = true
+}
+
 // Streams an answer from the runtime agent at /api/ask (NDJSON), falling back to the
 // in-browser resume agent when the endpoint is missing or has no API credentials.
 // Callbacks: onStatus(text), onText(chunk), onSource('live' | 'local'). voice: true asks for a short,
@@ -9,6 +24,8 @@ export async function askAgent(question, history, { onStatus, onText, onSource, 
     onSource('local')
     onText(answerLocally(question))
   }
+
+  if (!apiAvailable()) return local()
 
   let res
   try {
@@ -20,6 +37,7 @@ export async function askAgent(question, history, { onStatus, onText, onSource, 
     })
   } catch (err) {
     if (err.name === 'AbortError') throw err
+    markApiDown()
     return local()
   }
 
@@ -28,7 +46,11 @@ export async function askAgent(question, history, { onStatus, onText, onSource, 
     onSource('live')
     return onText((await res.json().catch(() => ({}))).error || 'Too many questions, please try again shortly.')
   }
-  if (!res.ok || !type.includes('ndjson') || !res.body) return local()
+  // 429 (above) is a live rate limit, so it doesn't count as the endpoint being down.
+  if (!res.ok || !type.includes('ndjson') || !res.body) {
+    markApiDown()
+    return local()
+  }
 
   onSource('live')
   const reader = res.body.getReader()
@@ -50,6 +72,7 @@ export async function askAgent(question, history, { onStatus, onText, onSource, 
         wroteText = true
         onText(evt.text)
       } else if (evt.type === 'error') {
+        if (evt.fallback) markApiDown()
         if (evt.fallback && !wroteText) return local()
         onText((wroteText ? '\n\n' : '') + evt.text)
       }

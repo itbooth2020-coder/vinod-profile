@@ -2,7 +2,7 @@
 // then keyword retrieval over the resume data in src/data.js.
 // Used when the live Claude agent (/api/ask) isn't available, e.g. on static hosting.
 // Answers use the same Markdown subset as the live agent (see components/RichText.jsx).
-import { profile, stats, availability, leadership, highlights, experience, projects, otherProjects, skills, certifications, education, languages, blogs } from '../data.js'
+import { profile, stats, availability, leadership, highlights, experience, projects, otherProjects, skills, certifications, education, languages, blogs, suggestedPrompts } from '../data.js'
 
 const STOP = new Set('a an the and or of to in on for with by at is are was were be has have had do does did he his him vinod yadav pyarelal what which who whom how tell me about can could would you your please give list any some there their it its this that from as into than then'.split(' '))
 
@@ -240,7 +240,8 @@ export function answerLocally(question) {
     .sort((a, b) => b.score - a.score)
 
   if (!scored.length) {
-    return `The resume doesn't cover that. You can ask Vinod directly at [${profile.email}](mailto:${profile.email}) or on [LinkedIn](${profile.linkedin}).`
+    const tryThese = suggestedPrompts.slice(1, 5).map((q) => `“${q.replace(/\?$/, '')}”`).join(', ')
+    return `The resume doesn't cover that. You could try ${tryThese}. You can also ask Vinod directly at [${profile.email}](mailto:${profile.email}) or on [LinkedIn](${profile.linkedin}).`
   }
   // Skill questions get every matching skill area; anything else gets the best two passages.
   const limit = scored[0].c.titleTokens.has('skills') ? skills.length : 2

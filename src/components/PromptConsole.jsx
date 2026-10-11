@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { profile, suggestedPrompts } from '../data.js'
-import { askAgent } from '../agent/askAgent.js'
+import { askAgent, liveAgent } from '../agent/askAgent.js'
 import RichText from './RichText.jsx'
 
-const GREETING = `Hi! I'm ${profile.firstName}'s profile agent. I answer questions about his experience, projects, skills and education from his resume, with live AI answers when available. I can answer with **photos, tables and charts** too.`
-const SOURCES = { live: 'resume.pdf + LinkedIn · Claude', local: 'resume data · offline' }
-const countTokens = (s) => s.split(/\s+/).filter(Boolean).length
+const GREETING = `Hi! I'm ${profile.firstName.split(' ')[0]}'s profile assistant. I answer questions about his experience, projects, skills and education from his resume${liveAgent ? ', with live AI answers when available' : ''}, with **photos, tables and charts**.`
+const SOURCES = { live: 'Claude · resume + LinkedIn', local: 'resume search · offline' }
 
 export default function PromptConsole() {
   const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }])
@@ -14,7 +13,6 @@ export default function PromptConsole() {
   const [status, setStatus] = useState('')
   // Offline until askAgent reports a live answer (static hosting has no /api/ask).
   const [source, setSource] = useState('local')
-  const [tokens, setTokens] = useState(countTokens(GREETING))
   const logRef = useRef(null)
   const inputRef = useRef(null)
   const abortRef = useRef(null)
@@ -37,7 +35,6 @@ export default function PromptConsole() {
 
     const appendText = (chunk) => {
       setStatus('')
-      setTokens((t) => t + countTokens(chunk))
       setMessages((m) => {
         const next = m.slice()
         const last = next[next.length - 1]
@@ -89,7 +86,6 @@ export default function PromptConsole() {
         })}
       </div>
       <div className="metrics" aria-hidden="true">
-        <span>tokens: {tokens}</span>
         <span>source: {SOURCES[source]}</span>
       </div>
       <form className="prompt" onSubmit={onSubmit}>

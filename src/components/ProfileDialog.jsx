@@ -104,7 +104,7 @@ export default function ProfileDialog({ titleId }) {
           <a className="btn" href={profile.x} target="_blank" rel="noopener noreferrer">
             X ↗<span className="sr-only"> (Twitter, opens in a new tab)</span>
           </a>
-          <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Resume (PDF)</a>
+          <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
         </div>
       </div>
     </div>

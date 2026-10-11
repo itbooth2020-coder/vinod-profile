@@ -80,6 +80,7 @@ export default function VoiceAssistant() {
   const launcherRef = useRef(null)
   const logRef = useRef(null)
   const wasOpen = useRef(false)
+  const keepFocus = useRef(false) // set by an outside-click close, so focus stays where the visitor clicked
 
   const addVince = (text) => setMessages((m) => [...m, { role: 'vince', text }])
 
@@ -146,6 +147,7 @@ export default function VoiceAssistant() {
   }
 
   const startTour = () => {
+    window.dispatchEvent(new Event('brief:exit')) // the tour narrates the full page (App.jsx)
     unlockSpeech()
     halt()
     setSuggestions([])
@@ -325,8 +327,28 @@ export default function VoiceAssistant() {
   }, [open, size])
 
   useEffect(() => {
-    showRef.current = { show, explain, stopAll }
+    showRef.current = { show, explain, stopAll, close }
   })
+
+  // In the normal panel (including during the tour), pressing anywhere else on the page closes
+  // VINCE. Minimized, he carries on while the visitor uses the page; maximized, the backdrop
+  // handles it. Presses on elements that drive VINCE ([data-vince-trigger]) are ignored, so
+  // they don't close him just as they open him or ask him something.
+  useEffect(() => {
+    if (!open || size !== 'normal') return
+    const onPointerDown = (e) => {
+      if (e.button !== 0) return
+      const root = document.documentElement
+      if (e.clientX >= root.clientWidth || e.clientY >= root.clientHeight) return // page scrollbar
+      const target = e.target
+      if (!(target instanceof Element) || panelRef.current?.contains(target)) return
+      if (target.closest('[data-vince-trigger]')) return
+      keepFocus.current = true
+      showRef.current.close()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [open, size])
 
   // Window events let other components drive VINCE: 'vince:open', 'vince:explain' (detail: a
   // domain-graph node; used by the graph dialog) and 'vince:stop'.
@@ -367,10 +389,12 @@ export default function VoiceAssistant() {
     return () => clearTimeout(id)
   }, [])
 
-  // Focus moves into the panel when it opens or changes size, and back to the launcher when it closes.
+  // Focus moves into the panel when it opens or changes size, and back to the launcher when it
+  // closes, unless it closed because the visitor clicked elsewhere: then focus stays there.
   useEffect(() => {
     if (open) panelRef.current?.focus()
-    else if (wasOpen.current) launcherRef.current?.focus()
+    else if (wasOpen.current && !keepFocus.current) launcherRef.current?.focus()
+    keepFocus.current = false
     wasOpen.current = open
   }, [open, size])
 
@@ -395,14 +419,14 @@ export default function VoiceAssistant() {
               <button type="button" onClick={() => setHint(false)} aria-label="Dismiss">✕</button>
             </p>
           )}
-          <button ref={launcherRef} type="button" className="vince-launch" onClick={show} aria-haspopup="dialog">
+          <button ref={launcherRef} type="button" className="vince-launch" onClick={show} aria-haspopup="dialog" data-vince-trigger>
             <span className="vince-launch__orb" aria-hidden="true" />
             <span>Ask VINCE</span>
           </button>
         </div>
       )}
 
-      {open && size === 'max' && <div className="vince-backdrop" onClick={() => setSize('normal')} aria-hidden="true" />}
+      {open && size === 'max' && <div className="vince-backdrop" onClick={close} aria-hidden="true" />}
 
       {open && (
         <section

@@ -40,7 +40,7 @@ export default function DomainGraph() {
   return (
     <div className="card">
       <div className="card__head">
-        <h2>Domain graph</h2>
+        <h3>Domain graph</h3>
         <button type="button" className="icon-btn" onClick={show} aria-haspopup="dialog">
           <span aria-hidden="true">⤢</span> Open
         </button>
@@ -60,7 +60,7 @@ export default function DomainGraph() {
         <div className="card__head">
           <h2 id="gdialog-title">Domain graph · projects &amp; technologies</h2>
           <div className="gdialog__tools">
-            <button type="button" className="askvince__btn" onClick={askVince} aria-label={`Ask VINCE to explain ${name}`}>
+            <button type="button" className="askvince__btn" data-vince-trigger onClick={askVince} aria-label={`Ask VINCE to explain ${name}`}>
               <span className="btn__orb" aria-hidden="true" />
               Ask VINCE<span className="askvince__label">&nbsp;to explain {name}</span>
             </button>
@@ -75,7 +75,7 @@ export default function DomainGraph() {
               <b>VINCE{speaking ? ' · speaking' : ''}:</b> {explainNode(explained)}
             </p>
             {speaking && (
-              <button type="button" className="icon-btn" onClick={() => window.dispatchEvent(new Event('vince:stop'))}>
+              <button type="button" className="icon-btn" data-vince-trigger onClick={() => window.dispatchEvent(new Event('vince:stop'))}>
                 <span aria-hidden="true">■</span> Stop
               </button>
             )}

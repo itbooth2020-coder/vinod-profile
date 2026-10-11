@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { profile } from '../data.js'
-import { matchRole, fitSummaryText, SAMPLE_JD, MIN_WORDS } from '../agent/roleFit.js'
+import { matchRole, fitSummaryText, availabilityNote, SAMPLE_JD, MIN_WORDS } from '../agent/roleFit.js'
 
 // Role-fit matcher: a recruiter pastes a job description and sees which requirements the profile
 // backs with evidence, related experience, and what isn't evident. Runs entirely in the browser.
@@ -94,6 +94,7 @@ export default function RoleFit() {
 
         {ready && (
           <>
+            {availabilityNote() && <p className="fit__avail">Availability: {availabilityNote()}</p>}
             <Coverage result={result} />
 
             {result.leadership && (

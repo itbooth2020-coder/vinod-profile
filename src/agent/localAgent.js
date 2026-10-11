@@ -2,7 +2,7 @@
 // then keyword retrieval over the resume data in src/data.js.
 // Used when the live Claude agent (/api/ask) isn't available, e.g. on static hosting.
 // Answers use the same Markdown subset as the live agent (see components/RichText.jsx).
-import { profile, highlights, experience, projects, otherProjects, skills, certifications, education, languages, blogs } from '../data.js'
+import { profile, stats, availability, leadership, highlights, experience, projects, otherProjects, skills, certifications, education, languages, blogs } from '../data.js'
 
 const STOP = new Set('a an the and or of to in on for with by at is are was were be has have had do does did he his him vinod yadav pyarelal what which who whom how tell me about can could would you your please give list any some there their it its this that from as into than then'.split(' '))
 
@@ -12,10 +12,14 @@ const SYNONYMS = {
   stack: 'skills technologies',
   tech: 'skills technologies',
   technologies: 'skills',
-  ai: 'agents claude copilotkit darwin generative',
+  ai: 'agents claude copilotkit darwin generative prompt',
+  prompt: 'prompt engineering few shot guardrails darwin',
+  prompts: 'prompt engineering few shot guardrails darwin',
+  agentic: 'agents claude code darwin',
+  sdk: 'claude agent',
   mdm: 'device management emm',
   iot: 'devices connected sensor',
-  contact: 'email linkedin facebook twitter x social reach',
+  contact: 'email linkedin github facebook twitter x social reach',
   reach: 'contact email',
   study: 'education degree',
   studied: 'education degree',
@@ -38,19 +42,26 @@ const chunks = [
   { title: 'Who is Vinod summary overview introduce', text: profile.summary },
   { title: 'Current role job accenture', text: `${profile.name} is currently ${profile.role} at ${profile.company} (${experience[0].period}), based in ${profile.location}. ${experience[0].points.slice(0, 3).join(' ')}`, media: experience[0].media, label: profile.company },
   { title: 'Impact highlights achievements', text: highlights.map((h) => `${h.title}: ${h.text}.`).join(' ') },
+  { title: 'Leadership management style hiring mentoring delivery quality budget stakeholders', text: leadership.map((l) => `${l.title}: ${l.points.join('; ')}.`).join(' ') },
   ...experience.map((e) => ({
     title: `${e.company} ${e.role} experience career history`,
     text: `${e.role} at ${e.company}, ${e.location} (${e.period}). ${e.points.join(' ')}`,
     media: e.media,
     label: e.company,
   })),
-  ...projects.map((p) => ({ title: `${p.name} ${p.tag} project`, text: `${p.name} (${p.tag}): ${p.text}`, media: p.media, label: p.name })),
+  ...projects.map((p) => ({
+    title: `${p.name} ${p.tag} project`,
+    // Case-study approach points add detail the short card text doesn't have (e.g. Darwin's prompt engineering).
+    text: [`${p.name} (${p.tag}): ${p.text}`, ...(p.caseStudy?.approach || []).filter((a) => !p.text.includes(a))].join(' '),
+    media: p.media,
+    label: p.name,
+  })),
   { title: 'Other notable projects portfolio', text: `Other notable projects: ${otherProjects.join(', ')}.` },
   ...skills.map((s) => ({ title: `${s.area} skills technologies stack`, text: `${s.area}: ${s.items.join(', ')}.` })),
   { title: 'Certifications courses learning', text: `Certifications: ${certifications.join('; ')}.` },
   { title: 'Education degree college university', text: `Education: ${education.join('; ')}.` },
   { title: 'Languages spoken', text: `Languages: ${languages.join(', ')}.` },
-  { title: 'Contact email linkedin facebook twitter x social reach hire location', text: `You can reach Vinod by email at ${profile.email} or on LinkedIn: ${profile.linkedin}. He is also on Facebook: ${profile.facebook} and X (Twitter): ${profile.x}. He is based in ${profile.location}.` },
+  { title: 'Contact email linkedin github facebook twitter x social reach hire location', text: `You can reach Vinod by email at ${profile.email} or on LinkedIn: ${profile.linkedin}. He is also on GitHub: ${profile.github}, Facebook: ${profile.facebook} and X (Twitter): ${profile.x}. He is based in ${profile.location}.` },
 ].map((c) => ({ ...c, titleTokens: new Set(tokenize(c.title)), textTokens: tokenize(c.text) }))
 
 // Markdown helpers
@@ -76,6 +87,33 @@ const RICH = [
       `Paste the job description into the role-fit checker. It lists the requirements ${profile.firstName.split(' ')[0]}'s experience covers, with evidence from his roles and projects, and what isn't evident in the profile. It runs in your browser.\n\n[Check role fit](#fit)`,
   },
   {
+    // "Is he open to work?", "notice period?", "would he relocate?", "remote?", "when can he join?"
+    test: (q) =>
+      /\b(availab\w*|notice|relocat\w*|open to (work|new|roles?|opportunit\w*|offers?|remote|hybrid|on-?site)|looking for (a )?(new )?(job|role|opportunit\w*)|job hunting|join(ing)? date|start date|(remote|hybrid|on-?site) (work|role|job|position|option)s?|work(ing)? (remotely|from home))\b|when can (he|vinod) (start|join)|\b(remote|hybrid|on-?site)\W*$/.test(q),
+    answer: (q) => {
+      const first = profile.firstName.split(' ')[0]
+      const modes = availability.workModes.map((m) => m.toLowerCase())
+      const or = (l) => (l.length < 2 ? l.join('') : `${l.slice(0, -1).join(', ')} or ${l.at(-1)}`)
+      if (!availability.open) return `${first} isn't actively looking right now. You can still reach him at [${profile.email}](mailto:${profile.email}).`
+      // Lead with a direct answer to what was asked, then the full picture.
+      const lead =
+        /notice|join|start/.test(q) ? `${first}'s notice period is **${availability.notice}**.`
+        : /relocat/.test(q) ? (availability.relocation ? `Yes, ${first} is **open to relocation**.` : `${first} isn't looking to relocate.`)
+        : /remote|hybrid|on-?site|from home/.test(q) ? `${first} is based in ${availability.location} and open to **${or(modes)}** work.`
+        : `Yes. ${first} is **open to new opportunities** as ${or(availability.roles)}.`
+      return (
+        `${lead}\n\n` +
+        table(['Availability', 'Details'], [
+          ['**Target roles**', availability.roles.join(', ')],
+          ['**Notice period**', availability.notice],
+          ['**Location**', `${availability.location}; ${modes.slice(0, -1).join(', ')} or ${modes.at(-1)}`],
+          ['**Relocation**', availability.relocation ? 'Open to relocation' : 'Not open to relocation'],
+        ]) +
+        `\n\n[Email ${first}](mailto:${profile.email})\n\n[Open LinkedIn profile ↗](${profile.linkedin})`
+      )
+    },
+  },
+  {
     test: (q) => /\b(blogs?|blogging|articles?|writes?|writing|comics?|batman|android ?super ?nerds)\b/.test(q),
     answer: () =>
       `${profile.firstName} writes two blogs:\n\n` +
@@ -86,14 +124,18 @@ const RICH = [
       `\n\n[Read ${blogs.tech.name} ↗](${blogs.tech.url})\n\n[Read ${blogs.comic.name} ↗](${blogs.comic.url})`,
   },
   {
-    test: (q) => /\b(linked\s?in|facebook|twitter|social|contact|reach|connect|hire|email|e-mail|mail)\b/.test(q),
+    test: (q) => /\b(linked\s?in|git\s?hub|facebook|twitter|social|contact|reach|connect|hire|email|e-mail|mail)\b/.test(q),
     answer: (q) => {
       const linkedin = `[Open LinkedIn profile ↗](${profile.linkedin})`
+      const github = `[Open GitHub profile ↗](${profile.github})`
       const email = `[Email ${profile.firstName.split(' ')[0]}](mailto:${profile.email})`
-      const social = `[Facebook ↗](${profile.facebook})\n\n[X (Twitter) ↗](${profile.x})`
+      const social = `${github}\n\n[Facebook ↗](${profile.facebook})\n\n[X (Twitter) ↗](${profile.x})`
+      if (/git\s?hub/.test(q)) {
+        return `Here is ${profile.firstName}'s GitHub profile; it opens in a new tab.\n\n${github}\n\nThis site's source code is public too: [vinod-profile on GitHub ↗](${profile.source})`
+      }
       return /linked\s?in/.test(q)
         ? `Here is ${profile.firstName}'s LinkedIn profile; it opens in a new tab.\n\n${linkedin}\n\nYou can also email him at ${profile.email}.`
-        : `You can reach ${profile.firstName} by email at ${profile.email} or on LinkedIn, Facebook or X (Twitter).\n\n${email}\n\n${linkedin}\n\n${social}`
+        : `You can reach ${profile.firstName} by email at ${profile.email} or on LinkedIn, GitHub, Facebook or X (Twitter).\n\n${email}\n\n${linkedin}\n\n${social}`
     },
   },
   {
@@ -112,6 +154,7 @@ const RICH = [
   {
     test: (q) => /\b(impact|metrics?|numbers|achievements?|stats|statistics|improvements?|kpis?|results)\b/.test(q),
     answer: () =>
+      `Headline manager metrics: ${stats.map((s) => `**${s.value}** ${s.label.charAt(0).toLowerCase() + s.label.slice(1)}`).join('; ')}.\n\n` +
       'Measured improvements from the resume (percent change):\n\n' +
       chart({
         type: 'bar',

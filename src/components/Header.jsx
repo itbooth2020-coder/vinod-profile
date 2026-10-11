@@ -3,6 +3,7 @@ import ThemePicker from './ThemePicker.jsx'
 
 const links = [
   { href: '#console', label: 'console' },
+  { href: '#lead', label: 'leadership' },
   { href: '#fit', label: 'role fit' },
   { href: '#experience', label: 'experience' },
   { href: '#projects', label: 'projects' },

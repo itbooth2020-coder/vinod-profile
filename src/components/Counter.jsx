@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
-export default function Counter({ value }) {
-  const match = String(value).match(/^(\d+)(.*)$/)
+// Counts up a leading number ('35+', '100%'). Values with more digits after it ('3 wk → 5 days')
+// aren't counted, so they never show a misleading partial figure. `sr` replaces the visible text
+// for screen readers when the value doesn't read well as written.
+export default function Counter({ value, sr }) {
+  const match = String(value).match(/^(\d+)(\D*)$/)
   const target = match ? Number(match[1]) : null
   const [n, setN] = useState(0)
   const ref = useRef(null)
@@ -27,5 +30,12 @@ export default function Counter({ value }) {
     return () => io.disconnect()
   }, [target])
 
-  return <span ref={ref}>{target === null ? value : `${n}${match[2]}`}</span>
+  const shown = target === null ? value : `${n}${match[2]}`
+  if (!sr) return <span ref={ref}>{shown}</span>
+  return (
+    <span ref={ref}>
+      <span aria-hidden="true">{shown}</span>
+      <span className="sr-only">{sr}</span>
+    </span>
+  )
 }

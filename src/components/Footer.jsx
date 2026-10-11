@@ -5,6 +5,7 @@ export default function Footer() {
     <footer className="footer">
       © {new Date().getFullYear()} {profile.name} · {profile.location} ·{' '}
       <a href={profile.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a> ·{' '}
+      <a href={profile.github} target="_blank" rel="noopener noreferrer">GitHub</a> ·{' '}
       <a href={profile.facebook} target="_blank" rel="noopener noreferrer">Facebook</a> ·{' '}
       <a href={profile.x} target="_blank" rel="noopener noreferrer">X<span className="sr-only"> (Twitter)</span></a>
       <br />

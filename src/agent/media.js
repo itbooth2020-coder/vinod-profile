@@ -25,7 +25,7 @@ export const media = [
   { id: 'project/presto', label: 'PRESTO Transit Payments', kind: 'project', domain: 'prestocard.ca' },
   { id: 'project/vusion', label: 'VusionGroup Retail IoT', kind: 'project', domain: 'vusion.com' },
   { id: 'project/meijer', label: 'Meijer Last-Mile Delivery', kind: 'project', mono: 'M' }, // meijer.com's site icon is a generic React logo
-  { id: 'project/meta-mdm', label: 'META MDM Platform', kind: 'project', mono: 'MDM' },
+  { id: 'project/meta-mdm', label: 'Meta (Facebook) MDM Platform', kind: 'project', mono: 'MDM' },
   { id: 'project/intelity', label: 'INTELITY Hospitality', kind: 'project', domain: 'intelity.com' },
   { id: 'project/bayer', label: 'Bayer Global Pharma Web', kind: 'project', domain: 'bayer.com' },
 

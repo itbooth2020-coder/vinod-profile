@@ -7,8 +7,8 @@ export default function Impact() {
       <h2 className="sec" id="impact-h">At a glance</h2>
       <dl className="stats">
         {stats.map((s) => (
-          <div key={s.label} className="card stat">
-            <dt><Counter value={s.value} /></dt>
+          <div key={s.label} className={`card stat${s.value.length > 6 ? ' stat--long' : ''}`}>
+            <dt><Counter value={s.value} sr={s.sr} /></dt>
             <dd>{s.label}</dd>
           </div>
         ))}

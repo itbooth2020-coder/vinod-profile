@@ -7,6 +7,7 @@ import PromptConsole from './components/PromptConsole.jsx'
 import ProfileCard from './components/ProfileCard.jsx'
 import DomainGraph from './components/DomainGraph.jsx'
 import Impact from './components/Impact.jsx'
+import Leadership from './components/Leadership.jsx'
 import RoleFit from './components/RoleFit.jsx'
 import Experience from './components/Experience.jsx'
 import Projects from './components/Projects.jsx'
@@ -107,6 +108,7 @@ export default function App() {
             </div>
           </div>
           <Impact />
+          <Leadership />
           <RoleFit />
           <Experience />
           <Projects />

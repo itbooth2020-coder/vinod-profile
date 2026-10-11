@@ -4,7 +4,7 @@ export default function Contact() {
   return (
     <section id="contact" aria-labelledby="contact-h">
       <div className="card contact">
-        <h3 className="sec" id="contact-h">Let's connect</h3>
+        <h2 className="sec" id="contact-h">Let's connect</h2>
         <p>
           Interested in engineering leadership, mobile, IoT, MDM or AI-agent platforms? I'd be glad to hear from you.
         </p>

@@ -9,11 +9,11 @@ const groups = [
 export default function Credentials() {
   return (
     <section id="credentials" aria-labelledby="credentials-h">
-      <h3 className="sec" id="credentials-h">Credentials</h3>
+      <h2 className="sec" id="credentials-h">Credentials</h2>
       <div className="grid">
         {groups.map((g) => (
           <article key={g.title} className="card mc">
-            <h4>{g.title}</h4>
+            <h3>{g.title}</h3>
             <ul>
               {g.items.map((item) => (
                 <li key={item}>{item}</li>

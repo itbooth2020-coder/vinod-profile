@@ -15,7 +15,7 @@ const SYNONYMS = {
   ai: 'agents claude copilotkit darwin generative',
   mdm: 'device management emm',
   iot: 'devices connected sensor',
-  contact: 'email linkedin reach',
+  contact: 'email linkedin facebook twitter x social reach',
   reach: 'contact email',
   study: 'education degree',
   studied: 'education degree',
@@ -50,7 +50,7 @@ const chunks = [
   { title: 'Certifications courses learning', text: `Certifications: ${certifications.join('; ')}.` },
   { title: 'Education degree college university', text: `Education: ${education.join('; ')}.` },
   { title: 'Languages spoken', text: `Languages: ${languages.join(', ')}.` },
-  { title: 'Contact email linkedin reach hire location', text: `You can reach Vinod by email at ${profile.email} or on LinkedIn: ${profile.linkedin}. He is based in ${profile.location}.` },
+  { title: 'Contact email linkedin facebook twitter x social reach hire location', text: `You can reach Vinod by email at ${profile.email} or on LinkedIn: ${profile.linkedin}. He is also on Facebook: ${profile.facebook} and X (Twitter): ${profile.x}. He is based in ${profile.location}.` },
 ].map((c) => ({ ...c, titleTokens: new Set(tokenize(c.title)), textTokens: tokenize(c.text) }))
 
 // Markdown helpers
@@ -79,13 +79,14 @@ const RICH = [
       `\n\n[Read ${blogs.tech.name} ↗](${blogs.tech.url})\n\n[Read ${blogs.comic.name} ↗](${blogs.comic.url})`,
   },
   {
-    test: (q) => /\b(linked\s?in|contact|reach|connect|hire|email|e-mail|mail)\b/.test(q),
+    test: (q) => /\b(linked\s?in|facebook|twitter|social|contact|reach|connect|hire|email|e-mail|mail)\b/.test(q),
     answer: (q) => {
       const linkedin = `[Open LinkedIn profile ↗](${profile.linkedin})`
       const email = `[Email ${profile.firstName.split(' ')[0]}](mailto:${profile.email})`
+      const social = `[Facebook ↗](${profile.facebook})\n\n[X (Twitter) ↗](${profile.x})`
       return /linked\s?in/.test(q)
         ? `Here is ${profile.firstName}'s LinkedIn profile; it opens in a new tab.\n\n${linkedin}\n\nYou can also email him at ${profile.email}.`
-        : `You can reach ${profile.firstName} by email at ${profile.email} or on LinkedIn.\n\n${email}\n\n${linkedin}`
+        : `You can reach ${profile.firstName} by email at ${profile.email} or on LinkedIn, Facebook or X (Twitter).\n\n${email}\n\n${linkedin}\n\n${social}`
     },
   },
   {

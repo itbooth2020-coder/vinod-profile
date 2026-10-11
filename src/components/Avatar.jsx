@@ -11,10 +11,11 @@ export default function Avatar() {
         <span className="avatar__fallback" role="img" aria-label={profile.name}>{initials}</span>
       ) : (
         <img
-          src={`${import.meta.env.BASE_URL}profile.png`}
+          src={`${import.meta.env.BASE_URL}profile.webp`}
           alt={`Portrait of ${profile.name}`}
           width="320"
           height="320"
+          decoding="async"
           onError={() => setFailed(true)}
         />
       )}

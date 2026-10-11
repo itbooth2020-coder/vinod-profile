@@ -7,7 +7,7 @@
 // Only city-level location is public; there is intentionally no street address entry.
 
 export const media = [
-  { id: 'profile', label: 'Vinod Pyarelal Yadav', kind: 'photo', src: 'profile.png' },
+  { id: 'profile', label: 'Vinod Pyarelal Yadav', kind: 'photo', src: 'profile.webp' },
 
   { id: 'company/accenture', label: 'Accenture', kind: 'company', domain: 'accenture.com' },
   { id: 'company/htc', label: 'HTC Global Services', kind: 'company', domain: 'htcinc.com' },

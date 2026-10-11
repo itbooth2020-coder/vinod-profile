@@ -14,6 +14,8 @@ export const profile = {
   location: 'Bengaluru, Karnataka',
   email: 'yadav.vinod579@gmail.com',
   linkedin: 'https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943',
+  facebook: 'https://www.facebook.com/vinodpyarelalyadav/',
+  x: 'https://x.com/yadavvinod579',
   resume: 'resume.pdf',
   domains: ['Mobile', 'IoT', 'MDM / EMM', 'AI Agents', 'Enterprise', 'Web'],
   summary:
@@ -22,7 +24,7 @@ export const profile = {
 
 // Profile dialog. Age is calculated from birthDate ('YYYY' or 'YYYY-MM-DD') and hidden while it's empty.
 export const personal = {
-  photo: 'formal-profile.png',
+  photo: 'profile.webp',
   birthDate: '1986-01-25', // e.g. '1987' or '1987-06-15'
   nationality: 'Indian',
   location: 'Bengaluru, Karnataka, India',

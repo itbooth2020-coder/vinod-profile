@@ -11,6 +11,8 @@ export default function Contact() {
         <div className="actions">
           <a className="btn btn--primary" href={`mailto:${profile.email}`}>{profile.email}</a>
           <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a className="btn" href={profile.facebook} target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a className="btn" href={profile.x} target="_blank" rel="noopener noreferrer">X<span className="sr-only"> (Twitter)</span></a>
           <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Resume (PDF)</a>
         </div>
       </div>

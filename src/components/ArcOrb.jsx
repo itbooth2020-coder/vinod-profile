@@ -193,10 +193,13 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
       t += dt
       draw(dt)
     }
+    // Only animate while the canvas is on screen, so several orbs on a page stay cheap.
+    let visible = true
     const start = () => {
       cancelAnimationFrame(raf)
+      raf = 0
       if (reduce.matches) draw(1)
-      else {
+      else if (visible) {
         last = performance.now()
         raf = requestAnimationFrame(tick)
       }
@@ -204,12 +207,23 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
 
     const ro = new ResizeObserver(resize)
     ro.observe(canvas)
+    const io =
+      typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(([entry]) => {
+            const next = entry.isIntersecting
+            if (next === visible) return
+            visible = next
+            start()
+          })
+        : null
+    io?.observe(canvas)
     resize()
     reduce.addEventListener('change', start)
     start()
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      io?.disconnect()
       reduce.removeEventListener('change', start)
     }
   }, [energyRef])

@@ -6,6 +6,7 @@
 // still works by text without it.
 
 import { speechChunks } from './chunks.js'
+import { liveAgent } from './askAgent.js'
 
 const hasWindow = typeof window !== 'undefined'
 const Recognition = hasWindow ? window.SpeechRecognition || window.webkitSpeechRecognition : null
@@ -139,8 +140,9 @@ if (hasSynthesis) whenVoicesReady()
 
 // ---------------------------------------------------------------------------------------------
 
-// 'unknown' until the first clip; 'on' once the server voice has answered; 'off' after a failure.
-let server = AudioCtx ? 'unknown' : 'off'
+// 'unknown' until the first clip; 'on' once the server voice has answered; 'off' after a failure,
+// or from the start when the build has no live server (VITE_LIVE_AGENT, see askAgent.js).
+let server = AudioCtx && liveAgent ? 'unknown' : 'off'
 
 export const voiceName = () => (server === 'on' ? 'Kokoro (British male), with JARVIS-style processing' : pickVoice()?.name ?? '')
 
@@ -240,9 +242,12 @@ async function speakServer(text, mine, done, { onBoundary, onLevel }) {
   const ctrl = new AbortController()
   active.abort = ctrl
   // Short first piece, then one sentence per piece (the same split the server prepares lines
-  // with). All are requested at once; the server generates them in order.
+  // with). Once the server voice has answered, all are requested at once and the server generates
+  // them in order; until then, the rest wait for the first, so a missing endpoint costs one request.
   const parts = speechChunks(text)
-  const clips = parts.map((p) => fetchClip(p, ctrl.signal))
+  const first = fetchClip(parts[0], ctrl.signal)
+  const ready = server === 'on' ? Promise.resolve() : first
+  const clips = parts.map((p, i) => (i === 0 ? first : ready.then(() => fetchClip(p, ctrl.signal))))
   clips.forEach((c) => c.catch(() => {}))
 
   // Feed the orb the real loudness of the voice.

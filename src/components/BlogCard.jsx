@@ -10,7 +10,7 @@ export default function BlogCard({ blog, icon, variant, cta }) {
       <header className="blog__head">
         <span className="blog__icon" aria-hidden="true">{icon}</span>
         <div>
-          <h4 id={headingId}>{blog.name}</h4>
+          <h3 id={headingId}>{blog.name}</h3>
           <p className="blog__tagline">{blog.tagline}</p>
         </div>
       </header>

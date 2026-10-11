@@ -4,7 +4,7 @@ import Counter from './Counter.jsx'
 export default function Impact() {
   return (
     <section id="impact" aria-labelledby="impact-h">
-      <h3 className="sec" id="impact-h">At a glance</h3>
+      <h2 className="sec" id="impact-h">At a glance</h2>
       <dl className="stats">
         {stats.map((s) => (
           <div key={s.label} className="card stat">
@@ -16,7 +16,7 @@ export default function Impact() {
       <div className="grid">
         {highlights.map((h) => (
           <article key={h.title} className="card mc">
-            <h4>{h.title}</h4>
+            <h3>{h.title}</h3>
             <p>{h.text}</p>
           </article>
         ))}

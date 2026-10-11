@@ -3,7 +3,7 @@ import { experience } from '../data.js'
 export default function Experience() {
   return (
     <section id="experience" aria-labelledby="experience-h">
-      <h3 className="sec" id="experience-h">Experience</h3>
+      <h2 className="sec" id="experience-h">Experience</h2>
       <ol className="timeline">
         {experience.map((job, i) => (
           <li key={job.company} className="card job">

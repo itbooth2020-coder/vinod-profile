@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
-import { profile, profileCard } from '../data.js'
-import Avatar from './Avatar.jsx'
+import { profileCard } from '../data.js'
 import ProfileDialog from './ProfileDialog.jsx'
 
 export default function ProfileCard() {
@@ -16,21 +15,13 @@ export default function ProfileCard() {
   return (
     <div className="card">
       <div className="card__head">
-        <h2>Profile card</h2>
+        <h3>Profile card</h3>
         <button type="button" className="icon-btn" onClick={show} aria-haspopup="dialog">
-          <span aria-hidden="true">⤢</span> Open
+          <span aria-hidden="true">⤢</span> Open<span className="sr-only"> full profile</span>
         </button>
       </div>
+      {/* The photo is shown in the hero; "Open" above shows it full size in the dialog. */}
       <div className="profile">
-        <button
-          type="button"
-          className="avatar-btn"
-          onClick={show}
-          aria-haspopup="dialog"
-          aria-label={`Open full profile of ${profile.name}`}
-        >
-          <Avatar />
-        </button>
         <dl className="kv">
           {profileCard.map(([k, v]) => (
             <div key={k}>

@@ -10,13 +10,26 @@ export const PALETTES = [
   { id: 'mahogany', name: 'Mahogany', note: 'dark reddish-brown', swatch: ['#140c0b', '#c8644c', '#e0a96d'] },
 ]
 
+// `css` is the Google Fonts query for the family + its mono pairing. Inter is linked in index.html;
+// the others load on demand (index.html's inline script also loads a saved choice before first paint).
 export const FONTS = [
   { id: 'inter', name: 'Inter', family: 'Inter, sans-serif' },
-  { id: 'grotesk', name: 'Space Grotesk', family: "'Space Grotesk', sans-serif" },
-  { id: 'plex', name: 'IBM Plex Sans', family: "'IBM Plex Sans', sans-serif" },
-  { id: 'serif', name: 'Source Serif', family: "'Source Serif 4', serif" },
+  { id: 'grotesk', name: 'Space Grotesk', family: "'Space Grotesk', sans-serif", css: 'Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600' },
+  { id: 'plex', name: 'IBM Plex Sans', family: "'IBM Plex Sans', sans-serif", css: 'IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600' },
+  { id: 'serif', name: 'Source Serif', family: "'Source Serif 4', serif", css: 'Source+Serif+4:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600' },
   { id: 'system', name: 'System UI', family: 'system-ui, sans-serif' },
 ]
+
+// Adds a font's stylesheet once (ids match the ones index.html uses).
+const loadFont = (id) => {
+  const font = FONTS.find((f) => f.id === id)
+  if (!font?.css || document.getElementById(`font-${id}`)) return
+  const link = document.createElement('link')
+  link.id = `font-${id}`
+  link.rel = 'stylesheet'
+  link.href = `https://fonts.googleapis.com/css2?family=${font.css}&display=swap`
+  document.head.appendChild(link)
+}
 
 const KEY = 'site-theme'
 const DEFAULTS = { palette: 'console', font: 'inter', accent: '', accent2: '' }
@@ -52,6 +65,7 @@ export default function ThemePicker() {
     const el = document.documentElement
     el.dataset.palette = theme.palette
     el.dataset.font = theme.font
+    loadFont(theme.font)
     for (const [prop, val] of [['--accent', theme.accent], ['--accent2', theme.accent2]]) {
       val ? el.style.setProperty(prop, val) : el.style.removeProperty(prop)
     }
@@ -69,6 +83,7 @@ export default function ThemePicker() {
 
   useEffect(() => {
     if (!open) return
+    FONTS.forEach((f) => loadFont(f.id)) // so each font option previews in its own typeface
     panelRef.current?.querySelector('input:checked')?.focus()
     const onKey = (e) => {
       if (e.key === 'Escape') {

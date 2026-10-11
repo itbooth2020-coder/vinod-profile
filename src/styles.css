@@ -208,7 +208,7 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .brief__head { grid-template-columns: auto minmax(0, 1fr) auto; }
 .brief__ask { align-self: start; min-height: 44px; padding: 4px 14px 4px 10px; font-size: 13.5px; }
 .brief__stop { width: 16px; margin-right: 6px; text-align: center; font-size: 12px; }
-.brief .tour-focus { border-radius: 10px; box-shadow: 0 0 0 6px color-mix(in srgb, #ff9a3c 12%, transparent), 0 0 0 8px rgb(255 150 60 / 0.65); }
+.brief .tour-focus { border-radius: 10px; box-shadow: 0 0 0 3px color-mix(in srgb, #ff9a3c 12%, transparent), 0 0 0 4px rgb(255 150 60 / 0.65); }
 @media (max-width: 640px) { .brief__ask { grid-column: 1 / -1; justify-self: start; } }
 @media (max-width: 420px) {
   .brief { padding: 16px; }

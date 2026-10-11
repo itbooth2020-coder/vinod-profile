@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { profile, profileCard, stats, projects } from '../data.js'
 import Avatar from './Avatar.jsx'
 
@@ -8,14 +8,34 @@ const SIGNALS = ['experience', 'team scale', 'company', 'previously', 'location'
 const signals = profileCard.filter(([k]) => SIGNALS.includes(k))
 const topProjects = projects.slice(0, 3)
 
+const stopVince = (detail) => window.dispatchEvent(new CustomEvent('vince:stop', { detail }))
+
 export default function Brief({ headingRef, onClose }) {
-  // Escape leaves brief mode, unless an open dialog, the theme panel or VINCE owns the key.
+  // "Ask VINCE": he narrates the brief from his minimized bar (VoiceAssistant.jsx), highlighting
+  // each data-brief="…" part as he goes, and reports 'vince:briefing' while he does.
+  const [narrating, setNarrating] = useState(false)
+  const narratingRef = useRef(false)
+  useEffect(() => {
+    const onBriefing = (e) => {
+      narratingRef.current = e.detail
+      setNarrating(e.detail)
+    }
+    window.addEventListener('vince:briefing', onBriefing)
+    return () => {
+      window.removeEventListener('vince:briefing', onBriefing)
+      if (narratingRef.current) stopVince('brief') // leaving brief mode ends the narration
+    }
+  }, [])
+
+  // Escape stops VINCE's narration first, then leaves brief mode, unless an open dialog, the
+  // theme panel or VINCE owns the key.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
       if (document.querySelector('dialog[open], #theme-panel')) return
       const inside = (el) => el instanceof Element && el.closest('.vince, [role="dialog"]')
       if (inside(e.target) || inside(document.activeElement)) return
+      if (narratingRef.current) return stopVince()
       onClose()
     }
     document.addEventListener('keydown', onKey)
@@ -82,7 +102,7 @@ export default function Brief({ headingRef, onClose }) {
       </div>
       <div className="brief__head">
         <Avatar />
-        <div>
+        <div data-brief="name">
           <p className="brief__eyebrow" aria-hidden="true">30-second brief</p>
           <h1 id="brief-h" ref={headingRef} tabIndex={-1}>
             <span className="sr-only">30-second brief: </span>
@@ -91,9 +111,19 @@ export default function Brief({ headingRef, onClose }) {
           <p className="brief__role">{profile.role} &middot; {profile.company}</p>
           <p className="brief__headline">{profile.headline}</p>
         </div>
+        <button
+          type="button"
+          className="askvince__btn brief__ask"
+          data-vince-trigger
+          onClick={() => window.dispatchEvent(new Event(narrating ? 'vince:stop' : 'vince:brief'))}
+          aria-label={narrating ? 'Stop VINCE' : 'Ask VINCE to explain this brief'}
+        >
+          {narrating ? <span className="brief__stop" aria-hidden="true">■</span> : <span className="btn__orb" aria-hidden="true" />}
+          {narrating ? 'Stop VINCE' : 'Ask VINCE'}
+        </button>
       </div>
 
-      <dl className="brief__signals">
+      <dl className="brief__signals" data-brief="signals">
         {signals.map(([k, v]) => (
           <div key={k}>
             <dt>{k}</dt>
@@ -106,8 +136,8 @@ export default function Brief({ headingRef, onClose }) {
         <div>
           <h2 className="brief__label">Proof points</h2>
           <dl className="brief__stats">
-            {stats.map((s) => (
-              <div key={s.label}>
+            {stats.map((s, i) => (
+              <div key={s.label} data-brief={`stat-${i}`}>
                 <dt>{s.value}</dt>
                 <dd>{s.label}</dd>
               </div>
@@ -116,7 +146,7 @@ export default function Brief({ headingRef, onClose }) {
         </div>
         <div>
           <h2 className="brief__label">Top projects</h2>
-          <ul className="brief__projects">
+          <ul className="brief__projects" data-brief="projects">
             {topProjects.map((p) => (
               <li key={p.name}>
                 <span className="brief__pname">{p.name}</span>
@@ -125,13 +155,13 @@ export default function Brief({ headingRef, onClose }) {
             ))}
           </ul>
           <h2 className="brief__label">Core domains</h2>
-          <ul className="tags">
+          <ul className="tags" data-brief="domains">
             {profile.domains.map((d) => <li key={d}>{d}</li>)}
           </ul>
         </div>
       </div>
 
-      <div className="actions">
+      <div className="actions" data-brief="actions">
         <a className="btn btn--primary" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
         {/* Leaves brief mode via App's in-page link handling; RoleFit then focuses its heading. */}
         <a className="btn" href="#fit">Check role fit</a>

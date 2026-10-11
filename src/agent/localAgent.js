@@ -69,6 +69,13 @@ const PROJECT_NAMES = /\b(darwin|presto|vusion|meijer|meta|intelity|bayer|elder|
 // Requests that read better as links, images, tables or charts than as text. First match wins.
 const RICH = [
   {
+    // "Is he a fit for this role?", "match this job": point to the role-fit checker (components/RoleFit.jsx).
+    test: (q) =>
+      /\b(fit|match(es)?|suitable|qualified)\b.*\b(job|role|position|opening|jd|vacanc\w*|description)\b|\b(is|would) (he|vinod) (be )?(a )?(good |right |strong )?fit\b/.test(q),
+    answer: () =>
+      `Paste the job description into the role-fit checker. It lists the requirements ${profile.firstName.split(' ')[0]}'s experience covers, with evidence from his roles and projects, and what isn't evident in the profile. It runs in your browser.\n\n[Check role fit](#fit)`,
+  },
+  {
     test: (q) => /\b(blogs?|blogging|articles?|writes?|writing|comics?|batman|android ?super ?nerds)\b/.test(q),
     answer: () =>
       `${profile.firstName} writes two blogs:\n\n` +

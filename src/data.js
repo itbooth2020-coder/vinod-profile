@@ -161,42 +161,93 @@ export const experience = [
   },
 ]
 
+// Case studies (CaseStudy.jsx). Every `caseStudy` field is restructured from text already in this
+// file: the project's own text, its graphProjects entry, or an experience bullet that names it.
+// Nothing is paraphrased or added. Empty fields are hidden in the dialog, and a project whose case
+// study adds nothing beyond its card text gets no "Read case study" button.
+// Vinod: fill `context` (the problem/situation) and `approach` in your own words where empty.
+//   company  -> the experience entry the role/approach bullets come from (shows its role and period)
+//   metrics  -> only numbers stated in the text: { label, before, after, unit, better } for
+//               "X to Y" figures, or { label, change, unit, better } for a single relative change.
 export const projects = [
   {
     name: 'Darwin Portal – Syngenta',
     media: 'project/darwin',
     tag: 'Agri-Tech AI Platform',
     text: 'AI-powered agricultural intelligence portal using React Native for Web, CopilotKit, AG-UI and A2-UI, with an orchestrator-core AI assistant and Claude AI agents. Backend APIs with Claude-Agent and Python/Databricks pipelines for crop-yield prediction, crop stabilization forecasting and seed-loss risk prediction.',
+    caseStudy: {
+      company: 'Accenture',
+      context: '',
+      // Both from the Accenture experience entry, verbatim.
+      role: 'Led the Darwin Portal program for client Syngenta, architecting a React Native for Web application with an AI assistant powered by an orchestrator-core architecture, integrating CopilotKit, AG-UI, and A2-UI frameworks together with Claude AI agents.',
+      approach: [
+        'Engineered Darwin Portal backend services using Claude-Agent for web APIs and Python on Databricks, applying data analysis and model training for crop-yield prediction, crop stabilization trend forecasting, and seed-loss risk prediction.',
+      ],
+      outcomes: [],
+      metrics: [],
+    },
   },
   {
     name: 'PRESTO – Transit Payment System',
     media: 'project/presto',
     tag: 'Transit · Canada',
     text: 'Secure transit payment platform integrating NFC, FarePay smart cards, embedded POS and backend systems, with MDM/EMM for large-scale device deployment. 99.9% uptime and regulatory compliance.',
+    caseStudy: {
+      company: '',
+      context: '',
+      role: '',
+      approach: [],
+      // From the PRESTO graphProjects entry, verbatim.
+      outcomes: ['1M+ contactless transactions with 99.9% uptime.'],
+      metrics: [], // 1M+ and 99.9% are totals, not before/after or relative changes
+    },
   },
   {
     name: 'VusionGroup – Retail IoT & ESL',
     media: 'project/vusion',
     tag: 'Retail IoT',
     text: 'GroceryTech mobile apps with real-time Bluetooth proximity tracking, camera scanning and enterprise API integration. Improved warehouse pick accuracy by 20% and reduced fulfillment time by 15%.',
+    caseStudy: {
+      company: '',
+      context: '',
+      role: '',
+      approach: [],
+      outcomes: ['Improved warehouse pick accuracy by 20% and reduced fulfillment time by 15%.'],
+      // From the text above ("pick accuracy +20%, fulfillment time −15%" in graphProjects).
+      metrics: [
+        { label: 'Warehouse pick accuracy', change: 20, unit: '%', better: 'higher' },
+        { label: 'Fulfillment time', change: -15, unit: '%', better: 'lower' },
+      ],
+    },
   },
   {
     name: 'META – MDM Platform for Qculous Devices',
     media: 'project/meta-mdm',
     tag: 'Device Management',
     text: 'React-based MDM solution and mobile agent app for secure onboarding, monitoring and policy enforcement with encrypted communications across 5,000+ managed devices.',
+    caseStudy: { company: '', context: '', role: '', approach: [], outcomes: [], metrics: [] },
   },
   {
     name: 'Meijer – Real-time Last-Mile Delivery',
     media: 'project/meijer',
     tag: 'GroceryTech',
     text: 'Led a 10-member team delivering real-time delivery tracking and last-mile routing. Sprint planning, CI/CD releases and code reviews; 3 major releases on schedule.',
+    caseStudy: {
+      company: 'HTC Global Services',
+      context: '',
+      // From the HTC Global Services experience entry, verbatim.
+      role: 'Architected a real-time last-mile delivery tracking platform for Meijer (GroceryTech), leading a 10-member team and delivering 3 major releases on schedule.',
+      approach: ['Sprint planning, CI/CD releases and code reviews'],
+      outcomes: ['3 major releases on schedule'],
+      metrics: [], // "3 major releases" is a count, not a change
+    },
   },
   {
     name: 'INTELITY – Hospitality Platform',
     media: 'project/intelity',
     tag: 'Hospitality',
     text: 'Managed Android/iOS development with a 12-member team, implementing CI/CD pipelines and zero-downtime production releases.',
+    caseStudy: { company: '', context: '', role: '', approach: [], outcomes: [], metrics: [] },
   },
 ]
 

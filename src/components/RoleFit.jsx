@@ -6,11 +6,18 @@ import { matchRole, fitSummaryText, availabilityNote, SAMPLE_JD, MIN_WORDS } fro
 // backs with evidence, related experience, and what isn't evident. Runs entirely in the browser.
 const resumeHref = `${import.meta.env.BASE_URL}${profile.resume}`
 const FIRST = profile.firstName.split(' ')[0]
+const statusOf = (result) =>
+  !result
+    ? ''
+    : result.tooShort
+      ? `Paste a bit more of the job description (at least ${MIN_WORDS} words) to check fit.`
+      : result.summary
 
 export default function RoleFit() {
   const [jd, setJd] = useState('')
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState('')
+  const [announce, setAnnounce] = useState('')
   const headingRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -35,10 +42,17 @@ export default function RoleFit() {
     return () => clearTimeout(id)
   }, [copied])
 
-  const check = (text = jd) => setResult(text.trim() ? matchRole(text) : null)
+  // The results update live as the visitor types, but screen readers only hear the summary when they
+  // ask for it (Check fit, Try a sample), not on every debounced keystroke.
+  const check = (text = jd) => {
+    const r = text.trim() ? matchRole(text) : null
+    setResult(r)
+    setAnnounce(statusOf(r))
+  }
   const clear = () => {
     setJd('')
     setResult(null)
+    setAnnounce('')
     inputRef.current?.focus()
   }
   const sample = () => {
@@ -56,11 +70,7 @@ export default function RoleFit() {
   }
 
   const ready = result && !result.tooShort
-  const status = !result
-    ? ''
-    : result.tooShort
-      ? `Paste a bit more of the job description (at least ${MIN_WORDS} words) to check fit.`
-      : result.summary
+  const status = statusOf(result)
 
   return (
     <section id="fit" aria-labelledby="fit-h">
@@ -90,7 +100,8 @@ export default function RoleFit() {
       </form>
 
       <div className="fit__results">
-        <p className="fit__status" role="status" aria-live="polite">{status}</p>
+        <p className="fit__status">{status}</p>
+        <p className="sr-only" role="status">{announce}</p>
 
         {ready && (
           <>

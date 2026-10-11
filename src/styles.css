@@ -88,6 +88,18 @@ a { color: var(--accent2); }
 .toggle { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; min-height: 40px; font: 13px var(--mono); cursor: pointer; }
 .toggle:hover { border-color: var(--accent); }
 .header__tools { display: flex; gap: 8px; }
+.brand__init { display: none; }
+/* Narrow screens: "Vinod P. Yadav" on screen; the full middle name stays for screen readers. */
+@media (max-width: 420px) {
+  .brand__mid { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .brand__init { display: inline; }
+}
+/* Phones: the nav becomes one horizontally scrollable row under the brand and tools, edge to edge,
+   fading out on the right. Focused links scroll into view on their own; scroll-padding keeps them clear of the fade. */
+@media (max-width: 680px) {
+  .nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; gap: 20px; margin: -8px -20px 0; padding: 6px 36px 6px 20px; overflow-x: auto; scrollbar-width: thin; scroll-padding-inline: 20px 36px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+  .nav a { flex: none; white-space: nowrap; padding: 8px 0; }
+}
 
 /* Theme picker */
 .picker { position: relative; }
@@ -123,9 +135,8 @@ h1 { font: 700 clamp(1.9rem, 6vw, 3.2rem)/1.1 var(--sans); letter-spacing: -0.03
 h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 @supports not (background-clip: text) { h1 em { color: var(--accent); } }
 .headline { font: 13px var(--mono); color: var(--accent2); margin: 0 0 0.5em; }
-.lede { color: var(--muted); max-width: 65ch; margin: 0 0 0.5em; }
-.hero__typing { font: 14px var(--mono); color: var(--muted); margin: 0 0 1em; }
-.hero__typed { color: var(--text); }
+/* Wide enough for the two-sentence pitch to sit on about 3 lines beside the desktop photo. */
+.lede { color: var(--muted); max-width: 80ch; margin: 0 0 0.5em; }
 .badge { display: inline-block; font: 11px var(--mono); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--accent2); color: var(--accent2); margin: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .btn { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: 600 14px var(--sans); text-decoration: none; overflow-wrap: anywhere; }
@@ -167,7 +178,6 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 :root[data-mode='brief'] main > :not(.hero, .brief),
 :root[data-mode='brief'] .footer,
 :root[data-mode='brief'] .hero__text > :not(.hero__top),
-:root[data-mode='brief'] .hero__top .badge,
 :root[data-mode='brief'] .hero__photo { display: none; }
 :root[data-mode='brief'] .hero { display: block; padding-bottom: 12px; }
 .brief { padding: 20px; margin: 0 0 28px; display: grid; gap: 18px; animation: brief-in 0.3s ease both; }
@@ -370,6 +380,11 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .stat { padding: 18px; }
 .stat dt { font: 700 2.2rem/1 var(--mono); color: var(--accent2); }
 .stat dd { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+/* Counter.jsx: the final value (hidden) and the counting copy share one cell, so the width never changes. */
+.counter { display: inline-grid; position: relative; }
+.counter__final, .counter__live { grid-area: 1 / 1; }
+.counter__final { visibility: hidden; }
+@media print { .counter__final { visibility: visible; } .counter__live { visibility: hidden; } }
 /* Longer values ('3 wk → 5 days') use a smaller size so they fit the column on one line. */
 .stat--long dt { font-size: 1.55rem; line-height: 2.2rem; }
 .brief__stats .stat--long dt { font-size: 1.15rem; line-height: 1.65rem; }
@@ -404,7 +419,8 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .contact { padding: 20px; }
 .contact p { color: var(--muted); margin: 0 0 14px; }
 
-.footer { padding: 28px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); margin-top: 20px; }
+/* Extra bottom room so the fixed VINCE dock (~68px, VoiceAssistant.jsx) never covers the last line. */
+.footer { padding: 28px 0 calc(48px + 72px); color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); margin-top: 20px; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -415,7 +431,15 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
   .avatar-btn, .pdialog__quote { transition: none; animation: none; }
   .avatar-btn:hover { transform: none; }
 }
-@media print { .header, .chat, .gview, .actions { display: none; } }
+/* Full-page print: the resume sections (hero, impact, leadership, projects, experience, skills,
+   credentials, contact). Interactive parts and the AI block are left out; Experience.jsx opens every
+   role before printing. Brief and case-study printing have their own rules. */
+@media print {
+  .header, .layout, .chat, .gview, .actions, #fit, #blogs, .skip, .progress { display: none; }
+  .contact .actions { display: flex; }
+  .contact a[href^='http']::after { content: ' (' attr(href) ')'; font-weight: 400; overflow-wrap: anywhere; }
+  .footer { padding-bottom: 28px; }
+}
 
 /* Rich agent answers: text, tables, image galleries, charts */
 .msg.a { width: 92%; }
@@ -523,7 +547,6 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .vince-launch__orb::before, .btn__orb::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px dashed rgb(255 170 80 / 0.75); animation: vspin 9s linear infinite; }
 .btn__orb { width: 18px; height: 18px; margin-right: 8px; }
 .btn__orb::before { inset: -3px; border-width: 1px; }
-.btn--vince { cursor: pointer; }
 @keyframes vbreathe { 50% { transform: scale(1.1); filter: brightness(1.3); } }
 @keyframes vspin { to { transform: rotate(360deg); } }
 .vince-hint { position: relative; max-width: 260px; margin: 0; padding: 10px 34px 10px 12px; border: 1px solid var(--hud-line); border-radius: 12px; background: var(--hud-bg); color: var(--text); font-size: 13.5px; box-shadow: 0 0 20px var(--hud-glow); animation: gfade 0.4s ease both; }

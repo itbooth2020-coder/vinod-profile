@@ -1,6 +1,5 @@
 import { profile } from '../data.js'
 import Avatar from './Avatar.jsx'
-import Typing from './Typing.jsx'
 import Availability from './Availability.jsx'
 
 // Simple-icons style glyphs (24x24), drawn with currentColor.
@@ -32,7 +31,6 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
     <section id="top" className="hero">
       <div className="hero__text">
         <div className="hero__top">
-          <p className="badge">{profile.role} &middot; {profile.company}</p>
           {/* Switches between the full profile and the brief. The label text is the accessible name. */}
           <button ref={toggleRef} type="button" role="switch" className="brief-switch" aria-checked={brief} onClick={onToggleBrief}>
             <span className="brief-switch__label">30-second brief</span>
@@ -49,14 +47,10 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
         <p className="headline">{profile.headline}</p>
         <p className="lede">{profile.pitch}</p>
         <Availability />
-        <Typing words={profile.domains} />
-        {/* The profile agent console stays reachable from the header nav. */}
+        {/* VINCE stays one click away in the floating launcher; the console is in the header nav ("ask AI"). */}
         <div className="actions">
-          <a className="btn btn--primary" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download résumé</a>
+          <a className="btn btn--primary" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
           <a className="btn" href={`mailto:${profile.email}`}>Email</a>
-          <button type="button" className="btn btn--vince" data-vince-trigger onClick={() => window.dispatchEvent(new Event('vince:open'))}>
-            <span className="btn__orb" aria-hidden="true" /> Talk to VINCE
-          </button>
         </div>
         <ul className="social" aria-label="Social profiles">
           {SOCIAL.map((s) => (

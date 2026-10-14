@@ -32,3 +32,6 @@ dist-ssr
 
 # VINCE voice: prepared lines (regenerated automatically)
 server/.voice-cache
+
+# UAT Doc
+docs/uat

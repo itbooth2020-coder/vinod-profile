@@ -16,12 +16,14 @@ export default function ThemeToggle() {
     try { localStorage.setItem('theme', theme) } catch {}
   }, [theme])
 
+  // The visible text is the accessible name ("Theme: dark"), so voice control can say what it sees
+  // (WCAG 2.5.3); the title says what a click does.
   return (
     <button
+      type="button"
       className="toggle"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      aria-pressed={theme === 'light'}
-      aria-label="Light theme"
+      title={`Switch to the ${theme === 'dark' ? 'light' : 'dark'} theme`}
     >
       Theme: {theme}
     </button>

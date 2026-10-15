@@ -17,6 +17,7 @@ export default function Counter({ value, sr }) {
       setN(target)
       return
     }
+    let raf = 0
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return
       io.disconnect()
@@ -24,12 +25,15 @@ export default function Counter({ value, sr }) {
       const step = (now) => {
         const p = Math.min(1, (now - start) / 1400)
         setN(Math.round(target * (1 - Math.pow(1 - p, 3))))
-        if (p < 1) requestAnimationFrame(step)
+        raf = p < 1 ? requestAnimationFrame(step) : 0
       }
-      requestAnimationFrame(step)
+      raf = requestAnimationFrame(step)
     })
     io.observe(ref.current)
-    return () => io.disconnect()
+    return () => {
+      io.disconnect()
+      cancelAnimationFrame(raf)
+    }
   }, [target])
 
   const shown = target === null ? value : `${n}${match[2]}`

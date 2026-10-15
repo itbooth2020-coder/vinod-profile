@@ -1,4 +1,4 @@
-import { mediaById } from '../agent/media.js'
+import { mediaById, LOGO_NOTE } from '../agent/media.js'
 import MediaTile from './MediaTile.jsx'
 import Chart from './Chart.jsx'
 
@@ -91,12 +91,24 @@ function Link({ href, children, className }) {
   )
 }
 
+// Only these become links: web and mail links, in-page #fragments, and media:<id> from the catalog
+// (linked to its image file). Anything else (data:, javascript:, relative paths…) stays plain text.
+function safeHref(href) {
+  if (/^(https?:\/\/|mailto:|#[\w-]*$)/i.test(href)) return href
+  const media = href.match(/^media:(.+)$/i)
+  const item = media && mediaById[media[1]]
+  return item?.src ? `${import.meta.env.BASE_URL}${item.src}` : null
+}
+
 function Inline({ text }) {
   return text.split(INLINE).map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) return <code key={i}>{part.slice(1, -1)}</code>
     const link = part.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/)
-    if (link) return <Link key={i} href={link[2]}>{link[1]}</Link>
+    if (link) {
+      const href = safeHref(link[2])
+      return href ? <Link key={i} href={href}>{link[1]}</Link> : link[1]
+    }
     if (BARE_URL.test(part)) return <Link key={i} href={part}>{part.replace(/^https?:\/\/(www\.)?/, '')}</Link>
     if (BARE_EMAIL.test(part)) return <Link key={i} href={`mailto:${part}`}>{part}</Link>
     return part
@@ -111,10 +123,14 @@ function Gallery({ images }) {
     .map(({ alt, src }) => ({ alt, item: src.startsWith('media:') ? mediaById[src.slice(6)] : null }))
     .filter((x) => x.item)
   if (!items.length) return null
+  const logos = items.some(({ item }) => item.src && (item.kind === 'company' || item.kind === 'project'))
   return (
-    <div className={`gallery${items.length === 1 ? ' gallery--single' : ''}`}>
-      {items.map(({ alt, item }) => <MediaTile key={item.id} item={item} caption={alt} />)}
-    </div>
+    <>
+      <div className={`gallery${items.length === 1 ? ' gallery--single' : ''}`}>
+        {items.map(({ alt, item }) => <MediaTile key={item.id} item={item} caption={alt} />)}
+      </div>
+      {logos && <p className="logo-note">{LOGO_NOTE}</p>}
+    </>
   )
 }
 

@@ -10,7 +10,7 @@ export default function Credentials() {
   return (
     <section id="credentials" aria-labelledby="credentials-h">
       <h2 className="sec" id="credentials-h">Credentials</h2>
-      <div className="grid">
+      <div className="grid grid--3">
         {groups.map((g) => (
           <article key={g.title} className="card mc">
             <h3>{g.title}</h3>

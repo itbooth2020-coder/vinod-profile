@@ -7,7 +7,9 @@
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:agent": "node scripts/test-local-agent.mjs",
+    "test:server": "node scripts/check-server.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

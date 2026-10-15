@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { graphDomains, graphProjects, profile } from '../data.js'
+import useMotionPaused from '../hooks/useMotion.js'
 
 // Radial tree: Vinod -> vertical | domain -> project -> technologies.
 const RADII = [0, 180, 320, 450]
@@ -120,50 +121,99 @@ function drift(nodes, t) {
   })
 }
 
-// Animation clock (seconds) that only runs while the graph is on screen, the tab is visible,
-// nothing is being dragged, and the visitor hasn't asked for reduced motion.
-function useFloatClock(ref, paused) {
-  const [t, setT] = useState(0)
+// How long the drift runs after the graph comes on screen or the visitor points at or focuses it.
+const DRIFT_MS = 10000
+
+// Drift animation, written straight to the SVG (node transforms, edge paths, flow dots) through
+// refs, so React doesn't re-render the graph on every frame. It runs at ~20fps (plenty for a drift of
+// a few units) only while the graph
+// is on screen, the tab is visible, nothing is being dragged, animations aren't paused (header
+// toggle) and reduced motion isn't requested, and rests after DRIFT_MS. Returns whether it's
+// running, so the flow dots are only rendered then.
+function useDrift(svgRef, nodes, els, hold) {
+  const paused = useMotionPaused()
+  const [moving, setMoving] = useState(false)
+  const epoch = useRef(performance.now())
+
   useEffect(() => {
+    const svg = svgRef.current
     const rm = window.matchMedia('(prefers-reduced-motion: reduce)')
     let raf = 0
     let last = 0
-    let visible = true
-    const start = performance.now() - t * 1000
-    const tick = (now) => {
-      raf = requestAnimationFrame(tick)
-      if (now - last < 33) return // ~30fps is smooth enough for a slow drift
-      last = now
-      setT((now - start) / 1000)
+    let until = 0
+    let visible = false
+
+    const paint = (t) => {
+      const shown = drift(nodes, t)
+      let k = 0
+      for (const i of shown) {
+        els.current.nodes.get(i.n.id)?.setAttribute('transform', `translate(${i.x},${i.y})`)
+        if (!i.parent) continue
+        els.current.edges.get(i.n.id)?.setAttribute('d', edgePath(i.parent, i))
+        if (i.depth > 2) continue
+        const dot = els.current.flows.get(i.n.id)
+        if (dot) {
+          const [x, y] = pointOnEdge(i.parent, i, (t / 3.2 + k * 0.37) % 1)
+          dot.setAttribute('cx', x)
+          dot.setAttribute('cy', y)
+        }
+        k++
+      }
     }
-    const sync = () => {
+    const stop = () => {
+      if (!raf) return
       cancelAnimationFrame(raf)
-      if (!paused && visible && !document.hidden && !rm.matches) raf = requestAnimationFrame(tick)
-      else if (rm.matches) setT(0)
+      raf = 0
+      paint(0) // back to the still layout, which is also what React rendered
+      setMoving(false)
     }
+    const tick = (now) => {
+      if (now > until) return stop()
+      raf = requestAnimationFrame(tick)
+      if (now - last < 50) return
+      last = now
+      paint((now - epoch.current) / 1000)
+    }
+    const run = () => {
+      if (paused || hold || !visible || document.hidden || rm.matches) return stop()
+      until = performance.now() + DRIFT_MS
+      if (raf) return
+      setMoving(true)
+      raf = requestAnimationFrame(tick)
+    }
+    const sync = () => (document.hidden || rm.matches ? stop() : run())
+    paint(0) // nodes React didn't re-render may still hold a drifted position from the last run
     const io = new IntersectionObserver(([e]) => {
+      const was = visible
       visible = e.isIntersecting
-      sync()
+      if (visible !== was) (visible ? run() : stop())
     })
-    io.observe(ref.current)
+    io.observe(svg)
+    svg.addEventListener('pointerenter', run)
+    svg.addEventListener('focusin', run)
     document.addEventListener('visibilitychange', sync)
     rm.addEventListener('change', sync)
-    sync()
     return () => {
+      // No repaint here: React may already have drawn a new layout.
       cancelAnimationFrame(raf)
+      if (raf) setMoving(false)
       io.disconnect()
+      svg.removeEventListener('pointerenter', run)
+      svg.removeEventListener('focusin', run)
       document.removeEventListener('visibilitychange', sync)
       rm.removeEventListener('change', sync)
     }
-  }, [paused, ref])
-  return t
+  }, [svgRef, nodes, els, hold, paused])
+
+  return moving
 }
 
-function Node({ item, selected, expanded, onActivate }) {
+function Node({ item, selected, expanded, onActivate, register }) {
   const { n, x, y, angle } = item
   const hasKids = n.children.length > 0
   const activate = () => onActivate(n)
   const props = {
+    ref: (el) => register('nodes', n.id, el),
     className: `gnode gnode--${n.type === 'vertical' || n.type === 'domain' ? 'group' : n.type}${selected ? ' is-selected' : ''}`,
     transform: `translate(${x},${y})`,
     role: 'button',
@@ -286,6 +336,14 @@ export default function GraphView({ large = false, onSelect }) {
     resetView()
   }
 
+  // Collapse hides whatever was selected below the top level, so the selection (and the dialog's
+  // "Ask VINCE") goes back to Vinod, as when the grouping changes.
+  const collapse = () => {
+    setExpanded(new Set(['root']))
+    setSelectedId('root')
+    onSelect?.(null)
+  }
+
   const onActivate = (n) => {
     setSelectedId(n.id)
     onSelect?.(n)
@@ -340,13 +398,18 @@ export default function GraphView({ large = false, onSelect }) {
     setDragging(false)
   }
 
-  const t = useFloatClock(svgRef, dragging)
-  const shown = useMemo(() => drift(nodes, t), [nodes, t])
-  // Dots flow along the edges out of Vinod and out of each open group.
-  const flows = t
-    ? shown
+  // SVG elements the drift animation moves directly (see useDrift).
+  const els = useRef({ nodes: new Map(), edges: new Map(), flows: new Map() })
+  const register = useCallback((kind, id, el) => {
+    if (el) els.current[kind].set(id, el)
+    else els.current[kind].delete(id)
+  }, [])
+  const moving = useDrift(svgRef, nodes, els, dragging)
+  // Dots flow along the edges out of Vinod and out of each open group, only while drifting.
+  const flows = moving
+    ? nodes
         .filter((i) => i.parent && i.depth <= 2)
-        .map((i, k) => ({ id: i.n.id, pos: pointOnEdge(i.parent, i, (t / 3.2 + k * 0.37) % 1) }))
+        .map((i, k) => ({ id: i.n.id, pos: pointOnEdge(i.parent, i, (k * 0.37) % 1) }))
     : []
 
   const onKeyDown = (e) => {
@@ -382,11 +445,11 @@ export default function GraphView({ large = false, onSelect }) {
         </div>
         <div className="gseg" role="group" aria-label="Expand">
           <button type="button" onClick={() => setExpanded(new Set(allParents))}>Expand all</button>
-          <button type="button" onClick={() => setExpanded(new Set(['root']))}>Collapse</button>
+          <button type="button" onClick={collapse}>Collapse</button>
         </div>
         <div className="gseg" role="group" aria-label="Zoom">
           <button type="button" onClick={() => zoom(1 / ZOOM_STEP)} aria-label="Zoom out" disabled={view.k <= ZOOM_MIN}>−</button>
-          <button type="button" onClick={resetView} aria-label="Reset zoom and position">{Math.round(view.k * 100)}%</button>
+          <button type="button" onClick={resetView} aria-label={`${Math.round(view.k * 100)}% (reset zoom and position)`}>{Math.round(view.k * 100)}%</button>
           <button type="button" onClick={() => zoom(ZOOM_STEP)} aria-label="Zoom in" disabled={view.k >= ZOOM_MAX}>+</button>
         </div>
       </div>
@@ -405,19 +468,20 @@ export default function GraphView({ large = false, onSelect }) {
         onPointerCancel={endDrag}
       >
         <g transform={`translate(${cx + view.x},${cy + view.y}) scale(${view.k}) translate(${-cx},${-cy})`}>
-          {shown.filter((i) => i.parent).map((i) => (
-            <path key={`e-${i.n.id}`} className={`gedge gedge--d${i.depth}`} d={edgePath(i.parent, i)} />
+          {nodes.filter((i) => i.parent).map((i) => (
+            <path key={`e-${i.n.id}`} ref={(el) => register('edges', i.n.id, el)} className={`gedge gedge--d${i.depth}`} d={edgePath(i.parent, i)} />
           ))}
           {flows.map((f) => (
-            <circle key={`f-${f.id}`} className="gflow" cx={f.pos[0]} cy={f.pos[1]} r="3.5" aria-hidden="true" />
+            <circle key={`f-${f.id}`} ref={(el) => register('flows', f.id, el)} className="gflow" cx={f.pos[0]} cy={f.pos[1]} r="3.5" aria-hidden="true" />
           ))}
-          {shown.map((i) => (
+          {nodes.map((i) => (
             <Node
               key={i.n.id}
               item={i}
               selected={i.n.id === selected.id}
               expanded={expanded.has(i.n.id)}
               onActivate={onActivate}
+              register={register}
             />
           ))}
         </g>

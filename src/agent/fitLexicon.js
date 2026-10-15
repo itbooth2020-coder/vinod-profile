@@ -192,7 +192,10 @@ export const LEXICON = [
   { label: 'Performance optimization', cat: 'Architecture', aliases: ['performance tuning', 'app performance', 'system performance'] },
   { label: 'Distributed systems', cat: 'Architecture', related: ['Microservices'] },
   { label: 'Security', cat: 'Architecture', aliases: ['application security', 'mobile security', 'secure coding'], also: ['secure', 'encrypted'] },
-  { label: 'Compliance', cat: 'Architecture', aliases: ['regulatory compliance', 'GDPR', 'SOC 2'] },
+  { label: 'Compliance', cat: 'Architecture', aliases: ['regulatory compliance', 'GDPR'] },
+  // Named security standards: evidenced only if data.js names them.
+  { label: 'SOC 2', cat: 'Architecture', aliases: ['SOC2', 'SOC 2 Type II'] },
+  { label: 'ISO 27001', cat: 'Architecture', aliases: ['ISO/IEC 27001', 'ISO27001'] },
   { label: 'Agile', cat: 'Practices' },
   { label: 'Scrum', cat: 'Practices' },
   { label: 'Kanban', cat: 'Practices', related: ['Agile'] },
@@ -218,7 +221,13 @@ export const LEXICON = [
   { label: 'OKRs', cat: 'Leadership', aliases: ['OKR', 'objectives and key results'] },
   { label: 'Stakeholder management', cat: 'Leadership', aliases: ['stakeholder', 'stakeholders', 'stakeholder communication'] },
   { label: 'Cross-functional teams', cat: 'Leadership', aliases: ['cross-functional'] },
-  { label: 'Budget management', cat: 'Leadership', aliases: ['budget', 'budgeting', 'budget ownership', 'cost management', 'P&L'] },
+  { label: 'Budget management', cat: 'Leadership', aliases: ['budget', 'budgeting', 'budget ownership', 'cost management'] },
+  // Executive scale: a P&L, managing managers, board reporting and M&A aren't the same as an engineering
+  // budget or managing engineers, so they're terms of their own ("not evident" unless data.js says so).
+  { label: 'P&L ownership', cat: 'Leadership', re: '(?<![A-Za-z0-9])(?:P&L|P and L|profit and loss|profit & loss)(?![A-Za-z0-9])', related: ['Budget management'] },
+  { label: 'Managing managers', cat: 'Leadership', re: '\\b(?:managers? of managers|(?:manag(?:e|es|ed|ing)|lead(?:s|ing)?|led) (?:other |multiple |several )?(?:engineering )?managers|(?:multiple|several|\\d+\\+?) (?:engineering |people )?managers|directors? of engineering|engineering directors)\\b' },
+  { label: 'Board reporting', cat: 'Leadership', aliases: ['board of directors', 'board-level', 'board reporting', 'report to the board', 'reporting to the board', 'board meetings', 'board members'] },
+  { label: 'M&A', cat: 'Leadership', re: '(?<![A-Za-z0-9])(?:M&A|M and A|mergers (?:and|&) acquisitions)(?![A-Za-z0-9])' },
   { label: 'Headcount planning', cat: 'Leadership', aliases: ['resource allocation', 'capacity planning', 'resource planning'] },
   { label: 'Vendor management', cat: 'Leadership', aliases: ['vendors', 'vendor'] },
   { label: 'Roadmaps', cat: 'Leadership', aliases: ['roadmap', 'technical roadmap', 'product roadmap', 'roadmapping'] },
@@ -230,6 +239,9 @@ export const LEXICON = [
   { label: 'Client management', cat: 'Leadership', aliases: ['client-facing', 'customer-facing', 'clients'], also: ['client leadership', 'client engagements'] },
   { label: 'Product management', cat: 'Leadership', related: ['Roadmaps', 'Stakeholder management'] },
   { label: 'Distributed teams', cat: 'Leadership', aliases: ['remote teams', 'global teams', 'offshore teams'], related: ['Cross-functional teams'] },
+
+  // Education
+  { label: 'PhD', cat: 'Education', aliases: ['Ph.D', 'doctorate', 'doctoral degree'] },
 
   // Domains
   { label: 'Retail', cat: 'Domain', aliases: ['retail tech'], also: ['GroceryTech'] },

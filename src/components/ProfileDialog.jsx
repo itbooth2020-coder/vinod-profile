@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { profile, personal, quotes, experience, education } from '../data.js'
+import useMotionPaused from '../hooks/useMotion.js'
 
-// Whole years since birthDate ('YYYY' or 'YYYY-MM-DD'); null while it isn't set.
-function ageFrom(birthDate) {
-  const m = String(birthDate).match(/^(\d{4})(?:-(\d{2})-(\d{2}))?$/)
-  if (!m) return null
+// Whole years since birthYear, one less before birthMonth (1–12) in the current year; null while
+// the year isn't set.
+function ageFrom(year, month = 1) {
+  if (!year) return null
   const now = new Date()
-  const [y, mo = 1, d = 1] = [Number(m[1]), Number(m[2] || 1), Number(m[3] || 1)]
-  const hadBirthday = now.getMonth() + 1 > mo || (now.getMonth() + 1 === mo && now.getDate() >= d)
-  return now.getFullYear() - y - (hadBirthday ? 0 : 1)
+  return now.getFullYear() - year - (now.getMonth() + 1 < month ? 1 : 0)
 }
 
 const pickQuote = (not) => {
@@ -19,7 +18,8 @@ const pickQuote = (not) => {
 const QUOTE_MS = 8000
 
 // Swaps the quote every QUOTE_MS. The timer restarts on every change (including "Another quote"),
-// pauses while paused is true, and stays off for visitors who prefer reduced motion.
+// pauses while paused is true, and stays off for visitors who prefer reduced motion or who paused
+// animations (header toggle, or "Pause quotes" here, since the header is behind the modal).
 function useRotatingQuote(paused) {
   const [quote, setQuote] = useState(() => pickQuote())
   useEffect(() => {
@@ -33,9 +33,11 @@ function useRotatingQuote(paused) {
 // Contents of the profile dialog: large photo with overlaid facts and a quote, details on the right.
 // Rendered only while the dialog is open, so the large photo isn't downloaded until needed.
 export default function ProfileDialog({ titleId }) {
-  const [paused, setPaused] = useState(false)
-  const [quote, nextQuote] = useRotatingQuote(paused)
-  const age = ageFrom(personal.birthDate)
+  const [paused, setPaused] = useState(false) // hover or focus on the caption
+  const [stopped, setStopped] = useState(false) // the Pause quotes button
+  const motionPaused = useMotionPaused()
+  const [quote, nextQuote] = useRotatingQuote(paused || stopped || motionPaused)
+  const age = ageFrom(personal.birthYear, personal.birthMonth)
   const current = experience[0]
 
   const facts = [
@@ -73,9 +75,16 @@ export default function ProfileDialog({ titleId }) {
             <p>“{quote.text}”</p>
             <footer>— {quote.by}</footer>
           </blockquote>
-          <button type="button" className="pdialog__shuffle" onClick={nextQuote}>
-            ↻ <span>Another quote</span>
-          </button>
+          <div className="pdialog__qtools">
+            <button type="button" className="pdialog__shuffle" onClick={nextQuote}>
+              <span aria-hidden="true">↻</span> Another quote
+            </button>
+            {!motionPaused && (
+              <button type="button" className="pdialog__shuffle" aria-pressed={stopped} onClick={() => setStopped((v) => !v)}>
+                Pause quotes
+              </button>
+            )}
+          </div>
         </figcaption>
       </figure>
 

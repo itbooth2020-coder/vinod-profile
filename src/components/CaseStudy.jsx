@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { experience, graphProjects } from '../data.js'
-import { mediaById } from '../agent/media.js'
+import { mediaById, LOGO_NOTE } from '../agent/media.js'
 import { explainNode } from '../agent/vince.js'
 import { unlockSpeech } from '../agent/voice.js'
 import MediaTile from './MediaTile.jsx'
@@ -157,9 +157,12 @@ export default function CaseStudy({ project: p, titleId, onClose }) {
             <h3 id={`${titleId}-tech`}>Technology</h3>
             {gp?.tech.length > 0 && <ul className="tags">{gp.tech.map((t) => <li key={t}>{t}</li>)}</ul>}
             {logos.length > 0 && (
-              <div className="case__logos">
-                {logos.map((m) => <MediaTile key={m.id} item={m} />)}
-              </div>
+              <>
+                <div className="case__logos">
+                  {logos.map((m) => <MediaTile key={m.id} item={m} />)}
+                </div>
+                <p className="logo-note">{LOGO_NOTE}</p>
+              </>
             )}
           </section>
         )}

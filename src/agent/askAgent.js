@@ -23,7 +23,8 @@ export const offline = () => !apiAvailable()
 // Streams an answer from the runtime agent at /api/ask (NDJSON), falling back to the
 // in-browser resume agent when the endpoint is missing or has no API credentials.
 // Callbacks: onStatus(text), onText(chunk), onSource('live' | 'local'), and for live answers
-// onReset() (discard the text so far: another model is taking over) and onDone({ sig, sources }).
+// onReset() (discard the text so far: another model is taking over) and onDone({ sig, sources, citations }),
+// where citations are the resume passages the answer cites: [{ label: 'resume p. 2', text }] (AI-006).
 // Keep sig on the answer in history: the server only trusts earlier answers it signed (AI-005).
 // voice: true asks for a short, speakable answer (used by the VINCE voice assistant). history
 // (earlier turns) also lets the offline agent follow up on "tell me more" or "what did he do there?".
@@ -88,7 +89,10 @@ export async function askAgent(question, history, { onStatus, onText, onSource, 
         wroteText = false
         onReset?.()
       } else if (evt.type === 'done') {
-        onDone?.({ sig: evt.sig, sources: evt.sources })
+        const citations = Array.isArray(evt.citations)
+          ? evt.citations.filter((c) => typeof c?.label === 'string' && typeof c?.text === 'string').slice(0, 5)
+          : []
+        onDone?.({ sig: evt.sig, sources: evt.sources, citations })
       } else if (evt.type === 'error') {
         // interrupted: part of the answer is shown, so it ends with the notice; no offline answer is appended.
         if (evt.fallback) markApiDown()

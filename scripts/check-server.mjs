@@ -1,6 +1,7 @@
 // Checks for the dev / Phase 2 server (server/*.js) that need no API key and no Kokoro model:
-// silent-audio detection, client IP keys, origin and content-type rules, body limits, and signed
-// history. Never calls Anthropic: the key is a dummy and the API URL a closed local port.
+// silent-audio detection, client IP keys, origin and content-type rules (/api/ask and /api/speak), body
+// limits, signed history, and citations from a mocked stream.
+// Never calls Anthropic: the key is a dummy and the API URL a closed local port or a local mock.
 // Run with `npm run test:server`; add --clean to delete silent clips from server/.voice-cache.
 import http from 'node:http'
 import { readdir, readFile, unlink } from 'node:fs/promises'
@@ -12,9 +13,9 @@ process.env.VOICE_AGENT_NO_START = '1' // import voiceAgent.js without loading K
 delete process.env.PROFILE_AGENT_ORIGINS
 delete process.env.TRUST_PROXY
 
-const { audible, audibleWav, DISK_CACHE, fixedLines } = await import('../server/voiceAgent.js')
+const { audible, audibleWav, DISK_CACHE, fixedLines, handleSpeak } = await import('../server/voiceAgent.js')
 const { clientIp, stripPort } = await import('../server/http.js')
-const { allowedOrigin, isJson, handleAsk, signTurn, verifyTurn, sanitizeHistory } = await import('../server/profileAgent.js')
+const { allowedOrigin, isJson, handleAsk, signTurn, verifyTurn, sanitizeHistory, compactCitation } = await import('../server/profileAgent.js')
 
 let failed = 0
 const check = (name, ok) => {
@@ -105,6 +106,90 @@ res = await post('{"question":"Where does he work?"}')
 const lines = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 check('API unreachable: streamed fallback, nothing billed', res.status === 200 && lines.at(-1).type === 'error' && lines.at(-1).fallback === true)
 server.close()
+
+// --- /api/speak: same Origin and content-type rules as /api/ask (PERF-BE-010) -------------------
+// VINCE_VOICE=off for these, so a request that passes the checks stops at "turned off" (503)
+// instead of loading Kokoro.
+const voiceSetting = process.env.VINCE_VOICE
+process.env.VINCE_VOICE = 'off'
+const speakServer = http.createServer(handleSpeak)
+await new Promise((r) => speakServer.listen(0, '127.0.0.1', r))
+const speakUrl = `http://127.0.0.1:${speakServer.address().port}/`
+const speak = (headers) => {
+  const all = { 'Content-Type': 'application/json', Origin: 'http://localhost:4173', ...headers }
+  for (const k of Object.keys(all)) if (all[k] === undefined) delete all[k]
+  return fetch(speakUrl, { method: 'POST', headers: all, body: '{"text":"hello"}' })
+}
+res = await speak({ 'Content-Type': 'text/plain', Origin: 'https://evil.example' })
+check('speak: text/plain from another site: 415', res.status === 415 && (await res.json()).fallback === true)
+res = await speak({ 'Content-Type': 'text/plain' })
+check('speak: text/plain from this site: 415', res.status === 415)
+res = await speak({ Origin: 'https://evil.example' })
+check('speak: JSON from another site: 403', res.status === 403 && (await res.json()).fallback === true)
+res = await speak({ Origin: undefined })
+check('speak: JSON without Origin or Referer: 403', res.status === 403)
+res = await speak({})
+check('speak: JSON from this site passes the checks (503 only because the voice is off)', res.status === 503)
+speakServer.close()
+if (voiceSetting === undefined) delete process.env.VINCE_VOICE
+else process.env.VINCE_VOICE = voiceSetting
+
+// --- Citations from a mocked Anthropic stream (AI-006) ------------------------------------------
+// A local server plays a recorded-style SSE stream with citations_delta events; a fresh copy of
+// profileAgent.js (query string = new module instance) creates its client against it. No real API call.
+check(
+  'compactCitation: resume page label and trimmed quote',
+  JSON.stringify(compactCitation({ type: 'page_location', cited_text: ' Led  the Darwin\nPortal ', document_index: 0, document_title: 'Resume', start_page_number: 2, end_page_number: 3 })) ===
+    JSON.stringify({ label: 'resume p. 2', text: 'Led the Darwin Portal' }),
+)
+const cited = [
+  { type: 'page_location', cited_text: 'Custom Software Engineering Manager, Accenture, Jun 2024 – Present', document_index: 0, document_title: 'Resume of Vinod Pyarelal Yadav', start_page_number: 1, end_page_number: 2 },
+  { type: 'page_location', cited_text: 'managing a team of 35+ engineers across Android, iOS, and web stacks', document_index: 0, document_title: 'Resume of Vinod Pyarelal Yadav', start_page_number: 1, end_page_number: 2 },
+]
+const sse = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`
+let mockRequest = null
+const mock = http.createServer(async (rq, rs) => {
+  let raw = ''
+  for await (const c of rq) raw += c
+  mockRequest = JSON.parse(raw || '{}')
+  rs.writeHead(200, { 'Content-Type': 'text/event-stream' })
+  rs.end(
+    sse('message_start', { message: { id: 'msg_mock', type: 'message', role: 'assistant', model: 'mock', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } }) +
+      sse('content_block_start', { index: 0, content_block: { type: 'text', text: '', citations: [] } }) +
+      sse('content_block_delta', { index: 0, delta: { type: 'citations_delta', citation: cited[0] } }) +
+      sse('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'He is a Custom Software Engineering Manager at Accenture' } }) +
+      sse('content_block_stop', { index: 0 }) +
+      sse('content_block_start', { index: 1, content_block: { type: 'text', text: '', citations: [] } }) +
+      sse('content_block_delta', { index: 1, delta: { type: 'citations_delta', citation: cited[1] } }) +
+      sse('content_block_delta', { index: 1, delta: { type: 'citations_delta', citation: cited[1] } }) + // duplicate: listed once
+      sse('content_block_delta', { index: 1, delta: { type: 'text_delta', text: ', leading 35+ engineers.' } }) +
+      sse('content_block_stop', { index: 1 }) +
+      sse('message_delta', { delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 12 } }) +
+      sse('message_stop', {}),
+  )
+})
+await new Promise((r) => mock.listen(0, '127.0.0.1', r))
+process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${mock.address().port}`
+const mocked = await import('../server/profileAgent.js?mock-citations')
+const askServer = http.createServer(mocked.handleAsk)
+await new Promise((r) => askServer.listen(0, '127.0.0.1', r))
+res = await fetch(`http://127.0.0.1:${askServer.address().port}/`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:4173' },
+  body: '{"question":"Where does he work?"}',
+})
+const events = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
+const done = events.find((e) => e.type === 'done')
+const doc = mockRequest?.messages?.[0]?.content?.find((b) => b.type === 'document')
+check('citations: the resume document block has citations enabled', doc?.citations?.enabled === true)
+check('citations: streamed text arrives', events.filter((e) => e.type === 'text').map((e) => e.text).join('') === 'He is a Custom Software Engineering Manager at Accenture, leading 35+ engineers.')
+check(
+  'citations: done carries compact, deduplicated citations',
+  done?.citations?.length === 2 && done.citations.every((c) => c.label === 'resume p. 1' && typeof c.text === 'string') && done.citations[1].text.startsWith('managing a team of 35+'),
+)
+check('citations: the answer is still signed', typeof done?.sig === 'string' && done.sig.length > 20)
+askServer.close()
+mock.close()
 
 // --- Voice lines prepared in advance (PERF-BE-009) and the saved clips (PERF-BE-001) ----------
 const lineList = await fixedLines()

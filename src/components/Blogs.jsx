@@ -1,31 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
 import TechBlog from './TechBlog.jsx'
 import ComicBlog from './ComicBlog.jsx'
 
-// The latest posts come from Blogger (Google), so the feeds only load once the section is about
-// 600px from the viewport, not for every visitor at start-up (PERF-FE-005, ADS-002).
+// The latest posts are built into the site (scripts/fetch-blogs.mjs), so this section makes no
+// requests to Blogger or Google (ADS-002, PERF-BE-005); thumbnails are local and lazy-loaded.
 export default function Blogs() {
-  const ref = useRef(null)
-  const [near, setNear] = useState(false)
-
-  useEffect(() => {
-    const el = ref.current
-    if (near || !el) return
-    if (!('IntersectionObserver' in window)) return setNear(true)
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: '600px 0px' })
-    io.observe(el)
-    return () => io.disconnect()
-  }, [near])
-
   return (
-    <section id="blogs" aria-labelledby="blogs-h" ref={ref}>
+    <section id="blogs" aria-labelledby="blogs-h">
       <h2 className="sec" id="blogs-h">Blogs</h2>
       <div className="blogs">
-        <TechBlog load={near} />
-        <ComicBlog load={near} />
+        <TechBlog />
+        <ComicBlog />
       </div>
       <p className="blogs__note">
-        Latest posts load from Blogger (Google) when you reach this section. <a href="/privacy.html">Privacy</a>
+        Post titles are copied from Blogger when the site is built; nothing loads from Google until you open a post. <a href="/privacy.html">Privacy</a>
       </p>
     </section>
   )

@@ -6,8 +6,9 @@
 //   3. Optional server/linkedin.md: paste LinkedIn sections here for content LinkedIn won't serve publicly.
 // Streams NDJSON lines to the browser: {type:"status"|"text"|"reset"|"error"|"done", ...}.
 //   reset: discard the text so far (a fallback model took over mid-answer; its answer follows)
-//   done:  { sig, sources }: sig signs this question and answer, so the browser can send the turn
-//          back as history (AI-005); sources lists what the answer could draw on (AI-006).
+//   done:  { sig, sources, citations }: sig signs this question and answer, so the browser can send
+//          the turn back as history (AI-005); sources lists what the answer could draw on, and
+//          citations the resume passages it cites, as [{ label: 'resume p.2', text }] (AI-006).
 //
 // Environment (.env), all optional except the key; see .env.example:
 //   PROFILE_AGENT_MODEL        default claude-sonnet-5-5
@@ -24,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { media } from '../src/agent/media.js'
 import { blogs } from '../src/data.js'
-import { TooLarge, clientIp, json, methodNotAllowed, pruned, readJson } from './http.js'
+import { TooLarge, allowedOrigin, clientIp, isJson, json, methodNotAllowed, pruned, readJson } from './http.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const RESUME_PATH = path.join(ROOT, 'public', 'resume.pdf')
@@ -42,9 +43,6 @@ const MAX_HISTORY_CHARS = 6000
 const MAX_TURN_CHARS = 2000
 const MAX_CONTINUATIONS = 3
 const REQUEST_TIMEOUT_MS = 60_000 // the whole answer, including tool use and continuations
-
-const SITE_ORIGINS = ['https://www.vinodyadav.com', 'https://vinodyadav.com']
-const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/
 
 const SYSTEM = `You are the profile assistant on Vinod Pyarelal Yadav's personal website. Visitors (often recruiters and hiring managers) ask you about his career, skills, projects and experience.
 
@@ -86,22 +84,8 @@ const INTERRUPTED = 'Answer interrupted: the live agent stopped before finishing
 let anthropic = null
 const client = () => (anthropic ||= new Anthropic({ timeout: 45_000, maxRetries: 1 }))
 
-// Only this site's pages may ask (PERF-BE-002): a JSON request from an allowed Origin (or Referer,
-// for browsers that omit Origin). A page elsewhere can't send a JSON content type without a CORS
-// preflight, which this endpoint never approves, and can't fake its Origin.
-export function allowedOrigin(req, env = process.env) {
-  const configured = (env.PROFILE_AGENT_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean)
-  const ok = (origin) => (configured.length ? configured.includes(origin) : SITE_ORIGINS.includes(origin) || LOCALHOST.test(origin))
-  const origin = req.headers.origin
-  if (origin) return ok(origin)
-  try {
-    return Boolean(req.headers.referer) && ok(new URL(req.headers.referer).origin)
-  } catch {
-    return false
-  }
-}
-
-export const isJson = (req) => /^application\/json\s*(;|$)/i.test(req.headers['content-type'] || '')
+// Origin and content-type rules live in server/http.js (shared with /api/speak); re-exported for the checks.
+export { allowedOrigin, isJson }
 
 // Per-IP limit, so a public deployment can't be used as a free Claude proxy (PERF-BE-003: keyed
 // on the visitor's address, and old entries are pruned).
@@ -184,6 +168,8 @@ function buildMessages({ resume, notes }, history, question) {
       type: 'document',
       source: { type: 'base64', media_type: 'application/pdf', data: resume },
       title: 'Resume of Vinod Pyarelal Yadav',
+      // Claude cites the resume pages it used (AI-006); they stream as citations_delta events.
+      citations: { enabled: true },
     },
   ]
   // web_fetch can only open URLs that appear in the conversation, so the LinkedIn URL is listed here.
@@ -194,6 +180,26 @@ function buildMessages({ resume, notes }, history, question) {
 
   // Consecutive user turns are merged by the API, so the sources lead the first question.
   return [{ role: 'user', content: sourceBlocks }, ...history, { role: 'user', content: question }]
+}
+
+// A compact citation for the browser: where it is ("resume p.2") and a short quote. Page numbers are
+// 1-based and end_page_number is exclusive. Fetched pages and other documents are labelled by title.
+const MAX_CITATIONS = 5
+const MAX_CITED_CHARS = 160
+export function compactCitation(c) {
+  if (!c || typeof c.cited_text !== 'string') return null
+  const quote = c.cited_text.replace(/\s+/g, ' ').trim()
+  if (!quote) return null
+  const text = quote.length > MAX_CITED_CHARS ? `${quote.slice(0, MAX_CITED_CHARS - 1).trimEnd()}…` : quote
+  let label
+  if (c.type === 'page_location') {
+    const last = Math.max(c.start_page_number, (c.end_page_number || c.start_page_number + 1) - 1)
+    const where = last > c.start_page_number ? `pp. ${c.start_page_number}–${last}` : `p. ${c.start_page_number}`
+    label = c.document_index === 0 ? `resume ${where}` : `${c.document_title || 'document'} ${where}`
+  } else {
+    label = c.document_title || c.title || 'source'
+  }
+  return { label, text }
 }
 
 // Node-style (req, res) handler, usable from Vite middleware or any Node HTTP server.
@@ -241,6 +247,11 @@ export async function handleAsk(req, res) {
 
   let answer = '' // the text sent so far, signed when complete
   let linkedIn = false
+  let citations = [] // compact citations for this answer (AI-006), deduplicated
+  const cite = (c) => {
+    const item = compactCitation(c)
+    if (item && citations.length < MAX_CITATIONS && !citations.some((x) => x.label === item.label && x.text === item.text)) citations.push(item)
+  }
   try {
     send({ type: 'status', text: 'reading resume.pdf' })
     const messages = buildMessages(await loadSources(), sanitizeHistory(body.history), question)
@@ -269,11 +280,14 @@ export async function handleAsk(req, res) {
             // Another model takes over from here (AI-006): drop the first model's partial text
             // rather than splicing two answers together.
             answer = ''
+            citations = []
             send({ type: 'reset' })
           }
         } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
           answer += event.delta.text
           send({ type: 'text', text: event.delta.text })
+        } else if (event.type === 'content_block_delta' && event.delta.type === 'citations_delta') {
+          cite(event.delta.citation)
         }
       }
       if (aborted) break
@@ -290,7 +304,7 @@ export async function handleAsk(req, res) {
       messages.push({ role: 'assistant', content: message.content })
     }
     if (!aborted && finished) {
-      send({ type: 'done', sig: answer ? signTurn(question, answer) : undefined, sources: linkedIn ? ['resume', 'LinkedIn'] : ['resume'] })
+      send({ type: 'done', sig: answer ? signTurn(question, answer) : undefined, sources: linkedIn ? ['resume', 'LinkedIn'] : ['resume'], citations })
     }
   } catch (err) {
     if (!aborted) {

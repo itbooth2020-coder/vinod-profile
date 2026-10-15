@@ -96,7 +96,19 @@ a { color: var(--accent2); }
 .motion-toggle { display: inline-grid; place-items: center; width: 40px; padding: 0; }
 .motion-toggle svg { display: block; }
 .motion-toggle[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+/* Theme (ThemeToggle.jsx): sun/moon icon + "Theme", the same width in both themes. */
+.theme-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.theme-toggle svg { flex: none; display: block; }
 .brand__init { display: none; }
+/* Desktop: brand, nav and tools on one row in every theme and font (UI-008). Nothing wraps, so the
+   header keeps its height when the theme or a Customize font changes. */
+@media (min-width: 1101px) {
+  .header { flex-wrap: nowrap; }
+  .brand, .header__tools { flex: none; }
+  .brand { white-space: nowrap; }
+  .nav { flex-wrap: nowrap; gap: 4px 14px; }
+  .nav a { white-space: nowrap; }
+}
 /* Tablets and small laptops: brand and tools share the first row; the nav gets its own row below. */
 @media (max-width: 1100px) {
   .header__tools { order: 2; margin-left: auto; }
@@ -117,8 +129,8 @@ a { color: var(--accent2); }
 /* Theme picker */
 .picker { position: relative; }
 .picker__dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; background: conic-gradient(var(--accent) 0 50%, var(--accent2) 0); }
-.picker__panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(380px, calc(100vw - 32px)); max-height: min(78vh, 640px); overflow: auto; padding: 14px 16px; box-shadow: 0 18px 40px rgb(0 0 0 / 0.35); }
-@media (max-width: 560px) { .header { position: relative; } .picker { position: static; } .picker__panel { left: 0; right: 0; width: auto; top: 100%; } }
+/* ThemePicker.jsx sets left/top/width/max-height from the button's position so the panel always fits the viewport. */
+.picker__panel { position: absolute; left: 0; top: calc(100% + 8px); z-index: 20; width: min(380px, calc(100vw - 32px)); max-height: min(78vh, 640px); overflow: auto; overscroll-behavior: contain; padding: 14px 16px; box-shadow: 0 18px 40px rgb(0 0 0 / 0.35); }
 .picker fieldset { border: 0; margin: 0 0 14px; padding: 0; }
 .picker legend { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; padding: 0; }
 .picker input[type='radio'] { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -305,6 +317,12 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .msg__text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg__status { font: 12px var(--mono); color: var(--muted); }
 .msg__src { margin: 6px 0 0; font: 11px var(--mono); color: var(--muted); }
+/* Citations under live answers (Citations.jsx) */
+.cites { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.cites summary { display: inline-flex; align-items: center; min-height: 24px; font: 11px var(--mono); cursor: pointer; }
+.cites ol { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.cites q { color: var(--text); overflow-wrap: anywhere; }
+.cites__where { font: 11px var(--mono); white-space: nowrap; }
 @keyframes tok { from { opacity: 0; } }
 .caret { display: inline-block; width: 8px; height: 1em; margin-left: 2px; background: var(--accent2); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
@@ -744,9 +762,12 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
    suggestions scroll sideways in one row. The tour runs minimized with a caption (VoiceAssistant.jsx). */
 @media (max-width: 600px) {
   .vince--normal { max-height: 60vh; max-height: 60dvh; }
-  .vince--normal .vince__stage { height: 96px; }
+  /* The orb gives way first when the panel is short; the chip strip and the form keep their height, so
+     the first chip ("Guided tour", CHAT-009) is always visible. */
+  .vince--normal .vince__stage { height: 96px; flex: 0 1 96px; min-height: 64px; }
   .vince--normal .vince__log { min-height: 64px; }
-  .vince--normal .vince__chips { flex-wrap: nowrap; overflow-x: auto; }
+  .vince--normal .vince__chips { flex: none; flex-wrap: nowrap; overflow-x: auto; }
+  .vince--normal .vince__form, .vince--normal .vince__note { flex: none; }
   .vince--normal .vince__chips button { flex: none; white-space: nowrap; }
   .vince--captioned { width: calc(100vw - 16px); }
 }

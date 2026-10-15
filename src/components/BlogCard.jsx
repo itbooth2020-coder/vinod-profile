@@ -1,4 +1,4 @@
-import useBloggerFeed from '../hooks/useBloggerFeed.js'
+import feeds from '../data/blogs.json'
 
 // Line icon (24×24, currentColor) in the same style as the site's other SVG icons.
 export const BlogIcon = ({ d }) => (
@@ -7,9 +7,13 @@ export const BlogIcon = ({ d }) => (
   </svg>
 )
 
-// Shared layout for one blog: intro, latest posts from its feed, and a link to the blog.
-export default function BlogCard({ blog, icon, variant, cta, load = true }) {
-  const { status, posts } = useBloggerFeed(blog.url, 3, load)
+const BASE = import.meta.env.BASE_URL
+
+// Shared layout for one blog: intro, its latest posts and a link to the blog. The posts and their
+// thumbnails are fetched at build time (scripts/fetch-blogs.mjs → src/data/blogs.json, public/blog-thumbs/),
+// so nothing loads from Blogger until a visitor follows a link.
+export default function BlogCard({ blog, icon, variant, cta }) {
+  const posts = feeds.blogs?.[variant] || []
   const headingId = `blog-${variant}-h`
 
   return (
@@ -23,26 +27,24 @@ export default function BlogCard({ blog, icon, variant, cta, load = true }) {
       </header>
       <p className="blog__desc">{blog.description}</p>
 
-      <div className="blog__posts" aria-busy={status === 'loading'}>
+      <div className="blog__posts">
         <p className="blog__label">Latest posts</p>
-        {status === 'idle' && <p className="blog__note">Posts load as you scroll here.</p>}
-        {status === 'loading' && <p className="blog__note">Loading posts…</p>}
-        {status === 'error' && <p className="blog__note">Couldn't load the latest posts. Visit the blog to read them.</p>}
-        {status === 'ready' && posts.length === 0 && <p className="blog__note">No posts yet.</p>}
-        {posts.length > 0 && (
+        {posts.length === 0 ? (
+          <p className="blog__note">Visit the blog to read the latest posts.</p>
+        ) : (
           <ul>
             {posts.map((p) => (
               <li key={p.id}>
                 <a className="post" href={p.url} target="_blank" rel="noopener noreferrer">
                   {p.thumb ? (
-                    <img className="post__thumb" src={p.thumb} alt="" loading="lazy" />
+                    <img className="post__thumb" src={`${BASE}${p.thumb}`} alt="" loading="lazy" decoding="async" />
                   ) : (
                     <span className="post__thumb post__thumb--icon" aria-hidden="true">{icon}</span>
                   )}
                   <span className="post__body">
                     <span className="post__title">{p.title}</span>
                     {p.summary && <span className="post__summary">{p.summary}</span>}
-                    {p.labels.length > 0 && <span className="post__labels">{p.labels.join(' · ')}</span>}
+                    {p.labels?.length > 0 && <span className="post__labels">{p.labels.join(' · ')}</span>}
                   </span>
                   <span className="sr-only"> (opens in a new tab)</span>
                 </a>

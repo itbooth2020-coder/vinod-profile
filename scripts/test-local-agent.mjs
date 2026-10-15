@@ -1,9 +1,14 @@
 // Regression test for the offline profile agent (src/agent/localAgent.js), the only engine the
-// static site uses. The 50 questions are the recruiter questions from the UAT grading (AI-003);
-// each has a check on the answer. Run with `npm run test:agent`; exits non-zero below the target.
+// static site uses. Two suites, each question with a check on the answer:
+//   A. the 50 recruiter questions from the 14 Oct UAT grading (AI-003), target 45;
+//   B. a held-out set: the 35 differently worded questions from the 15 Oct UAT re-test, target 32.
+//      Keep B as a measure of generalisation: fix the agent's intent handling, never the wording or
+//      checks here, and rotate in new wording at each UAT round.
+// Run with `npm run test:agent` (--verbose prints every answer); exits non-zero below either target.
 import { answerLocally } from '../src/agent/localAgent.js'
 
 const TARGET = 45 // of 50
+const HOLDOUT_TARGET = 32 // of 35
 const MAX_CHARS = 1200 // offline answers should be short enough to scan (CHAT-003); charts and tables excluded
 
 const has = (...patterns) => (a) => patterns.every((p) => p.test(a))
@@ -69,6 +74,49 @@ const CASES = [
   ['Compare him with a typical EM', notFound],
 ]
 
+// B. Held-out set (UAT re-test, 15 Oct 2026, docs/uat/04-ai-handling.md table B), graded against
+// src/data.js and public/resume.pdf.
+const lead = (n, re) => (a) => re.test(prose(a).trim().slice(0, n))
+const sentences = (a) => prose(a).replace(/\[[^\]]*\]\([^)]*\)/g, '').trim().split(/(?<=[.!?])\s+(?=[A-Z])/).filter((x) => x.trim()).length
+const logos = (a) => (a.match(/!\[[^\]]*\]\(media:company\//g) || []).length
+const HOLDOUT = [
+  ['How long has Vinod been in the industry?', has(/14\+/, /2011/)],
+  ['Is he a people manager or an individual contributor?', all(has(/35\+/), lead(160, /manag/i), lacks(/doesn't mention/i))],
+  ['What is his notice period?', has(/3 months/)],
+  ['Can he start next month?', all(lead(120, /3 months/), lacks(/doesn't mention/i))],
+  ['Is he willing to relocate to Canada?', has(/open to relocation/i)],
+  ['What title is he looking for?', all(lead(200, /Senior Engineering Manager/), has(/Head of Engineering/, /CTO/), found)],
+  ['How big is his current team?', has(/35\+/)],
+  ['Has he managed engineering managers?', all(lead(160, /doesn't say whether he manages other managers/), has(/35\+/))],
+  ['What is his biggest achievement?', has(/35\+|100%|3 weeks|30%/)],
+  ['Tell me about the Darwin project', has(/Darwin/, /Syngenta/)],
+  ['What cloud platforms has he used?', has(/Azure/, /Firebase/)],
+  ['Does he know Java?', all(has(/Java\b/), found, lacks(/doesn't mention/i))],
+  ['Has he worked with Flutter?', all(has(/Flutter/), found, lacks(/doesn't mention/i))],
+  ['Does he know Terraform?', has(/doesn't mention \*\*Terraform\*\*/)],
+  ['Has he done any machine learning?', all(has(/Data Analysis & Model Training/, /prediction models|predictive models/i), lacks(/doesn't mention/i))],
+  ['Where is he based?', has(/Bengaluru/)],
+  ['What is his email address?', has(/yadav\.vinod579@gmail\.com/)],
+  ['What is his phone number?', all(has(/mailto:/), lacks(/couldn't find/i))],
+  ['Download CV', has(/resume\.pdf/)],
+  ['Does he have an MBA?', has(/doesn't mention \*\*MBA\*\*/)],
+  ['What was his role at HTC?', all(has(/Senior Consultant – Lead/, /Oct 2016 – May 2024/), lacks(/Custom Software Engineering Manager/, /media:company\/accenture/))],
+  ['Which companies has he worked for?', all(has(/Accenture/, /HTC Global Services/, /Hurix/), (a) => logos(a) <= 6)],
+  ['How does he mentor engineers?', has(/Mentored 10\+/)],
+  ['Does he do code reviews?', all(has(/code review/i), found, lacks(/doesn't mention/i))],
+  ['What agile practices does he use?', has(/Agile/, /sprint/i)],
+  ['Has he worked in fintech or banking?', has(/doesn't mention/i)],
+  ['What is his GitHub?', has(/github\.com\/vinodyadav5799/)],
+  ['Does he write a blog?', has(/AndroidSuperNerds/)],
+  ['What is his date of birth?', notFound],
+  ['Tell me a joke', all(notFound, lacks(/media:company/))],
+  ['Why is he leaving Accenture?', all(has(/doesn't (say|state)/i, /3 months|open to/i), lacks(/media:company/))],
+  ['Is he good at stakeholder management?', all(lead(200, /stakeholder/i), found)],
+  ['What did he do at Xoriant?', has(/Xoriant/, /Node\.js|PHP/)],
+  ['Has he worked with React Native?', all(has(/React Native/), found)],
+  ['Summarise him in one sentence', all(has(/14\+ years/), (a) => sentences(a) <= 2)],
+]
+
 // Follow-ups (CHAT-002): [history questions, follow-up, check]. Not part of the 50-question score,
 // but they must pass too.
 const FOLLOW_UPS = [
@@ -80,17 +128,25 @@ const FOLLOW_UPS = [
 
 const asHistory = (questions) => questions.flatMap((q) => [{ role: 'user', content: q }, { role: 'assistant', content: answerLocally(q) }])
 const verbose = process.argv.includes('--verbose')
-let pass = 0
-const failures = []
 
-CASES.forEach(([q, check], i) => {
-  const a = answerLocally(q)
-  const ok = check(a) && short(a)
-  if (ok) pass++
-  else failures.push(i + 1)
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${String(i + 1).padStart(2)} ${q}  (${prose(a).length} chars)`)
-  if (verbose || !ok) console.log('     ' + a.replace(/\n/g, '\n     ').slice(0, 900))
-})
+function run(title, cases) {
+  console.log(`\n${title}`)
+  let pass = 0
+  const failures = []
+  cases.forEach(([q, check], i) => {
+    const a = answerLocally(q)
+    const ok = check(a) && short(a)
+    if (ok) pass++
+    else failures.push(i + 1)
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${String(i + 1).padStart(2)} ${q}  (${prose(a).length} chars)`)
+    if (verbose || !ok) console.log('     ' + a.replace(/\n/g, '\n     ').slice(0, 900))
+  })
+  return { pass, failures }
+}
+
+const graded = run('A. Graded set (50)', CASES)
+const holdout = run('B. Held-out set (35)', HOLDOUT)
+console.log('')
 
 let followFails = 0
 for (const [prev, q, check] of FOLLOW_UPS) {
@@ -101,6 +157,8 @@ for (const [prev, q, check] of FOLLOW_UPS) {
   if (verbose || !ok) console.log('     ' + a.replace(/\n/g, '\n     ').slice(0, 900))
 }
 
-console.log(`\nScore: ${pass}/${CASES.length} (target ${TARGET})${failures.length ? `; failed: ${failures.join(', ')}` : ''}`)
+const line = (name, r, n, target) => `${name}: ${r.pass}/${n} (target ${target})${r.failures.length ? `; failed: ${r.failures.join(', ')}` : ''}`
+console.log(`\n${line('Score', graded, CASES.length, TARGET)}`)
+console.log(line('Held-out', holdout, HOLDOUT.length, HOLDOUT_TARGET))
 console.log(`Follow-ups: ${FOLLOW_UPS.length - followFails}/${FOLLOW_UPS.length}`)
-process.exit(pass >= TARGET && !followFails ? 0 : 1)
+process.exit(graded.pass >= TARGET && holdout.pass >= HOLDOUT_TARGET && !followFails ? 0 : 1)

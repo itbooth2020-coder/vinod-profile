@@ -5,6 +5,7 @@ import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceNa
 import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
 import RichText from './RichText.jsx'
+import Citations from './Citations.jsx'
 
 // VINCE, the voice assistant: a floating launcher that opens a HUD panel. VINCE introduces
 // himself, answers spoken or typed questions through the profile agent, reads the answers
@@ -288,7 +289,11 @@ export default function VoiceAssistant({ onReady }) {
         onSource: setSource,
         onText: (chunk) => setAnswer((answer += chunk)),
         onReset: () => setAnswer((answer = '')), // a fallback model took over mid-answer
-        onDone: (done) => (sig = done.sig),
+        onDone: (done) => {
+          sig = done.sig
+          // Resume passages the live answer cites (AI-006), listed under it.
+          if (done.citations?.length) setMessages((m) => m.map((x, i) => (i === m.length - 1 ? { ...x, citations: done.citations } : x)))
+        },
       })
     } catch (err) {
       if (err.name === 'AbortError') return
@@ -671,6 +676,7 @@ export default function VoiceAssistant({ onReady }) {
                       ) : (
                         <p>{m.text}</p>
                       )}
+                      <Citations items={m.citations} />
                     </div>
                   ))}
                 </div>
@@ -682,17 +688,19 @@ export default function VoiceAssistant({ onReady }) {
                   </div>
                 ) : (
                   <div className="vince__chips" role="group" aria-label="Suggested questions">
-                    {suggestions.map((q) => (
-                      <button key={q} type="button" onClick={() => (unlockSpeech(), ask(q))} disabled={mode === 'thinking'}>
-                        {q}
-                      </button>
-                    ))}
+                    {/* First, so it's visible without scrolling the one-row chip strip on phones (CHAT-009);
+                        DOM order, not CSS order, so focus order matches what's seen. */}
                     <button type="button" className="vince__tourbtn" onClick={startTour} disabled={mode === 'thinking'}>
                       <svg className="vince__play" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false">
                         <path d="M3 1.5v9l7-4.5z" fill="currentColor" />
                       </svg>
                       Guided tour
                     </button>
+                    {suggestions.map((q) => (
+                      <button key={q} type="button" onClick={() => (unlockSpeech(), ask(q))} disabled={mode === 'thinking'}>
+                        {q}
+                      </button>
+                    ))}
                   </div>
                 )}
 

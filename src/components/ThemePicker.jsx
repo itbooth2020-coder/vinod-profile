@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 // Exploration tool: try palettes, fonts and custom accent colors, then finalize one in styles.css.
 // Palette/font CSS lives in styles.css under [data-palette] / [data-font]; swatches show the dark variant.
@@ -99,6 +99,50 @@ export default function ThemePicker() {
       document.removeEventListener('pointerdown', onDown)
     }
   }, [open])
+
+  // The header reflows (the tools can sit left, right or on their own row), so a CSS-only anchor can push
+  // the panel off-screen. Place it under the button: right-aligned when there's room, otherwise
+  // left-aligned, always clamped to a 16px gutter, and capped to the space below the button.
+  // Offsets are relative to the panel's offsetParent, so it still scrolls with the page.
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const panel = panelRef.current
+      const btn = btnRef.current?.getBoundingClientRect()
+      const parent = panel?.offsetParent?.getBoundingClientRect()
+      if (!panel || !btn || !parent) return
+      const gutter = 16
+      const vw = document.documentElement.clientWidth
+      const width = Math.min(380, vw - gutter * 2)
+      const ideal = btn.right - width >= gutter ? btn.right - width : btn.left
+      const left = Math.min(Math.max(gutter, ideal), vw - gutter - width)
+      const top = btn.bottom + 8
+      panel.style.width = `${width}px`
+      panel.style.left = `${left - parent.left}px`
+      panel.style.top = `${top - parent.top}px`
+      panel.style.maxHeight = `${Math.max(160, Math.min(640, window.innerHeight - top - gutter))}px`
+    }
+    place()
+    // Also re-place whenever the button moves without a window resize (FUNC-012): the header or the
+    // button changes size (a web font finishes loading, the theme label changes), or fonts load.
+    window.addEventListener('resize', place)
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(place) : null
+    const header = btnRef.current?.closest('.header')
+    if (ro) {
+      if (header) ro.observe(header)
+      if (btnRef.current) ro.observe(btnRef.current)
+    }
+    const fonts = document.fonts
+    let live = true
+    fonts?.addEventListener?.('loadingdone', place)
+    fonts?.ready?.then(() => live && place())
+    return () => {
+      live = false
+      window.removeEventListener('resize', place)
+      ro?.disconnect()
+      fonts?.removeEventListener?.('loadingdone', place)
+    }
+  }, [open, theme])
 
   const update = (patch) => setTheme((t) => ({ ...t, ...patch }))
 

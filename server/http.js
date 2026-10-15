@@ -58,3 +58,24 @@ export function pruned(map, isStale, { every = 10 * 60 * 1000, max = 10_000 } = 
     if (map.size > max) prune()
   }
 }
+
+// Only this site's pages may call /api/ask and /api/speak (PERF-BE-002, PERF-BE-010): a JSON request
+// from an allowed Origin (or Referer, for browsers that omit Origin). A page elsewhere can't send a
+// JSON content type without a CORS preflight, which these endpoints never approve, and can't fake
+// its Origin. PROFILE_AGENT_ORIGINS (comma-separated) replaces the defaults.
+const SITE_ORIGINS = ['https://www.vinodyadav.com', 'https://vinodyadav.com']
+const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/
+
+export function allowedOrigin(req, env = process.env) {
+  const configured = (env.PROFILE_AGENT_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean)
+  const ok = (origin) => (configured.length ? configured.includes(origin) : SITE_ORIGINS.includes(origin) || LOCALHOST.test(origin))
+  const origin = req.headers.origin
+  if (origin) return ok(origin)
+  try {
+    return Boolean(req.headers.referer) && ok(new URL(req.headers.referer).origin)
+  } catch {
+    return false
+  }
+}
+
+export const isJson = (req) => /^application\/json\s*(;|$)/i.test(req.headers['content-type'] || '')

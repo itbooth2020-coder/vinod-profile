@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "start": "vite",
+    "prebuild": "node scripts/fetch-blogs.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test:agent": "node scripts/test-local-agent.mjs",

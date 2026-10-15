@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { profile, suggestedPrompts } from '../data.js'
 import { askAgent, liveAgent } from '../agent/askAgent.js'
 import RichText from './RichText.jsx'
+import Citations from './Citations.jsx'
 
 const GREETING = `Hi! I'm ${profile.firstName.split(' ')[0]}'s profile assistant. I answer questions about his experience, projects, skills and education from his resume${liveAgent ? ', with live AI answers when available' : ''}, with **photos, tables and charts**.`
 const SOURCES = { live: 'Claude · resume + LinkedIn', local: 'resume search · offline' }
@@ -61,8 +62,8 @@ export default function PromptConsole() {
         onSource: setSource,
         // A fallback model took over mid-answer: start again rather than splice two answers.
         onReset: () => updateLast({ content: '' }),
-        // sig lets the live agent trust this answer as history; sources is shown under it.
-        onDone: ({ sig, sources }) => updateLast({ sig, sources }),
+        // sig lets the live agent trust this answer as history; sources and citations are shown under it.
+        onDone: ({ sig, sources, citations }) => updateLast({ sig, sources, citations }),
         signal: abortRef.current.signal,
       })
     } catch (err) {
@@ -98,6 +99,7 @@ export default function PromptConsole() {
               <small>{m.role === 'user' ? 'you' : 'profile-agent'}</small>
               {m.role === 'user' ? <span className="msg__text">{m.content}</span> : <RichText text={m.content} />}
               {m.sources?.length > 0 && <p className="msg__src">Source: {m.sources.join(' and ')}</p>}
+              <Citations items={m.citations} />
               {streaming && (
                 <>
                   {status && <span className="msg__status"> {status}…</span>}

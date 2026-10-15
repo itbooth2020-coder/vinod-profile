@@ -473,7 +473,7 @@ export const education = [
 
 export const languages = ['English (Professional)', 'Hindi (Native)', 'Marathi (Native)']
 
-// Blogs section (latest posts load at runtime from each blog's feed).
+// Blogs section. The latest posts are fetched at build time (scripts/fetch-blogs.mjs → src/data/blogs.json).
 export const blogs = {
   tech: {
     name: 'AndroidSuperNerds',

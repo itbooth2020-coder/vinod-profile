@@ -1,0 +1,75 @@
+{
+  "fetched": "2026-10-15",
+  "blogs": {
+    "tech": [
+      {
+        "id": "tag:blogger.com,1999:blog-3790134556359619397.post-6947596006216534110",
+        "title": "Alert dialog box include custom dialog and Chat Dialog Fragment",
+        "url": "https://androidsupernerds.blogspot.com/2020/09/alert-dialog-box.html",
+        "date": "2020-09-23",
+        "summary": "Welcome to \"Android Super Nerds\". Thanks for coming back to my site, I really appreciate that and if you guys are new to my Site please d…",
+        "labels": [
+          "Android UI",
+          "Dialogs and Toasts",
+          "Jetpack Compose"
+        ],
+        "thumb": "blog-thumbs/53e841e0362e71ca.png"
+      },
+      {
+        "id": "tag:blogger.com,1999:blog-3790134556359619397.post-515058746335399560",
+        "title": "Vertical Line Separator with TextView",
+        "url": "https://androidsupernerds.blogspot.com/2018/09/vertical-line-separator-with-textview.html",
+        "date": "2020-08-21",
+        "summary": "Welcome to \"Android Super Nerds\". Thanks for coming back to my site, I really appreciate that and if you guys are new to my Site please d…",
+        "labels": [
+          "Android UI",
+          "Jetpack Compose",
+          "Layouts"
+        ],
+        "thumb": "blog-thumbs/f383af093738d2ea.jpg"
+      },
+      {
+        "id": "tag:blogger.com,1999:blog-3790134556359619397.post-7255403513640867594",
+        "title": "TextView Overlapping ImageView",
+        "url": "https://androidsupernerds.blogspot.com/2018/09/textview-overlapping-imageview.html",
+        "date": "2018-09-17",
+        "summary": "Hello Friends, Welcome Back to \"Android Super Nerds\". I really appreciate that and if you guys are new to my Site please do check my prev…",
+        "labels": [
+          "Android UI",
+          "Jetpack Compose",
+          "Layouts"
+        ],
+        "thumb": "blog-thumbs/8c072a60e9692d4f.jpg"
+      }
+    ],
+    "comic": [
+      {
+        "id": "tag:blogger.com,1999:blog-77564045802236574.post-4556471586086960818",
+        "title": "Jason Todd : Second Robin with a dark side",
+        "url": "https://batmansfact.blogspot.com/2018/10/jason-todd-second-robin-with-dark-side.html",
+        "date": "2026-09-21",
+        "summary": "No Robin's story is more infamous than Jason Todd's — a character literally voted to death by fans, only to claw his way back into contin…",
+        "labels": [],
+        "thumb": null
+      },
+      {
+        "id": "tag:blogger.com,1999:blog-77564045802236574.post-1332687750226584387",
+        "title": "Tim Drake : Unusually carrying the legacy of \"THE JOKER\"",
+        "url": "https://batmansfact.blogspot.com/2018/10/tim-drake-unusually-carrying-legacy-of.html",
+        "date": "2026-09-21",
+        "summary": "Tim Drake wasn't handed the Robin mantle out of tragedy or circumstance — he earned it by being the only person in Gotham smart enough to…",
+        "labels": [],
+        "thumb": null
+      },
+      {
+        "id": "tag:blogger.com,1999:blog-77564045802236574.post-1683517017684005383",
+        "title": "Damian Wayne : The Real Blood of the Bat",
+        "url": "https://batmansfact.blogspot.com/2018/10/damian-wayne-real-blood-of-bat.html",
+        "date": "2026-09-21",
+        "summary": "Every previous Robin was chosen by Batman. Damian Wayne is the only one who was born into the role — quite literally the biological son o…",
+        "labels": [],
+        "thumb": null
+      }
+    ]
+  }
+}

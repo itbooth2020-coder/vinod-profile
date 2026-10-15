@@ -33,16 +33,16 @@ function profileAgent(env) {
 // inline script and style are computed here, so editing them can't silently break the page.
 // frame-ancestors can't be set from a <meta>: CloudFront sends it as a header, together with this
 // same policy (keep .claude/agents/aws-deployer.md in sync).
-//   script-src: the Blogger JSONP feeds (useBloggerFeed.js, loaded near the Blogs section)
+//   script-src: this site only (blog posts are built in by scripts/fetch-blogs.mjs; no JSONP)
 //   style-src / font-src: Google Fonts, only for a font picked in Customize (ThemePicker.jsx)
-//   img-src: Blogger post thumbnails
+//   img-src: this site only; blog thumbnails are downloaded at build time into public/blog-thumbs/
 //   media-src blob:: VINCE's server voice clips (dev / Phase 2)
 const CSP = {
   'default-src': ["'self'"],
-  'script-src': ["'self'", 'https://androidsupernerds.blogspot.com', 'https://batmansfact.blogspot.com'],
+  'script-src': ["'self'"],
   'style-src': ["'self'", 'https://fonts.googleapis.com'],
   'font-src': ["'self'", 'https://fonts.gstatic.com'],
-  'img-src': ["'self'", 'data:', 'https://blogger.googleusercontent.com', 'https://*.bp.blogspot.com', 'https://i.ytimg.com', 'https://img.youtube.com'],
+  'img-src': ["'self'", 'data:'],
   'connect-src': ["'self'"],
   'media-src': ["'self'", 'blob:'],
   'object-src': ["'none'"],

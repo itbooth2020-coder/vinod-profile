@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { TooLarge, clientIp, json, methodNotAllowed, pruned, readJson } from './http.js'
+import { TooLarge, allowedOrigin, clientIp, isJson, json, methodNotAllowed, pruned, readJson } from './http.js'
 
 const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX'
 // Prepared fixed lines are saved here, so a restart doesn't have to generate them again.
@@ -263,6 +263,10 @@ const fallback = (res, status, error, warming = false, headers = {}) => json(res
 // Node-style (req, res) handler, usable from Vite middleware or any Node HTTP server.
 export async function handleSpeak(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
+  // Same rules as /api/ask (PERF-BE-010): only JSON from this site's pages, so other sites can't use
+  // this server's CPU for speech through simple (no-preflight) requests.
+  if (!isJson(req)) return fallback(res, 415, 'Send JSON')
+  if (!allowedOrigin(req)) return fallback(res, 403, 'Not allowed')
   let body
   try {
     body = await readJson(req, 8_000)

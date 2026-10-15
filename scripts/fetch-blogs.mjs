@@ -63,27 +63,48 @@ async function postsOf(blogUrl) {
     entries.map(async (entry) => {
       const url = entry.link?.find((l) => l.rel === 'alternate')?.href || ''
       const summary = text(entry.summary?.$t)
+      const id = entry.id?.$t || url
+      const src = entry.media$thumbnail?.url
       return {
-        id: entry.id?.$t || url,
+        id,
         title: text(entry.title?.$t) || 'Untitled post',
         url: url.startsWith(blogUrl) ? url : blogUrl,
         date: (entry.published?.$t || '').slice(0, 10),
         summary: summary.length > 140 ? `${summary.slice(0, 137).trimEnd()}…` : summary,
         labels: (entry.category || []).map((c) => c.term).slice(0, 3),
-        thumb: await thumbFor(entry.media$thumbnail?.url),
+        // A failed download keeps the post's previous thumbnail, so a network blip isn't a change.
+        thumb: (await thumbFor(src)) ?? (src ? previousThumb(id) : null),
       }
     }),
   )
 }
 
-const previous = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { blogs: {} }
+// The current file as written on disk, so an unchanged run leaves it byte-for-byte alone and a
+// changed run keeps its line endings (CRLF in a Windows checkout with core.autocrlf) and final newline.
+const raw = existsSync(OUT) ? readFileSync(OUT, 'utf8') : null
+const previous = raw ? JSON.parse(raw) : { blogs: {} }
+const EOL = raw ? (raw.includes('\r\n') ? '\r\n' : '\n') : process.platform === 'win32' ? '\r\n' : '\n'
+const finalNewline = raw ? /\r?\n$/.test(raw) : true
+const serialise = (data) => JSON.stringify(data, null, 2).replace(/\n/g, EOL) + (finalNewline ? EOL : '')
+// Key-order-independent JSON, used to compare posts while ignoring `fetched`.
+const stable = (v) =>
+  Array.isArray(v) ? `[${v.map(stable).join(',')}]`
+  : v && typeof v === 'object' ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(',')}}`
+  : JSON.stringify(v)
+
+// The thumbnail a post already had, if its file is still on disk.
+function previousThumb(id) {
+  const thumb = Object.values(previous.blogs).flat().find((p) => p.id === id)?.thumb
+  return thumb && existsSync(path.join(ROOT, 'public', thumb)) ? thumb : null
+}
+
 const next = { fetched: previous.fetched || null, blogs: { ...previous.blogs } }
-let changed = false
+let fetchedAny = false
 
 for (const [key, blog] of Object.entries(blogs)) {
   try {
     next.blogs[key] = await postsOf(blog.url)
-    changed = true
+    fetchedAny = true
     console.log(`fetch-blogs: ${blog.name}: ${next.blogs[key].length} posts`)
   } catch (e) {
     warn(`${blog.name}: ${e.message}; keeping the ${next.blogs[key]?.length ?? 0} posts already in blogs.json`)
@@ -91,14 +112,28 @@ for (const [key, blog] of Object.entries(blogs)) {
   }
 }
 
-if (changed) {
-  next.fetched = new Date().toISOString().slice(0, 10)
+if (raw === null) {
+  if (fetchedAny) next.fetched = new Date().toISOString().slice(0, 10)
   mkdirSync(path.dirname(OUT), { recursive: true })
-  writeFileSync(OUT, JSON.stringify(next, null, 2) + '\n')
-  // Drop thumbnails no post uses any more.
+  writeFileSync(OUT, serialise(next))
+  if (!fetchedAny) warn('no feed could be fetched; wrote an empty blogs.json')
+} else if (!fetchedAny) {
+  warn('no feed could be fetched; blogs.json left unchanged')
+} else if (stable(next.blogs) === stable(previous.blogs)) {
+  console.log('fetch-blogs: no changes; blogs.json left unchanged')
+} else {
+  next.fetched = new Date().toISOString().slice(0, 10)
+  writeFileSync(OUT, serialise(next))
+  console.log('fetch-blogs: posts changed; blogs.json updated')
+}
+
+// Drop thumbnails no post uses any more (only after a successful fetch, so a failed run never deletes).
+if (fetchedAny && existsSync(THUMBS)) {
   const used = new Set(Object.values(next.blogs).flat().map((p) => p.thumb && path.basename(p.thumb)))
-  if (existsSync(THUMBS)) for (const f of readdirSync(THUMBS)) if (!used.has(f)) rmSync(path.join(THUMBS, f))
-} else if (!existsSync(OUT)) {
-  writeFileSync(OUT, JSON.stringify(next, null, 2) + '\n')
-  warn('no feed could be fetched; wrote an empty blogs.json')
+  for (const f of readdirSync(THUMBS)) {
+    if (!used.has(f)) {
+      rmSync(path.join(THUMBS, f))
+      console.log(`fetch-blogs: removed unused thumbnail ${f}`)
+    }
+  }
 }

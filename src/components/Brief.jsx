@@ -102,7 +102,7 @@ export default function Brief({ headingRef, onClose }) {
         </button>
       </div>
       <div className="brief__head">
-        <Avatar />
+        <Avatar sizes="(max-width: 600px) 56px, 96px" />
         <div data-brief="name">
           <p className="brief__eyebrow" aria-hidden="true">30-second brief</p>
           <h1 id="brief-h" ref={headingRef} tabIndex={-1}>

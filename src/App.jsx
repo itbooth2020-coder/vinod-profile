@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import ScrollProgress from './components/ScrollProgress.jsx'
 import Header from './components/Header.jsx'
 import Hero from './components/Hero.jsx'
 import Brief from './components/Brief.jsx'
-import PromptConsole from './components/PromptConsole.jsx'
 import ProfileCard from './components/ProfileCard.jsx'
-import DomainGraph from './components/DomainGraph.jsx'
 import Impact from './components/Impact.jsx'
 import Leadership from './components/Leadership.jsx'
-import RoleFit from './components/RoleFit.jsx'
 import Experience from './components/Experience.jsx'
 import Projects from './components/Projects.jsx'
 import Skills from './components/Skills.jsx'
@@ -16,7 +13,15 @@ import Credentials from './components/Credentials.jsx'
 import Contact from './components/Contact.jsx'
 import Blogs from './components/Blogs.jsx'
 import Footer from './components/Footer.jsx'
-import VoiceAssistant from './components/VoiceAssistant.jsx'
+import Vince from './components/Vince.jsx'
+import { liveAgent } from './agent/askAgent.js'
+
+// Below-the-fold, interactive sections load as separate chunks after first paint (PERF-FE-002).
+// Each placeholder reserves the section's height (styles.css .lazy-ph), so nothing shifts when it
+// arrives, and keeps its anchor id for the header nav and deep links.
+const RoleFit = lazy(() => import('./components/RoleFit.jsx'))
+const PromptConsole = lazy(() => import('./components/PromptConsole.jsx'))
+const DomainGraph = lazy(() => import('./components/DomainGraph.jsx'))
 
 // 30-second brief: <html data-mode="brief"> hides everything but the header and the brief (styles.css).
 // Shareable via ?brief=1 (index.html applies it before first paint); not persisted.
@@ -104,13 +109,19 @@ export default function App() {
           <Leadership />
           <Projects />
           <Experience />
-          <RoleFit />
+          <Suspense fallback={<div id="fit" className="lazy-ph lazy-ph--fit" aria-busy="true" />}>
+            <RoleFit />
+          </Suspense>
           <div className="layout">
-            <h2 className="sr-only">Ask the AI about the profile</h2>
-            <PromptConsole />
+            <h2 className="sr-only">{liveAgent ? 'Ask the AI about the profile' : 'Ask about the profile'}</h2>
+            <Suspense fallback={<div id="console" className="card chat lazy-ph" aria-busy="true" />}>
+              <PromptConsole />
+            </Suspense>
             <div className="side">
               <ProfileCard />
-              <DomainGraph />
+              <Suspense fallback={<div className="card lazy-ph lazy-ph--graph" aria-busy="true" />}>
+                <DomainGraph />
+              </Suspense>
             </div>
           </div>
           <Skills />
@@ -120,7 +131,7 @@ export default function App() {
         </main>
         <Footer />
       </div>
-      <VoiceAssistant />
+      <Vince />
     </>
   )
 }

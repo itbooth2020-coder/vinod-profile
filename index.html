@@ -78,7 +78,18 @@
         if (s.font) r.dataset.font = s.font
         if (s.accent) r.style.setProperty('--accent', s.accent)
         if (s.accent2) r.style.setProperty('--accent2', s.accent2)
-        // A saved non-default font: fetch its stylesheet now. Keep in sync with FONTS in ThemePicker.jsx.
+        // The default font, Inter, is self-hosted (public/fonts); preload it only when it will be used.
+        if (!s.font || s.font === 'inter') {
+          var p = document.createElement('link')
+          p.rel = 'preload'
+          p.as = 'font'
+          p.type = 'font/woff2'
+          p.href = '/fonts/inter-latin-var.woff2'
+          p.crossOrigin = 'anonymous'
+          document.head.appendChild(p)
+        }
+        // A saved non-default font: fetch its stylesheet from Google Fonts now (disclosed in
+        // public/privacy.html). Keep in sync with FONTS in ThemePicker.jsx.
         var f = {
           grotesk: 'Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600',
           plex: 'IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600',
@@ -92,18 +103,24 @@
           document.head.appendChild(l)
         }
       } catch (e) {}
+      // "Pause animations": saved choice, else the reduced-motion preference (see src/hooks/useMotion.js).
+      try {
+        var m = localStorage.getItem('motion-paused')
+        if (m === '1' || (m !== '0' && matchMedia('(prefers-reduced-motion: reduce)').matches)) document.documentElement.dataset.motion = 'paused'
+      } catch (e) {}
       // Shareable 30-second brief (?brief=1): switch before first paint to avoid a flash (see App.jsx).
       try {
         if (new URLSearchParams(location.search).get('brief') === '1') document.documentElement.dataset.mode = 'brief'
       } catch (e) {}
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Only the default font (Inter) loads up front; other Customize fonts load on demand (see ThemePicker.jsx). -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-    <!-- Static #root fallback (see body); React replaces it on mount. -->
     <style>
-      .nojs { max-width: 1100px; margin: 0 auto; padding: 48px 20px; line-height: 1.6; color: var(--text, inherit); font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+      /* Inter (SIL OFL 1.1, public/fonts/OFL.txt): one self-hosted variable file, Latin subset, weights
+         400-700. 'Inter Fallback' is Arial resized to Inter's metrics, so the swap barely shifts text.
+         Other Customize fonts load from Google Fonts only when a visitor picks one (ThemePicker.jsx). */
+      @font-face { font-family: Inter; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/inter-latin-var.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+      @font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('ArialMT'), local('Helvetica'), local('Arimo'); size-adjust: 107.12%; ascent-override: 90.44%; descent-override: 22.52%; line-gap-override: 0%; }
+      /* Static #root fallback (see body); React replaces it on mount. */
+      .nojs { max-width: 1100px; margin: 0 auto; padding: 48px 20px; line-height: 1.6; color: var(--text, inherit); font-family: var(--sans, Inter, 'Inter Fallback', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif); }
       .nojs h1 { margin: 0 0 4px; font-size: clamp(1.8rem, 6vw, 2.8rem); line-height: 1.15; }
       .nojs .nojs__role { margin: 0 0 16px; font-weight: 600; color: var(--accent2, inherit); }
       .nojs p { max-width: 70ch; }

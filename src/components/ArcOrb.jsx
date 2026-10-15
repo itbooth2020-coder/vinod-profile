@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react'
+import useMotionPaused from '../hooks/useMotion.js'
 
 // VINCE's face: a glowing particle sphere with rotating HUD rings, drawn on a canvas.
 // It breathes slowly while idle and reacts to state: ripples while listening, a fast scanning
 // arc while thinking, and a voice waveform while speaking (energyRef pulses on each word).
-// Visitors who prefer reduced motion get a still frame that changes only with the state.
+// Visitors who prefer reduced motion, or who pause animations (header toggle), get a still frame that
+// changes only with the state. While idle it animates for IDLE_MS, then rests on its last frame until
+// VINCE listens, thinks or speaks again.
 // Colours come from the site theme (--accent, --accent2, --bg) and update live when it changes.
 // Dark pages blend additively for a glow; light pages paint normally with deeper shades and
 // slightly stronger alphas, since additive light washes out on a light background.
@@ -48,6 +51,7 @@ function parseColor(value, ctx) {
 
 const mixRGB = (a, b, t) => a.map((c, i) => Math.round(c + (b[i] - c) * t)) // t = share of b
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${Math.min(1, a)})`
+const IDLE_MS = 6000
 const WHITE = [255, 255, 255]
 const BLACK = [0, 0, 0]
 const luminance = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
@@ -56,11 +60,16 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
   const canvasRef = useRef(null)
   const stateRef = useRef(state)
   const drawRef = useRef(null)
+  const startRef = useRef(null)
+  const paused = useMotionPaused()
+  const pausedRef = useRef(paused)
+  const idleSince = useRef(performance.now())
 
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const still = () => reduce.matches || pausedRef.current
     const pts = spherePoints(560)
     const sparks = Array.from({ length: 36 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), v: 0.2 + Math.random() * 0.5 }))
     const p = { ...STATES.idle }
@@ -109,7 +118,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
       h = r.height
       canvas.width = Math.round(w * dpr)
       canvas.height = Math.round(h * dpr)
-      if (reduce.matches) draw(0)
+      if (!raf) draw(0) // resizing clears the canvas; redraw it when the loop is resting
     }
 
     const arc = (r, a0, a1, width, alpha) => {
@@ -246,6 +255,10 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
     drawRef.current = () => draw(1)
 
     const tick = (now) => {
+      if (stateRef.current === 'idle' && now - idleSince.current > IDLE_MS) {
+        raf = 0 // rest on the current frame
+        return
+      }
       raf = requestAnimationFrame(tick)
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
@@ -258,7 +271,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
     const start = () => {
       cancelAnimationFrame(raf)
       raf = 0
-      if (reduce.matches) draw(1)
+      if (still()) draw(1)
       else if (visible) {
         last = performance.now()
         raf = requestAnimationFrame(tick)
@@ -281,7 +294,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
     // Follow theme changes live: light/dark toggle, palette, custom accent (inline style on <html>).
     const onTheme = () => {
       readColors()
-      if (reduce.matches) draw(1)
+      if (!raf) draw(still() ? 1 : 0)
     }
     const mo = new MutationObserver(onTheme)
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme', 'data-palette'] })
@@ -291,6 +304,7 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
     readColors()
     resize()
     reduce.addEventListener('change', start)
+    startRef.current = start
     start()
     return () => {
       cancelAnimationFrame(raf)
@@ -302,11 +316,19 @@ export default function ArcOrb({ state = 'idle', energyRef, className = '' }) {
     }
   }, [energyRef])
 
-  // Keep the loop reading the latest state; redraw the still frame when motion is reduced.
+  // Keep the loop reading the latest state; wake it when VINCE becomes active (or redraw the still
+  // frame when motion is reduced or paused).
   useEffect(() => {
     stateRef.current = state
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) drawRef.current?.()
+    idleSince.current = performance.now()
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || pausedRef.current) drawRef.current?.()
+    else startRef.current?.()
   }, [state])
+
+  useEffect(() => {
+    pausedRef.current = paused
+    startRef.current?.()
+  }, [paused])
 
   return <canvas ref={canvasRef} className={`orb ${className}`} aria-hidden="true" />
 }

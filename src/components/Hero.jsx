@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { profile } from '../data.js'
 import Avatar from './Avatar.jsx'
 import Availability from './Availability.jsx'
@@ -27,6 +28,9 @@ const SOCIAL = [
 ]
 
 export default function Hero({ brief, onToggleBrief, toggleRef }) {
+  // Phones clamp the pitch to three lines (styles.css); "Read more" shows all of it. The full text is
+  // always in the page, so screen readers and print get it either way.
+  const [more, setMore] = useState(false)
   return (
     <section id="top" className="hero">
       <div className="hero__text">
@@ -45,9 +49,12 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
         </div>
         <h1>{profile.firstName} <em>{profile.lastName}</em></h1>
         <p className="headline">{profile.headline}</p>
-        <p className="lede">{profile.pitch}</p>
+        <p id="hero-pitch" className={`lede${more ? ' lede--open' : ''}`}>{profile.pitch}</p>
+        <button type="button" className="lede__more" aria-expanded={more} aria-controls="hero-pitch" onClick={() => setMore((m) => !m)}>
+          {more ? 'Show less' : 'Read more'}
+        </button>
         <Availability />
-        {/* VINCE stays one click away in the floating launcher; the console is in the header nav ("ask AI"). */}
+        {/* VINCE stays one click away in the floating launcher; the console is in the header nav ("ask", or "ask AI" with the live agent). */}
         <div className="actions">
           <a className="btn btn--primary" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
           <a className="btn" href={`mailto:${profile.email}`}>Email</a>
@@ -66,7 +73,7 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
         </ul>
       </div>
       <div className="hero__photo">
-        <Avatar priority />
+        <Avatar priority sizes="(min-width: 900px) 200px, (max-width: 600px) 60px, 76px" />
       </div>
     </section>
   )

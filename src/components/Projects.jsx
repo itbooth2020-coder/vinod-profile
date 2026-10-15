@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { projects, otherProjects } from '../data.js'
-import CaseStudy from './CaseStudy.jsx'
+
+// The case study (and the VINCE helpers it uses) loads on first open, not with the page
+// (PERF-FE-002). It is rendered only once loaded, so showModal() can focus its first control.
+let CaseStudy = null
+const loadCaseStudy = () => import('./CaseStudy.jsx').then((m) => (CaseStudy = m.default))
 
 const slugOf = (p) => p.media.split('/').pop() // e.g. #case-darwin
 const has = (s) => Boolean(s && s.trim())
@@ -24,6 +28,7 @@ export default function Projects() {
   const [current, setCurrent] = useState(null)
   const currentRef = useRef(null)
   currentRef.current = current
+  const openCase = (p) => (CaseStudy ? setCurrent(p) : loadCaseStudy().then(() => setCurrent(p), () => {}))
 
   // Shareable deep links: #case-<slug> opens that case study on load and on hashchange.
   useEffect(() => {
@@ -33,7 +38,7 @@ export default function Projects() {
         // Brief mode hides this section (and the dialog with it), so leave it first (App.jsx).
         // Deferred: on load this runs before App's effect has added its listener.
         if (document.documentElement.dataset.mode === 'brief') setTimeout(() => window.dispatchEvent(new Event('brief:exit')))
-        setCurrent(p)
+        openCase(p)
       } else if (currentRef.current && window.location.hash) {
         dialogRef.current?.close() // navigated elsewhere, e.g. #fit
       }
@@ -80,7 +85,9 @@ export default function Projects() {
                   type="button"
                   className="case-open"
                   ref={(el) => { openers.current[slugOf(p)] = el }}
-                  onClick={() => setCurrent(p)}
+                  onClick={() => openCase(p)}
+                  onPointerEnter={() => loadCaseStudy().catch(() => {})}
+                  onFocus={() => loadCaseStudy().catch(() => {})}
                   aria-haspopup="dialog"
                 >
                   Read case study<span className="sr-only">: {p.name}</span> <span aria-hidden="true">→</span>

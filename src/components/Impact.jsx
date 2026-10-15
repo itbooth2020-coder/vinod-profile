@@ -13,7 +13,7 @@ export default function Impact() {
           </div>
         ))}
       </dl>
-      <div className="grid">
+      <div className="grid grid--2">
         {highlights.map((h) => (
           <article key={h.title} className="card mc">
             <h3>{h.title}</h3>

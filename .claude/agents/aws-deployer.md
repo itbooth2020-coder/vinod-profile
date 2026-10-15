@@ -51,11 +51,28 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
    - `ViewerProtocolPolicy: redirect-to-https`, GET/HEAD, `Compress: true`, managed CachingOptimized policy `658327ea-f89d-4fab-a63d-7e88639e58f6`
    - aliases for both domains, the ACM cert with `sni-only` and `TLSv1.2_2021`, `DefaultRootObject: index.html`, `HttpVersion: http2and3`, IPv6 on, price class `PriceClass_200` unless the user picks otherwise
    - custom error responses: 403 and 404 → `ResponsePagePath: /404.html`, `ResponseCode: 404`, `ErrorCachingMinTTL: 60` (the private bucket answers 403 for missing keys, so both must map to the 404 page)
-   - response headers policy: the AWS-managed **SecurityHeadersPolicy** (`67f7725c-6f97-4210-82d7-5512b31e9d03`; confirm with `aws cloudfront list-response-headers-policies --type managed`) on the default behavior
+   - response headers policy: a **custom** policy instead of the AWS-managed SecurityHeadersPolicy, because it adds a Content-Security-Policy header. Create it once with `aws cloudfront create-response-headers-policy` (name `vinodyadav-security-headers`) and attach it to the default behavior:
+     ```json
+     {
+       "Name": "vinodyadav-security-headers",
+       "SecurityHeadersConfig": {
+         "StrictTransportSecurity": { "AccessControlMaxAgeSec": 31536000, "IncludeSubdomains": true, "Override": true },
+         "ContentTypeOptions": { "Override": true },
+         "FrameOptions": { "FrameOption": "DENY", "Override": true },
+         "ReferrerPolicy": { "ReferrerPolicy": "strict-origin-when-cross-origin", "Override": true },
+         "XSSProtection": { "Protection": true, "ModeBlock": true, "Override": true },
+         "ContentSecurityPolicy": {
+           "ContentSecurityPolicy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self' mailto:",
+           "Override": true
+         }
+       }
+     }
+     ```
+     The full policy lives in each page as a `<meta http-equiv="Content-Security-Policy">`: `npm run build` writes it into `dist/index.html` with the sha256 hashes of that page's inline script and style (see `vite.config.js`), and `404.html` and `privacy.html` carry their own. The browser enforces the header and the meta together, so the effective policy for the home page is `default-src 'self'; script-src 'self' <inline hashes> https://androidsupernerds.blogspot.com https://batmansfact.blogspot.com; style-src 'self' <inline hash> https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://blogger.googleusercontent.com https://*.bp.blogspot.com https://i.ytimg.com https://img.youtube.com; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' mailto:; frame-ancestors 'none'`. Keep only the page-independent directives in the header: hashes in a header would go stale whenever an inline script changes, and would block the other pages' inline styles. `frame-ancestors` can only be sent as a header (browsers ignore it in a meta tag).
 6. **Bucket policy:** allow `s3:GetObject` to principal `cloudfront.amazonaws.com`, with the condition `AWS:SourceArn` = the distribution ARN.
 7. **Apex → www redirect:** create, publish and associate the CloudFront Function from the guide (viewer-request) on the default behavior.
 8. **DNS:** add A and AAAA alias records for both names. Use the distribution domain and the CloudFront hosted zone ID `Z2FDTNDATAQYW2`.
-9. **Upload** (cache-friendly). Only Vite's hashed `/assets/*` files are immutable for a year; everything else in `dist/` keeps a fixed name (`index.html`, `404.html`, `resume.pdf`, `sitemap.xml`, `robots.txt`, `og-image.jpg`, `profile*.{png,webp}`, the favicons and `apple-touch-icon.png`), so it gets a short TTL:
+9. **Upload** (cache-friendly). Only Vite's hashed `/assets/*` files are immutable for a year; everything else in `dist/` keeps a fixed name (`index.html`, `404.html`, `privacy.html`, `resume.pdf`, `sitemap.xml`, `robots.txt`, `og-image.jpg`, `profile*.{png,webp}`, `fonts/*`, `logos/*`, the favicons and `apple-touch-icon.png`), so it gets a short TTL:
    ```bash
    aws s3 sync dist/assets s3://vinodyadav-com-site/assets --delete --cache-control "public,max-age=31536000,immutable"
    aws s3 sync dist/ s3://vinodyadav-com-site --delete --exclude "assets/*" --cache-control "public,max-age=300"
@@ -74,6 +91,8 @@ Offer this only after Phase 1 is live, and explain the extra cost first (about $
 - Recommended host: one Lightsail instance or a small EC2 instance (2 GB RAM, Node 22, run under systemd or pm2) in `ap-south-1`. Avoid Lambda: Kokoro's model size and cold starts make it a poor fit, and the handlers expect Node's `req`/`res`.
 - Store `ANTHROPIC_API_KEY` in SSM Parameter Store as a SecureString, and have the instance load it at startup through an instance role.
 - Add a second CloudFront origin (the instance, HTTPS or HTTP-only from CloudFront) and an ordered cache behavior for `/api/*`: all methods, managed `CachingDisabled` policy, and the `AllViewerExceptHostHeader` origin request policy. Restrict the instance's security group to the CloudFront managed prefix list.
+- Per-visitor limits key on the `CloudFront-Viewer-Address` header (`server/http.js`), so the `/api/*` origin request policy must forward it: check with `aws cloudfront get-origin-request-policy` that it's included, and if not, create a custom policy with all viewer headers plus `CloudFront-Viewer-Address`. Only CloudFront may reach the instance (the prefix-list rule above), or the header could be forged.
+- Also set `PROFILE_AGENT_SECRET` (SecureString), and optionally `PROFILE_AGENT_DAILY_LIMIT` and `PROFILE_AGENT_MODEL`, and set a monthly spend limit on the Anthropic workspace (see `.env.example`).
 - Check that streaming works through CloudFront: `curl -N -X POST https://www.vinodyadav.com/api/ask ...`.
 - Then rebuild with `VITE_LIVE_AGENT=true` (for example in the workflow env) so the frontend starts calling `/api/*`.
 
@@ -94,7 +113,9 @@ curl -sI https://www.vinodyadav.com/does-not-exist       # 404 (not 200), served
 curl -s https://www.vinodyadav.com/does-not-exist | grep -o "<title>[^<]*"   # <title>Page not found · Vinod Pyarelal Yadav
 curl -sI "https://www.vinodyadav.com/?brief=1" | head -1 # 200 (index.html)
 curl -sI https://www.vinodyadav.com/404.html | head -1   # 200 when requested directly
-curl -sI https://www.vinodyadav.com | grep -i "strict-transport-security\|x-content-type-options\|x-frame-options"  # SecurityHeadersPolicy
+curl -sI https://www.vinodyadav.com | grep -i "strict-transport-security\|x-content-type-options\|x-frame-options\|content-security-policy"  # custom headers policy, CSP with frame-ancestors 'none'
+curl -s https://www.vinodyadav.com | grep -o '<meta http-equiv="Content-Security-Policy"[^>]*' | head -c 120   # full policy in the page
+curl -sI https://www.vinodyadav.com/privacy.html | head -1   # 200
 curl -sI https://www.vinodyadav.com/index.html | grep -i cache-control   # no-cache
 curl -sI https://vinodyadav-com-site.s3.ap-south-1.amazonaws.com/index.html  # 403: bucket not public
 curl -sI https://www.vinodyadav.com/resume.pdf           # 200

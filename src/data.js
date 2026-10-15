@@ -32,10 +32,9 @@ export const profile = {
     'Results-driven Engineering Manager with 14+ years of experience leading cross-functional teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered, and web platforms at scale. Proven track record of improving system performance by 30%+, shipping solutions supporting 30K+ users and devices, and reducing time-to-market through CI/CD automation. Deep expertise in Android/iOS, MDM/EMM, prompt engineering, Claude AI agent integration, agentic development, system architecture, and Agile delivery across Retail, Transit, Healthcare, Agri-Tech, and Enterprise Mobility verticals. Adept at hiring, mentoring, setting OKRs, managing stakeholder relationships, budget ownership, and aligning engineering roadmaps with business strategy.',
 }
 
-// Profile dialog. Age is calculated from birthDate ('YYYY' or 'YYYY-MM-DD') and hidden while it's empty.
+// empty. Only the year and month are kept: the full date of birth isn't needed and shouldn't be public.
 export const personal = {
   photo: 'profile.webp',
-  birthDate: '1986', // e.g. '1987' or '1987-06-15'
   nationality: 'Indian',
   location: 'Bengaluru, Karnataka, India',
   languages: 'English (Professional), Hindi (Native), Marathi (Native)',

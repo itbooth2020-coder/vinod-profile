@@ -14,7 +14,7 @@ const when = (s) =>
   /present/i.test(s)
     ? new Date().getFullYear() + new Date().getMonth() / 12
     : Number(s.match(/\d{4}/)[0]) + MONTHS.indexOf(s.trim().slice(0, 3).toLowerCase()) / 12
-const yearsIn = (period) => Math.round(when(period.split('–')[1]) - when(period.split('–')[0]))
+const yearsIn = (period) => Math.floor(when(period.split('–')[1]) - when(period.split('–')[0]))
 const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 const YEARS = profile.tagline.match(/\d+\+?/)[0] // e.g. '14+'
 const firstSentence = (s) => s.split(/\.(?:\s|$)/)[0] // without its full stop; keeps "99.9%"
@@ -28,11 +28,12 @@ function greeting() {
   return GREETINGS[h < 12 ? 0 : h < 17 ? 1 : 2]
 }
 
-// greet is the visitor's time-of-day greeting; the server passes each one to prepare the audio.
-export function introduction(greet = greeting()) {
+// greet is the visitor's time-of-day greeting; the server passes each one to prepare the audio
+// (live wording). offline: answers come from the in-browser resume search (askAgent.js offline()).
+export function introduction(greet = greeting(), { offline = false } = {}) {
   return (
     `${greet}. I'm VINCE: ${EXPANSION}. Think of me as ${FIRST}'s own JARVIS. ` +
-    `I know his ${YEARS} years of work inside out. ` +
+    (offline ? `I answer from his resume, which covers ${YEARS} years of work. ` : `I know his ${YEARS} years of work inside out. `) +
     `What would you like to know about ${FIRST}? His experience, his projects, his skills? Or shall I take you on a guided tour?`
   )
 }
@@ -149,10 +150,26 @@ export function followUpPieces() {
   return { lines, questions }
 }
 
+const MONTH_NAMES = { Jan: 'January', Feb: 'February', Mar: 'March', Apr: 'April', May: 'May', Jun: 'June', Jul: 'July', Aug: 'August', Sep: 'September', Sept: 'September', Oct: 'October', Nov: 'November', Dec: 'December' }
+const MON = '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)[a-z]*\\.?\\s+(\\d{4})'
+const month = (m) => MONTH_NAMES[m.slice(0, 1).toUpperCase() + m.slice(1, m.toLowerCase().startsWith('sept') ? 4 : 3).toLowerCase()] || m
+// Date ranges as people say them: "(Jun 2024 – Present)" -> ", since June 2024,";
+// "Oct 2016 – May 2024" -> "from October 2016 to May 2024".
+const speakDates = (s) =>
+  s
+    .replace(new RegExp(`\\s*\\(${MON}\\s*[–-]\\s*present\\)`, 'gi'), (_, m, y) => `, since ${month(m)} ${y},`)
+    .replace(new RegExp(`${MON}\\s*[–-]\\s*present`, 'gi'), (_, m, y) => `since ${month(m)} ${y}`)
+    .replace(new RegExp(`\\s*\\(${MON}\\s*[–-]\\s*${MON}\\)`, 'gi'), (_, m1, y1, m2, y2) => `, from ${month(m1)} ${y1} to ${month(m2)} ${y2},`)
+    .replace(new RegExp(`${MON}\\s*[–-]\\s*${MON}`, 'gi'), (_, m1, y1, m2, y2) => `from ${month(m1)} ${y1} to ${month(m2)} ${y2}`)
+    .replace(new RegExp(`\\b${MON}`, 'g'), (_, m, y) => `${month(m)} ${y}`)
+
 // Turns a Markdown answer into something worth hearing: visuals are mentioned, not read out,
-// and long answers are cut at a sentence with a pointer to the screen.
+// button-style links are dropped (their labels read badly: "Email Vinod Open LinkedIn profile"),
+// symbols and dates are said as words, and long answers are cut at a sentence with a pointer to
+// the screen.
 export function toSpeech(md, max = 480) {
   let shown = false
+  let links = false
   let text = md
     .replace(/```chart\s*([\s\S]*?)```/g, (_, json) => {
       shown = true
@@ -167,14 +184,24 @@ export function toSpeech(md, max = 480) {
     .replace(/(^\|.*\|\s*$\n?)+/gm, (block) => {
       shown = true
       const rows = block.trim().split('\n').length - 2
-      return ` I've put a table${rows > 0 ? ` of ${rows} rows` : ''} on screen. `
+      return ` I've put a table${rows > 0 ? ` of ${rows} rows` : ''} on screen.\n`
     })
     .replace(/!\[[^\]]*]\([^)]*\)/g, () => ((shown = true), ''))
+    // A link on a line of its own is a button on screen.
+    .replace(/^\s*\[[^\]]+]\(([^)]*)\)\s*$/gm, (_, href) => ((links ||= /^(https?:|mailto:)/.test(href)), ''))
     .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
     .replace(/[*_`#>↗]/g, '')
-    .replace(/^\s*[-•]\s+(.*)$/gm, '$1.')
+    .replace(/^\s*[-•]\s+(.*?)[.;:,]?\s*$/gm, '$1.')
+    .replace(/[\s\S]*/, speakDates)
+    .replace(/\s*→\s*/g, ' to ')
+    .replace(/(\d+)\s*wks?\b/g, (_, n) => `${n} ${n === '1' ? 'week' : 'weeks'}`)
+    .replace(/\s+·\s+/g, ', ')
+    // A small lexicon, before "/" becomes "and".
+    .replace(/\bCI\/CD\b/g, 'C I C D')
+    .replace(/\bMDM\s*\/\s*EMM\b/g, 'device management')
     .replace(/(\d)\s*[–-]\s*(\d)/g, '$1 to $2')
     .replace(/https?:\/\/\S+/g, 'the link on screen')
+    .replace(/(\d+)M\+/g, '$1 million plus')
     .replace(/(\d+)K\b/g, '$1 thousand')
     .replace(/(\d%?|thousand)\+/g, '$1 plus')
     .replace(/(\w)\/(\w)/g, '$1 and $2')
@@ -183,9 +210,11 @@ export function toSpeech(md, max = 480) {
     // noun (é = e-acute), which both Kokoro and browser voices say as REZ-oo-may.
     .replace(/\b([Rr])esume(s?)\b/g, (_, r, s) => `${r}ésumé${s}`)
     .replace(/\s*\n+\s*/g, ' ')
+    .replace(/,\s*([,.:;!?])/g, '$1')
     .replace(/\.\s*\./g, '.')
     .replace(/\s{2,}/g, ' ')
     .trim()
+  if (links && !shown) text += ` The links are on screen.`
 
   if (text.length > max) {
     const cut = text.slice(0, max)
@@ -218,7 +247,7 @@ export function tourSteps() {
     },
     {
       target: 'experience',
-      text: `His journey spans ${experience.length} companies. It began at ${company(first.company)} in ${startYear(first.period)}, ran through ${NUMBERS[yearsIn(experience[1].period)] || yearsIn(experience[1].period)} years at ${company(experience[1].company)}, and continues today at ${experience[0].company}, where he leads as ${experience[0].role}.`,
+      text: `His journey spans ${experience.length} companies. It began at ${company(first.company)} in ${startYear(first.period)}, ran through more than ${NUMBERS[yearsIn(experience[1].period)] || yearsIn(experience[1].period)} years at ${company(experience[1].company)}, and continues today at ${experience[0].company}, where he leads as ${experience[0].role}.`,
     },
     {
       target: 'skills',
@@ -285,18 +314,17 @@ const spoken = (text) =>
     .replace(/([a-z])([A-Z])/g, '$1 $2') // VusionGroup → Vusion Group
 
 // Short narration of each stat (keyed by stats[].value): [shown text, spoken form]. A stat without an
-// entry falls back to "value label". The whole brief stays at about 90 words.
+// entry falls back to "value label". The whole brief stays at about 75 spoken words (30 seconds).
 const STAT_LINES = {
   '35+': ['35+ engineers led', 'thirty-five plus engineers led'],
   '100%': ['100% on-time milestones', 'a hundred percent on-time milestones'],
-  '3 wk → 5 days': ['release cycles cut from 3 weeks to 5 days', 'release cycles cut from three weeks to five days'],
-  '8': ['8 senior engineers hired', 'eight senior engineers hired'],
+  '3 wk → 5 days': ['releases from 3 weeks to 5 days', 'releases from three weeks to five days'],
+  '8': ['8 senior hires', 'eight senior hires'],
 }
-const NUMBER_WORDS = { 3: 'three' } // e.g. availability.notice '3 months' -> 'three-month'
+const NUMBER_WORDS = { 3: 'three' } // e.g. availability.notice '3 months' -> "three months'"
 
 export function briefNarration() {
   const card = Object.fromEntries(profileCard)
-  const an = (word) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
   const proof = stats.map((s, i) => {
     const [text, speech] = STAT_LINES[s.value] || [`${s.value} ${lowerFirst(s.label)}`]
     const pre = i === 0 ? 'In numbers: ' : i === stats.length - 1 ? 'and ' : ''
@@ -304,18 +332,18 @@ export function briefNarration() {
     return { text: pre + text + end, speech: speech && pre + speech + end }
   })
   const [n, unit] = availability.notice.split(' ') // '3 months'
-  const notice = `${NUMBER_WORDS[n] || n}-${unit.replace(/s$/, '')}` // 'three-month'
+  const notice = `${NUMBER_WORDS[n] || n} ${unit}'` // "three months'"
   const segments = [
-    { target: 'name', text: `Allow me. ${profile.name} is ${an(profile.role)} ${profile.role} at ${profile.company}.` },
+    { target: 'name', text: `${profile.name}, ${profile.role} at ${profile.company}.` },
     availability.open && {
       target: 'availability',
-      text: `He's open to ${list(availability.roles)} roles, with a ${notice} notice period${availability.relocation ? ', and is open to relocation' : ''}.`,
+      text: `Open to ${list(availability.roles)} roles; ${notice} notice${availability.relocation ? '; will relocate' : ''}.`,
     },
-    { target: 'signals', text: `He brings ${card.experience} of experience.` },
+    { target: 'signals', text: `${card.experience}' experience.` },
     ...proof.map((p, i) => ({ target: `stat-${i}`, ...p })),
-    { target: 'projects', text: `Top projects: ${list(projects.slice(0, 3).map(project))}.` },
-    { target: 'domains', text: `Core domains: ${list(profile.domains)}.` },
-    { target: 'actions', text: 'Download his resume, or check role fit.' },
+    { target: 'projects', text: `Projects: ${list(projects.slice(0, 3).map(project))}.` },
+    { target: 'domains', text: `Domains: ${list(profile.domains)}.` },
+    { target: 'actions', text: 'His resume is right here.' },
   ].filter(Boolean)
   return segments.map((s) => ({ ...s, speech: s.speech ? spoken(s.speech) : spoken(s.text) }))
 }

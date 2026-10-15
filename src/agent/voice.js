@@ -147,9 +147,10 @@ let server = AudioCtx && liveAgent ? 'unknown' : 'off'
 export const voiceName = () => (server === 'on' ? 'Kokoro (British male), with JARVIS-style processing' : pickVoice()?.name ?? '')
 
 // Browsers only allow audio that starts inside a tap or click. Call this from click handlers
-// so answers spoken later (after a network round trip) are allowed too.
+// so answers spoken later (after a network round trip) are allowed too. The Web Audio graph is
+// only built when the server voice can play; the static site speaks with speechSynthesis alone.
 export function unlockSpeech() {
-  const ac = audio()
+  const ac = server !== 'off' ? audio() : null
   if (ac?.state === 'suspended') ac.resume()
   if (unlockSpeech.done) return
   unlockSpeech.done = true
@@ -250,10 +251,11 @@ async function speakServer(text, mine, done, { onBoundary, onLevel }) {
   const clips = parts.map((p, i) => (i === 0 ? first : ready.then(() => fetchClip(p, ctrl.signal))))
   clips.forEach((c) => c.catch(() => {}))
 
-  // Feed the orb the real loudness of the voice.
+  // Feed the orb the real loudness of the voice, until this line ends (finished) or is replaced.
+  let finished = false
   const samples = new Uint8Array(analyser.fftSize)
   const meter = () => {
-    if (mine !== generation) return
+    if (mine !== generation || finished) return
     analyser.getByteTimeDomainData(samples)
     let sum = 0
     for (const v of samples) sum += ((v - 128) / 128) ** 2
@@ -272,6 +274,7 @@ async function speakServer(text, mine, done, { onBoundary, onLevel }) {
       // server voice is only warming up.
       if (!err.warming) server = 'off'
       ctrl.abort()
+      finished = true
       return speakBrowser(parts.slice(i).join(' '), mine, done, onBoundary)
     }
     if (mine !== generation) return
@@ -279,6 +282,7 @@ async function speakServer(text, mine, done, { onBoundary, onLevel }) {
     await play(buffer)
     if (mine !== generation) return
   }
+  finished = true
   done()
 }
 

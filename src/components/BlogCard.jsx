@@ -1,8 +1,15 @@
 import useBloggerFeed from '../hooks/useBloggerFeed.js'
 
+// Line icon (24×24, currentColor) in the same style as the site's other SVG icons.
+export const BlogIcon = ({ d }) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+    <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
 // Shared layout for one blog: intro, latest posts from its feed, and a link to the blog.
-export default function BlogCard({ blog, icon, variant, cta }) {
-  const { status, posts } = useBloggerFeed(blog.url)
+export default function BlogCard({ blog, icon, variant, cta, load = true }) {
+  const { status, posts } = useBloggerFeed(blog.url, 3, load)
   const headingId = `blog-${variant}-h`
 
   return (
@@ -18,6 +25,7 @@ export default function BlogCard({ blog, icon, variant, cta }) {
 
       <div className="blog__posts" aria-busy={status === 'loading'}>
         <p className="blog__label">Latest posts</p>
+        {status === 'idle' && <p className="blog__note">Posts load as you scroll here.</p>}
         {status === 'loading' && <p className="blog__note">Loading posts…</p>}
         {status === 'error' && <p className="blog__note">Couldn't load the latest posts. Visit the blog to read them.</p>}
         {status === 'ready' && posts.length === 0 && <p className="blog__note">No posts yet.</p>}

@@ -10,8 +10,9 @@ export const PALETTES = [
   { id: 'mahogany', name: 'Mahogany', note: 'dark reddish-brown', swatch: ['#140c0b', '#c8644c', '#e0a96d'] },
 ]
 
-// `css` is the Google Fonts query for the family + its mono pairing. Inter is linked in index.html;
-// the others load on demand (index.html's inline script also loads a saved choice before first paint).
+// `css` is the Google Fonts query for the family + its mono pairing. Inter is self-hosted (index.html);
+// the others load from Google Fonts only once a visitor picks one (index.html's inline script also
+// loads a saved choice before first paint). Disclosed in the panel and in public/privacy.html.
 export const FONTS = [
   { id: 'inter', name: 'Inter', family: 'Inter, sans-serif' },
   { id: 'grotesk', name: 'Space Grotesk', family: "'Space Grotesk', sans-serif", css: 'Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600' },
@@ -83,7 +84,6 @@ export default function ThemePicker() {
 
   useEffect(() => {
     if (!open) return
-    FONTS.forEach((f) => loadFont(f.id)) // so each font option previews in its own typeface
     panelRef.current?.querySelector('input:checked')?.focus()
     const onKey = (e) => {
       if (e.key === 'Escape') {
@@ -162,6 +162,9 @@ export default function ThemePicker() {
                 </label>
               ))}
             </div>
+            <p className="picker__hint">
+              Space Grotesk, IBM Plex Sans and Source Serif load from Google Fonts when picked (<a href="/privacy.html">privacy</a>).
+            </p>
           </fieldset>
 
           <fieldset>

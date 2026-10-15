@@ -1,5 +1,7 @@
 import ThemeToggle from './ThemeToggle.jsx'
 import ThemePicker from './ThemePicker.jsx'
+import MotionToggle from './MotionToggle.jsx'
+import { liveAgent } from '../agent/askAgent.js'
 
 // Same order as the sections in App.jsx.
 const links = [
@@ -7,7 +9,7 @@ const links = [
   { href: '#projects', label: 'projects' },
   { href: '#experience', label: 'experience' },
   { href: '#fit', label: 'role fit' },
-  { href: '#console', label: 'ask AI' },
+  { href: '#console', label: liveAgent ? 'ask AI' : 'ask' }, // "AI" only with the live agent (askAgent.js)
   { href: '#skills', label: 'skills' },
   { href: '#blogs', label: 'blogs' },
   { href: '#contact', label: 'contact' },
@@ -28,6 +30,7 @@ export default function Header() {
       </nav>
       <div className="header__tools">
         <ThemePicker />
+        <MotionToggle />
         <ThemeToggle />
       </div>
     </header>

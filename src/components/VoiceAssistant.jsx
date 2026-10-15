@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { profile } from '../data.js'
-import { askAgent } from '../agent/askAgent.js'
+import { askAgent, offline } from '../agent/askAgent.js'
 import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName } from '../agent/voice.js'
 import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
@@ -13,13 +13,20 @@ import RichText from './RichText.jsx'
 // a large, centered conversation view.
 // Other components open him with: window.dispatchEvent(new Event('vince:open')).
 // The 30-second brief asks him to narrate it with 'vince:brief'.
+// Loaded on demand by Vince.jsx, which shows the launcher until then.
 
 const STATUS = { idle: 'Standing by', listening: 'Listening…', thinking: 'Accessing records…', speaking: 'Speaking' }
 const MUTE_KEY = 'vince-muted'
 const HINT_KEY = 'vince-hint-seen'
+const HINT_MS = 12000
 const FIRST = profile.firstName.split(' ')[0]
 const readingTime = (text) => Math.max(2500, text.split(/\s+/).length * 330)
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+// Phones: the tour runs in the minimized bar with a caption, so the narrated section stays visible.
+const narrow = () => window.matchMedia('(max-width: 600px)').matches
+// The tour starts on an explicit request, or on a bare "yes" right after the introduction offers it.
+const WANTS_TOUR = /\b(take|give|start|begin|show)\b.*\btour\b|\bguided tour\b|\btour (me|of)\b|^(the )?tour\b|show me around/i
+const ACCEPT = /^(yes|yeah|yep|sure|ok(ay)?|please( do)?|go ahead|let'?s go|why not)([ ,]+(please|go ahead|sure|thanks|thank you))?[.!]*$/i
 
 function stored(key) {
   try {
@@ -44,6 +51,9 @@ const Icon = ({ d }) => (
 const MINIMIZE = 'M5 18h14'
 const MAXIMIZE = 'M4 4h16v16H4z'
 const RESTORE = 'M8 4h12v12M4 8h12v12H4z'
+const SPEAKER = 'M4 9.5h3.5L12 5.5v13l-4.5-4H4z'
+const SPEAKER_ON = `${SPEAKER}M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11`
+const SPEAKER_OFF = `${SPEAKER}M16 9.5l5 5M21 9.5l-5 5`
 
 function MicIcon() {
   return (
@@ -54,7 +64,7 @@ function MicIcon() {
   )
 }
 
-export default function VoiceAssistant() {
+export default function VoiceAssistant({ onReady }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState('idle')
   const [muted, setMuted] = useState(() => stored(MUTE_KEY))
@@ -66,11 +76,17 @@ export default function VoiceAssistant() {
   const [hint, setHint] = useState(false)
   const [size, setSize] = useState('normal') // 'mini' | 'normal' | 'max'
   const [briefing, setBriefing] = useState(false) // narrating the 30-second brief
+  const [caption, setCaption] = useState('') // the tour stop being narrated, shown in the minimized bar
+  // 'local': answers come from the offline resume search, shown as "Offline · answers from the resume".
+  const [source, setSource] = useState(() => (offline() ? 'local' : 'live'))
 
   const energy = useRef(0) // pulses the orb on each spoken word
   const asked = useRef(new Set())
   const history = useRef([])
   const greeted = useRef(false)
+  const offeredTour = useRef(false) // the introduction just offered the tour, so a bare "yes" accepts it
+  const autoMini = useRef(false) // the tour minimized the panel (phones), so restore it afterwards
+  const sizeRef = useRef('normal') // the current size, for callbacks created earlier (voice input)
   const handsFree = useRef(false) // after the visitor first uses the mic, VINCE listens after each answer
   const stopListening = useRef(null)
   const abort = useRef(null)
@@ -128,7 +144,9 @@ export default function VoiceAssistant() {
     if (!tour.current) return
     clearFocus()
     tour.current = null
+    autoMini.current = false
     setTouring(false)
+    setCaption('')
   }
 
   const runTour = (i) => {
@@ -138,10 +156,16 @@ export default function VoiceAssistant() {
     if (i >= steps.length) {
       tour.current = null
       setTouring(false)
+      setCaption('')
       setSuggestions(nextQuestions('', '', asked.current))
+      if (autoMini.current) {
+        autoMini.current = false
+        setSize('normal')
+      }
       return autoListen()
     }
     tour.current.i = i
+    setCaption(steps[i].text)
     const el = document.getElementById(steps[i].target)
     if (el) {
       el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
@@ -156,7 +180,11 @@ export default function VoiceAssistant() {
     unlockSpeech()
     halt()
     setSuggestions([])
-    setSize((s) => (s === 'max' ? 'normal' : s)) // the tour scrolls the page, so it must be visible
+    offeredTour.current = false
+    // The tour scrolls the page, so the page must be visible; on phones even the normal panel
+    // covers most of it, so he narrates from the minimized bar.
+    autoMini.current = narrow() && sizeRef.current !== 'mini'
+    setSize((s) => (autoMini.current ? 'mini' : s === 'max' ? 'normal' : s))
     tour.current = { steps: tourSteps(), i: 0 }
     setTouring(true)
     runTour(0)
@@ -198,6 +226,7 @@ export default function VoiceAssistant() {
     setInterim('')
     setSuggestions([])
     setHint(false)
+    offeredTour.current = false
     // Minimized, so the brief stays readable; focus stays on the brief's button.
     if (!open || size !== 'mini') keepFocus.current = true
     setOpen(true)
@@ -214,6 +243,7 @@ export default function VoiceAssistant() {
     unlockSpeech()
     halt()
     stopTour()
+    offeredTour.current = false
     const text = explainNode(node)
     setMessages((m) => [...m, { role: 'you', text: `Explain ${node.type === 'root' ? 'the domain graph' : node.label}` }, { role: 'vince', text }])
     setSuggestions(nodeQuestions(node))
@@ -223,8 +253,11 @@ export default function VoiceAssistant() {
   const ask = async (raw) => {
     const question = raw.trim()
     if (!question) return
-    // "Take the tour", or a plain "yes" to the introduction's offer, starts the tour.
-    if (/\btour\b|show me around/i.test(question) || (!history.current.length && /^(yes|yeah|yep|sure|ok(ay)?|please|go ahead)\b/i.test(question))) {
+    // "Take the tour", or a bare "yes" right after the introduction offered it, starts the tour.
+    // "OK, what is his notice period?" or "Please list his projects" are questions, not a yes.
+    const accepted = offeredTour.current && ACCEPT.test(question)
+    offeredTour.current = false
+    if (WANTS_TOUR.test(question) || accepted) {
       setInput('')
       setMessages((m) => [...m, { role: 'you', text: question }])
       return startTour()
@@ -238,6 +271,7 @@ export default function VoiceAssistant() {
     setMode('thinking')
 
     let answer = ''
+    let sig // the live agent's signature for this answer, kept in history (AI-005)
     const setAnswer = (text) =>
       setMessages((m) => {
         const next = m.slice()
@@ -251,8 +285,10 @@ export default function VoiceAssistant() {
         voice: true,
         signal: ctrl.signal,
         onStatus: () => {},
-        onSource: () => {},
+        onSource: setSource,
         onText: (chunk) => setAnswer((answer += chunk)),
+        onReset: () => setAnswer((answer = '')), // a fallback model took over mid-answer
+        onDone: (done) => (sig = done.sig),
       })
     } catch (err) {
       if (err.name === 'AbortError') return
@@ -261,7 +297,7 @@ export default function VoiceAssistant() {
     if (ctrl.signal.aborted) return
     abort.current = null
 
-    history.current = [...history.current, { role: 'user', content: question }, { role: 'assistant', content: answer }].slice(-10)
+    history.current = [...history.current, { role: 'user', content: question }, { role: 'assistant', content: answer, sig }].slice(-10)
     const next = nextQuestions(question, answer, asked.current)
     const invite = followUpLine(next)
     setSuggestions(next)
@@ -349,7 +385,8 @@ export default function VoiceAssistant() {
     setOpen(true)
     if (!greeted.current) {
       greeted.current = true
-      const text = introduction()
+      offeredTour.current = true
+      const text = introduction(undefined, { offline: offline() })
       // Keep anything VINCE already said elsewhere (e.g. explanations in the graph dialog).
       setMessages((m) => [...m, { role: 'vince', text }])
       setSuggestions(nextQuestions('', '', asked.current))
@@ -370,40 +407,67 @@ export default function VoiceAssistant() {
     setSize('normal')
   }
 
-  // Maximized is modal: the page behind can't be reached or scrolled.
+  // Maximized is modal: the page behind can't be reached or scrolled. Everything in #root except
+  // the panel (and its backdrop, which closes it on click) is inert, including the skip link and
+  // progress bar outside .wrap (UX-010).
   useEffect(() => {
-    const page = document.querySelector('.wrap')
     const max = open && size === 'max'
-    if (page) page.inert = max
+    const root = document.getElementById('root')
+    const outside = max && root
+      ? [...root.children].filter((el) => !el.contains(panelRef.current) && !el.classList.contains('vince-backdrop'))
+      : []
+    outside.forEach((el) => (el.inert = true))
     document.body.style.overflow = max ? 'hidden' : ''
     return () => {
-      if (page) page.inert = false
+      outside.forEach((el) => (el.inert = false))
       document.body.style.overflow = ''
     }
   }, [open, size])
 
   useEffect(() => {
     showRef.current = { show, explain, stopAll, close, startBrief, briefing: () => Boolean(brief.current) }
+    sizeRef.current = size
   })
 
-  // In the normal panel (including during the tour), pressing anywhere else on the page closes
-  // VINCE. Minimized, he carries on while the visitor uses the page; maximized, the backdrop
-  // handles it. Presses on elements that drive VINCE ([data-vince-trigger]) are ignored, so
-  // they don't close him just as they open him or ask him something.
+  // In the normal panel (including during the tour), a tap or click anywhere else on the page
+  // closes VINCE. Minimized, he carries on while the visitor uses the page; maximized, the
+  // backdrop handles it. Presses on elements that drive VINCE ([data-vince-trigger]) are ignored,
+  // so they don't close him just as they open him or ask him something.
+  // Like the brief (Brief.jsx): eligibility is decided on pointerdown, but the close waits for
+  // pointerup and only happens if the pointer moved 10px or less. A touch scroll fires
+  // pointercancel (or drifts), so scrolling the page leaves VINCE open.
   useEffect(() => {
     if (!open || size !== 'normal') return
+    let start = null
     const onPointerDown = (e) => {
-      if (e.button !== 0) return
+      start = null
+      if (e.button !== 0 || !e.isPrimary) return
       const root = document.documentElement
       if (e.clientX >= root.clientWidth || e.clientY >= root.clientHeight) return // page scrollbar
       const target = e.target
       if (!(target instanceof Element) || panelRef.current?.contains(target)) return
       if (target.closest('[data-vince-trigger]')) return
+      start = { x: e.clientX, y: e.clientY }
+    }
+    const onCancel = () => {
+      start = null
+    }
+    const onPointerUp = (e) => {
+      const from = start
+      start = null
+      if (!from || e.button !== 0 || !e.isPrimary) return
+      if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > 10) return
       keepFocus.current = true
       showRef.current.close()
     }
     document.addEventListener('pointerdown', onPointerDown, true)
-    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('pointercancel', onCancel, true)
+    document.addEventListener('pointerup', onPointerUp, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('pointercancel', onCancel, true)
+      document.removeEventListener('pointerup', onPointerUp, true)
+    }
   }, [open, size])
 
   // Window events let other components drive VINCE: 'vince:open', 'vince:explain' (detail: a
@@ -419,6 +483,7 @@ export default function VoiceAssistant() {
     window.addEventListener('vince:explain', onExplain)
     window.addEventListener('vince:brief', onBrief)
     window.addEventListener('vince:stop', onStop)
+    onReady?.() // Vince.jsx replays events sent while this panel was loading
     return () => {
       window.removeEventListener('vince:open', onOpen)
       window.removeEventListener('vince:explain', onExplain)
@@ -439,7 +504,9 @@ export default function VoiceAssistant() {
     window.dispatchEvent(new CustomEvent('vince:briefing', { detail: briefing }))
   }, [briefing])
 
-  // A one-time nudge per browser session, a few seconds after the page loads.
+  // A one-time nudge per browser session (UI-005): only on wide screens, at least 6 s after load and
+  // once the hero has scrolled away (so it never sits on the name, pitch or buttons), and it hides
+  // itself after HINT_MS. Phones only get the orb launcher.
   useEffect(() => {
     let seen = false
     try {
@@ -448,11 +515,33 @@ export default function VoiceAssistant() {
       /* treat as unseen */
     }
     if (seen) return
-    const id = setTimeout(() => {
+    const wide = window.matchMedia('(min-width: 900px)')
+    const hero = document.getElementById('top')
+    let ready = false
+    let away = !hero
+    let shown = false
+    let hide = 0
+    const maybe = () => {
+      if (shown || !ready || !away || !wide.matches) return
+      shown = true
       setHint(true)
       store(HINT_KEY, true, sessionStorage)
+      hide = setTimeout(() => setHint(false), HINT_MS)
+    }
+    const id = setTimeout(() => {
+      ready = true
+      maybe()
     }, 6000)
-    return () => clearTimeout(id)
+    const io = hero && new IntersectionObserver(([e]) => {
+      away = !e.isIntersecting
+      maybe()
+    })
+    io?.observe(hero)
+    return () => {
+      clearTimeout(id)
+      clearTimeout(hide)
+      io?.disconnect()
+    }
   }, [])
 
   // Focus moves into the panel when it opens or changes size, and back to the launcher when it
@@ -489,7 +578,7 @@ export default function VoiceAssistant() {
           )}
           <button ref={launcherRef} type="button" className="vince-launch" onClick={show} aria-haspopup="dialog" data-vince-trigger>
             <span className="vince-launch__orb" aria-hidden="true" />
-            <span>Ask VINCE</span>
+            <span className="vince-launch__label">Ask VINCE</span>
           </button>
         </div>
       )}
@@ -499,11 +588,11 @@ export default function VoiceAssistant() {
       {open && (
         <section
           ref={panelRef}
-          className={`vince vince--${size}${touring ? ' vince--touring' : ''}`}
+          className={`vince vince--${size}${touring ? ' vince--touring' : ''}${size === 'mini' && touring && caption ? ' vince--captioned' : ''}`}
           role="dialog"
           aria-modal={size === 'max' || undefined}
           aria-labelledby="vince-title"
-          aria-describedby="vince-sub"
+          aria-describedby={source === 'local' && size !== 'mini' ? 'vince-sub vince-source' : 'vince-sub'}
           tabIndex={-1}
           onKeyDown={(e) => e.key === 'Escape' && (size === 'max' ? setSize('normal') : close())}
         >
@@ -514,7 +603,10 @@ export default function VoiceAssistant() {
               {size === 'mini' ? (
                 <p id="vince-sub" className="vince__sub" role="status">{interim ? `“${interim}”` : STATUS[mode]}</p>
               ) : (
-                <p id="vince-sub" className="vince__sub">{EXPANSION}</p>
+                <>
+                  <p id="vince-sub" className="vince__sub">{EXPANSION}</p>
+                  {source === 'local' && <p id="vince-source" className="vince__source">Offline · answers from the resume</p>}
+                </>
               )}
             </div>
             <div className="vince__tools">
@@ -525,7 +617,7 @@ export default function VoiceAssistant() {
               )}
               {canSpeak && (
                 <button type="button" className="vince__icon" onClick={toggleMute} aria-pressed={!muted} aria-label="Voice" title={voiceName() ? `Voice: ${voiceName()}` : 'Voice'}>
-                  <span aria-hidden="true">{muted ? '🔇' : '🔊'}</span>
+                  <Icon d={muted ? SPEAKER_OFF : SPEAKER_ON} />
                 </button>
               )}
               {size !== 'mini' && (
@@ -552,6 +644,10 @@ export default function VoiceAssistant() {
               </button>
             </div>
           </header>
+
+          {size === 'mini' && touring && caption && (
+            <p className="vince__caption" aria-live="polite">{caption}</p>
+          )}
 
           {size !== 'mini' && (
             <div className="vince__body">
@@ -592,7 +688,10 @@ export default function VoiceAssistant() {
                       </button>
                     ))}
                     <button type="button" className="vince__tourbtn" onClick={startTour} disabled={mode === 'thinking'}>
-                      ▶ Guided tour
+                      <svg className="vince__play" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false">
+                        <path d="M3 1.5v9l7-4.5z" fill="currentColor" />
+                      </svg>
+                      Guided tour
                     </button>
                   </div>
                 )}

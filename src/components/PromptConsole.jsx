@@ -16,6 +16,7 @@ export default function PromptConsole() {
   const logRef = useRef(null)
   const inputRef = useRef(null)
   const abortRef = useRef(null)
+  const stoppedRef = useRef(false) // set by the Stop button
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -24,7 +25,9 @@ export default function PromptConsole() {
     if (log) log.scrollTop = log.scrollHeight
   }, [messages, status])
 
-  const ask = async (raw) => {
+  // fromInput: the question was typed, so focus goes back to the field afterwards. A suggestion
+  // chip keeps focus, so keyboard users can try the next chip and phones don't open the keyboard.
+  const ask = async (raw, { fromInput = false } = {}) => {
     const question = raw.trim()
     if (!question || busy) return
     const history = messages.slice(1).filter((m) => m.content)
@@ -32,6 +35,13 @@ export default function PromptConsole() {
     setBusy(true)
     setStatus('thinking')
     setMessages((m) => [...m, { role: 'user', content: question }, { role: 'assistant', content: '' }])
+
+    const updateLast = (patch) =>
+      setMessages((m) => {
+        const next = m.slice()
+        next[next.length - 1] = { ...next[next.length - 1], ...patch }
+        return next
+      })
 
     const appendText = (chunk) => {
       setStatus('')
@@ -49,20 +59,32 @@ export default function PromptConsole() {
         onStatus: setStatus,
         onText: appendText,
         onSource: setSource,
+        // A fallback model took over mid-answer: start again rather than splice two answers.
+        onReset: () => updateLast({ content: '' }),
+        // sig lets the live agent trust this answer as history; sources is shown under it.
+        onDone: ({ sig, sources }) => updateLast({ sig, sources }),
         signal: abortRef.current.signal,
       })
     } catch (err) {
       if (err.name !== 'AbortError') appendText('Something went wrong. Please try again.')
+      else if (stoppedRef.current) appendText('\n\nStopped.')
     } finally {
       setBusy(false)
       setStatus('')
-      inputRef.current?.focus()
+      if (fromInput || stoppedRef.current) inputRef.current?.focus()
+      stoppedRef.current = false
     }
+  }
+
+  // Stops a streaming answer: what has arrived so far stays, and focus returns to the field.
+  const stop = () => {
+    stoppedRef.current = true
+    abortRef.current?.abort()
   }
 
   const onSubmit = (e) => {
     e.preventDefault()
-    ask(input)
+    ask(input, { fromInput: true })
   }
 
   return (
@@ -75,6 +97,7 @@ export default function PromptConsole() {
             <div key={i} className={`msg ${m.role === 'user' ? 'u' : 'a'}`}>
               <small>{m.role === 'user' ? 'you' : 'profile-agent'}</small>
               {m.role === 'user' ? <span className="msg__text">{m.content}</span> : <RichText text={m.content} />}
+              {m.sources?.length > 0 && <p className="msg__src">Source: {m.sources.join(' and ')}</p>}
               {streaming && (
                 <>
                   {status && <span className="msg__status"> {status}…</span>}
@@ -85,7 +108,7 @@ export default function PromptConsole() {
           )
         })}
       </div>
-      <div className="metrics" aria-hidden="true">
+      <div className="metrics">
         <span>source: {SOURCES[source]}</span>
       </div>
       <form className="prompt" onSubmit={onSubmit}>
@@ -101,13 +124,18 @@ export default function PromptConsole() {
           maxLength={500}
           autoComplete="off"
         />
-        <button type="submit" disabled={busy || !input.trim()}>
-          {busy ? 'Thinking…' : 'Ask'}
-        </button>
+        {busy ? (
+          <button type="button" onClick={stop}>
+            <span aria-hidden="true">■</span> Stop
+          </button>
+        ) : (
+          <button type="submit" disabled={!input.trim()}>Ask</button>
+        )}
       </form>
       <div className="chips" role="group" aria-label="Suggested prompts">
+        {/* aria-disabled, not disabled, while busy: a disabled button drops keyboard focus. ask() ignores the press. */}
         {suggestedPrompts.map((q) => (
-          <button key={q} type="button" onClick={() => ask(q)} disabled={busy}>
+          <button key={q} type="button" onClick={() => ask(q)} aria-disabled={busy || undefined}>
             {q}
           </button>
         ))}

@@ -11,7 +11,7 @@ export default function Leadership() {
           <p>{leadershipPhilosophy}</p>
         </blockquote>
       )}
-      <div className="grid">
+      <div className="grid grid--2">
         {leadership.map((l) => (
           <article key={l.title} className="card mc">
             <h3>{l.title}</h3>

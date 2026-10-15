@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 
 // Latest posts from a Blogger blog. Blogger feeds don't send CORS headers, so this uses the
-// feed's JSONP format (alt=json-in-script). Returns { status: 'loading' | 'ready' | 'error', posts }.
+// feed's JSONP format (alt=json-in-script), from Blogger's own blogspot.com host (allowed in the CSP in
+// index.html). Nothing is requested until `enabled` is true (Blogs.jsx sets it near the section).
+// Returns { status: 'idle' | 'loading' | 'ready' | 'error', posts }.
 let seq = 0
 const TIMEOUT_MS = 8000
 
@@ -24,10 +26,12 @@ function toPost(entry, blogUrl) {
   }
 }
 
-export default function useBloggerFeed(blogUrl, max = 3) {
-  const [state, setState] = useState({ status: 'loading', posts: [] })
+export default function useBloggerFeed(blogUrl, max = 3, enabled = true) {
+  const [state, setState] = useState({ status: enabled ? 'loading' : 'idle', posts: [] })
 
   useEffect(() => {
+    if (!enabled) return
+    setState((s) => (s.status === 'idle' ? { status: 'loading', posts: [] } : s))
     const cb = `__bloggerFeed${++seq}`
     const script = document.createElement('script')
     let done = false
@@ -58,7 +62,7 @@ export default function useBloggerFeed(blogUrl, max = 3) {
       done = true
       cleanup()
     }
-  }, [blogUrl, max])
+  }, [blogUrl, max, enabled])
 
   return state
 }

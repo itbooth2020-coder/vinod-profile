@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { profile } from '../data.js'
-import { matchRole, fitSummaryText, availabilityNote, SAMPLE_JD, MIN_WORDS } from '../agent/roleFit.js'
+import { matchRole, fitSummaryText, availabilityNote, SAMPLE_JD, MIN_WORDS, MAX_CHARS } from '../agent/roleFit.js'
 
 // Role-fit matcher: a recruiter pastes a job description and sees which requirements the profile
 // backs with evidence, related experience, and what isn't evident. Runs entirely in the browser.
@@ -27,13 +27,21 @@ export default function RoleFit() {
     return () => clearTimeout(id)
   }, [jd])
 
-  // Arriving via #fit (header nav, the brief's "Check role fit") moves focus to the heading.
+  // Arriving via #fit (header nav, the brief's "Check role fit") moves focus to the heading. A link
+  // to #fit clicked while the URL already ends in #fit fires no hashchange, so clicks count too.
   useEffect(() => {
-    const onHash = () => {
-      if (window.location.hash === '#fit') headingRef.current?.focus({ preventScroll: true })
+    const focusHeading = () => headingRef.current?.focus({ preventScroll: true })
+    const onHash = () => window.location.hash === '#fit' && focusHeading()
+    const onClick = (e) => {
+      if (e.defaultPrevented || e.button !== 0 || window.location.hash !== '#fit') return
+      if (e.target instanceof Element && e.target.closest('a[href="#fit"]')) setTimeout(focusHeading)
     }
     window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    document.addEventListener('click', onClick)
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      document.removeEventListener('click', onClick)
+    }
   }, [])
 
   useEffect(() => {
@@ -88,10 +96,16 @@ export default function RoleFit() {
           rows={8}
           value={jd}
           onChange={(e) => setJd(e.target.value)}
-          aria-describedby="fit-note"
+          maxLength={MAX_CHARS}
+          aria-describedby="fit-note fit-count"
           placeholder="e.g. Engineering Manager, Mobile Platform: lead a team of engineers across Android, iOS..."
         />
         <p id="fit-note" className="fit__note">Runs in your browser. Nothing is sent or stored.</p>
+        <p id="fit-count" className="fit__note">
+          {jd.length >= MAX_CHARS
+            ? `Limit reached: only the first ${MAX_CHARS.toLocaleString('en')} characters are checked.`
+            : `${jd.length.toLocaleString('en')} / ${MAX_CHARS.toLocaleString('en')} characters`}
+        </p>
         <div className="actions">
           <button type="submit" className="btn btn--primary">Check fit</button>
           <button type="button" className="btn" onClick={clear}>Clear</button>
@@ -149,12 +163,22 @@ export default function RoleFit() {
               </div>
             )}
 
-            {result.gaps.length > 0 && (
+            {result.gaps.length + result.scale.length > 0 && (
               <div className="fit__group">
-                <h3>Not evident in the profile <span className="fit__n">({result.gaps.length})</span></h3>
-                <ul className="tags fit__gaps">
-                  {result.gaps.map((g) => <li key={g.label}>{g.label}</li>)}
-                </ul>
+                <h3>Not evident in the profile <span className="fit__n">({result.gaps.length + result.scale.length})</span></h3>
+                {/* Scale and seniority: the JD's figure beside the profile's, so the reader can judge. */}
+                {result.scale.length > 0 && (
+                  <ul className="fit__scale">
+                    {result.scale.map((g) => (
+                      <li key={g.label}><span className="fit__term">{g.label}</span> <span className="fit__via">{g.note}</span></li>
+                    ))}
+                  </ul>
+                )}
+                {result.gaps.length > 0 && (
+                  <ul className="tags fit__gaps">
+                    {result.gaps.map((g) => <li key={g.label}>{g.label}</li>)}
+                  </ul>
+                )}
               </div>
             )}
 
@@ -187,7 +211,7 @@ function Coverage({ result }) {
   const parts = [
     { key: 'strong', label: 'Matched', n: result.strong.length },
     { key: 'related', label: 'Related', n: result.related.length },
-    { key: 'gap', label: 'Not evident', n: result.gaps.length },
+    { key: 'gap', label: 'Not evident', n: result.gaps.length + result.scale.length },
   ]
   const total = parts.reduce((s, p) => s + p.n, 0)
   if (!total) return <p className="fit__none">No recognised skills or requirements found in this text yet.</p>

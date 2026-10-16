@@ -95,10 +95,14 @@ a { color: var(--accent2); }
 /* Pause animations (MotionToggle.jsx): an icon toggle; pressed = paused. */
 .motion-toggle { display: inline-grid; place-items: center; width: 40px; padding: 0; }
 .motion-toggle svg { display: block; }
-.motion-toggle[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-/* Theme (ThemeToggle.jsx): sun/moon icon + "Theme", the same width in both themes. */
+/* <html data-motion> as well: the prerendered HTML shows the saved choice before the app hydrates. */
+.motion-toggle[aria-pressed='true'], :root[data-motion='paused'] .motion-toggle { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+/* Theme (ThemeToggle.jsx): sun/moon icon + "Theme", the same width in both themes. The icon follows
+   <html data-theme> (set before first paint by index.html), so the prerendered button is right too. */
 .theme-toggle { display: inline-flex; align-items: center; gap: 6px; }
 .theme-toggle svg { flex: none; display: block; }
+.theme-toggle__icon--light, :root[data-theme='light'] .theme-toggle__icon--dark { display: none; }
+:root[data-theme='light'] .theme-toggle__icon--light { display: inline; }
 .brand__init { display: none; }
 /* Desktop: brand, nav and tools on one row in every theme and font (UI-008). Nothing wraps, so the
    header keeps its height when the theme or a Customize font changes. */
@@ -180,7 +184,7 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .hero__top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
 /* "Read more" for the pitch: phones only (below). */
 .lede__more { display: none; }
-/* Phones: a small photo beside the name, then Download resume and Email, then the pitch clamped to
+/* Phones: a small photo beside the name, then the Email button, then the pitch clamped to
    three lines with "Read more" (the full text stays in the page for screen readers), availability
    and social links. .hero__text's children join the hero grid; tab order is unchanged because the
    pitch and availability have no controls. */
@@ -230,6 +234,13 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 :root[data-mode='brief'] .hero__text > :not(.hero__top),
 :root[data-mode='brief'] .hero__photo { display: none; }
 :root[data-mode='brief'] .hero { display: block; padding-bottom: 12px; }
+/* Until the app has mounted (index.html sets data-app, App.jsx removes it), only the prerendered header
+   and hero are laid out, so the hero paints quickly (PERF-FE-007); the rest appears with the app. */
+:root[data-app='pending'] #main > :not(.hero), :root[data-app='pending'] .footer { display: none; }
+/* The full page always scrolls: keep the scrollbar meanwhile, so the hero doesn't move sideways when it appears. */
+:root[data-app='pending']:not([data-mode='brief']) { overflow-y: scroll; }
+/* ?brief=1: the prerendered page is the full profile (its switch is off), so show nothing until the brief mounts. */
+:root[data-app='pending'][data-mode='brief'] #root { visibility: hidden; }
 .brief { padding: 20px; margin: 0 0 28px; display: grid; gap: 18px; animation: brief-in 0.3s ease both; }
 @keyframes brief-in { from { opacity: 0; transform: scale(0.985); } }
 .brief__head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; }
@@ -270,7 +281,7 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .brief__stop { width: 16px; margin-right: 6px; text-align: center; font-size: 12px; }
 .brief .tour-focus { border-radius: 10px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent), 0 0 0 4px color-mix(in srgb, var(--accent) 65%, transparent); }
 @media (max-width: 640px) { .brief__ask { grid-column: 1 / -1; justify-self: start; } }
-/* Phones: a small photo beside the name, and the action row (Download resume, Email…) right under
+/* Phones: a small photo beside the name, and the action row (Email, Check role fit…) right under
    the head, so they're on the first screen. The parts it moves above (availability, signals, stats,
    projects) have no controls, so the tab order still matches what's on screen. */
 @media (max-width: 600px) {
@@ -448,6 +459,16 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .mc > ul { padding-left: 1.1em; }
 .tag { display: inline-block; font: 11px var(--mono); color: var(--accent2); margin-bottom: 4px; }
 .tags { list-style: none; padding: 0 !important; display: flex; flex-wrap: wrap; gap: 6px; }
+/* Credentials: "Currently learning" under the completed certifications (UX-007) */
+.mc__sub { margin: 14px 0 6px; font-size: 0.95rem; }
+/* Skills: the collapsed "Earlier experience" group (UX-008); Skills.jsx opens it for print */
+.skills__earlier summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; }
+.skills__earlier summary::-webkit-details-marker { display: none; }
+.skills__earlier summary::after { content: '+'; font: 700 16px var(--mono); color: var(--muted); }
+.skills__earlier[open] summary::after { content: '−'; }
+.skills__earlier summary h3 { margin: 0; }
+.skills__earlier summary:hover h3 { color: var(--accent); }
+.skills__earlier[open] summary { margin-bottom: 8px; }
 .tags li { font: 12px var(--mono); padding: 3px 9px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); color: var(--text); }
 .more { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
 .more span { font: 12px var(--mono); color: var(--accent2); }
@@ -622,8 +643,9 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .post__summary { font-size: 13px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .post__labels { font: 11px var(--mono); color: var(--accent2); }
 .blog__cta { align-self: flex-start; }
-/* Comic blog: halftone dots behind the header for a comic-book feel */
-.blog--comic .blog__head { margin: -18px -18px 0; padding: 18px; background: radial-gradient(color-mix(in srgb, var(--accent2) 22%, transparent) 1px, transparent 1.5px) 0 0 / 8px 8px, var(--panel2); border-bottom: 1px solid var(--border); }
+/* Outside work: the comic fan blog as one quiet line under the tech blog (DES-001) */
+.blogs__outside { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+.blogs__outside-label { font-weight: 600; color: var(--text); }
 @media (max-width: 420px) { .post { grid-template-columns: 72px 1fr; } .post__thumb { width: 72px; } }
 @media (prefers-reduced-motion: reduce) { .post { transition: none; } .post:hover { transform: none; } }
 
@@ -690,6 +712,11 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 /* Minimized during the tour: a caption strip under the bar shows the stop being narrated */
 .vince--captioned { width: min(400px, calc(100vw - 32px)); border-radius: 18px; }
 .vince__caption { margin: 0; padding: 0 14px 10px; font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+/* Next stop / End tour under the caption, so phone visitors can step through the tour (CHAT-010) */
+.vince__tourbar { display: flex; gap: 8px; padding: 0 12px 12px; }
+.vince__tourbar button { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 6px 10px; border: 1px solid var(--hud-line); border-radius: 999px; background: transparent; color: var(--text); font: 600 12.5px var(--mono); letter-spacing: 0.04em; white-space: nowrap; cursor: pointer; }
+.vince__tourbar button:first-child { border-color: var(--accent); color: var(--hud-ink2); }
+.vince__tourbar button:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .vince__miniorb { position: relative; width: 36px; height: 36px; flex: none; border-radius: 50%; background: var(--orb); animation: vbreathe 4.5s ease-in-out infinite; }
 .vince__miniorb::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px dashed var(--orb-ring); animation: vspin 9s linear infinite; }
 /* At rest the mini orb is still; it moves only to show VINCE speaking, listening or thinking. */

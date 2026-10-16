@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { profile } from '../data.js'
 
 // priority: the photo is above the fold (hero), so fetch it early.
@@ -9,6 +9,11 @@ const SRCSET = `${base}profile-160.webp 160w, ${base}profile-320.webp 320w, ${ba
 
 export default function Avatar({ priority = false, sizes = '96px' }) {
   const [failed, setFailed] = useState(false)
+  const img = useRef(null)
+  // A prerendered image can fail before the app hydrates, when onError isn't listening yet.
+  useEffect(() => {
+    if (img.current?.complete && !img.current.naturalWidth) setFailed(true)
+  }, [])
   const initials = profile.name.split(' ').filter((_, i, a) => i === 0 || i === a.length - 1).map((w) => w[0]).join('')
 
   return (
@@ -17,6 +22,7 @@ export default function Avatar({ priority = false, sizes = '96px' }) {
         <span className="avatar__fallback" role="img" aria-label={profile.name}>{initials}</span>
       ) : (
         <img
+          ref={img}
           src={`${base}profile-320.webp`}
           srcSet={SRCSET}
           sizes={sizes}

@@ -1,27 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { experience } from '../data.js'
+import usePrintOpen from '../hooks/usePrintOpen.js'
 
 export default function Experience() {
   const ref = useRef(null)
 
-  // Print every role in full: open the collapsed ones before printing and close them again after.
-  useEffect(() => {
-    let opened = []
-    const before = () => {
-      opened = [...(ref.current?.querySelectorAll('details:not([open])') ?? [])]
-      opened.forEach((d) => (d.open = true))
-    }
-    const after = () => {
-      opened.forEach((d) => (d.open = false))
-      opened = []
-    }
-    window.addEventListener('beforeprint', before)
-    window.addEventListener('afterprint', after)
-    return () => {
-      window.removeEventListener('beforeprint', before)
-      window.removeEventListener('afterprint', after)
-    }
-  }, [])
+  usePrintOpen(ref) // print every role in full
 
   return (
     <section id="experience" aria-labelledby="experience-h" ref={ref}>

@@ -108,6 +108,9 @@
         var m = localStorage.getItem('motion-paused')
         if (m === '1' || (m !== '0' && matchMedia('(prefers-reduced-motion: reduce)').matches)) document.documentElement.dataset.motion = 'paused'
       } catch (e) {}
+      // Until the app mounts, only the prerendered header and hero are shown, so they paint without
+      // laying out the whole page first (styles.css; App.jsx removes it). Without JavaScript all of it shows.
+      document.documentElement.dataset.app = 'pending'
       // Shareable 30-second brief (?brief=1): switch before first paint to avoid a flash (see App.jsx).
       try {
         if (new URLSearchParams(location.search).get('brief') === '1') document.documentElement.dataset.mode = 'brief'
@@ -119,33 +122,20 @@
          Other Customize fonts load from Google Fonts only when a visitor picks one (ThemePicker.jsx). */
       @font-face { font-family: Inter; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/inter-latin-var.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
       @font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('ArialMT'), local('Helvetica'), local('Arimo'); size-adjust: 107.12%; ascent-override: 90.44%; descent-override: 22.52%; line-gap-override: 0%; }
-      /* Static #root fallback (see body); React replaces it on mount. */
-      .nojs { max-width: 1100px; margin: 0 auto; padding: 48px 20px; line-height: 1.6; color: var(--text, inherit); font-family: var(--sans, Inter, 'Inter Fallback', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif); }
-      .nojs h1 { margin: 0 0 4px; font-size: clamp(1.8rem, 6vw, 2.8rem); line-height: 1.15; }
-      .nojs .nojs__role { margin: 0 0 16px; font-weight: 600; color: var(--accent2, inherit); }
-      .nojs p { max-width: 70ch; }
-      .nojs .nojs__muted { color: var(--muted, inherit); }
-      .nojs ul { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 0; list-style: none; }
-      .nojs a { color: var(--accent2, inherit); font-weight: 600; }
     </style>
+    <noscript>
+      <!-- Without JavaScript the prerendered page (vite.config.js) is static: show the counters' final
+           values and the full pitch, and hide the controls and sections that need the app. -->
+      <style>
+        .counter__final { visibility: visible !important; } .counter__live { visibility: hidden !important; }
+        .hero .lede { display: block !important; }
+        .header__tools, .hero__top, .lede__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress { display: none !important; }
+      </style>
+    </noscript>
   </head>
   <body>
-    <div id="root">
-      <!-- Static fallback for crawlers and visitors without JavaScript; React replaces it on mount.
-           Keep in sync with src/data.js (profile, availability). -->
-      <main class="nojs">
-        <h1>Vinod Pyarelal Yadav</h1>
-        <p class="nojs__role">Engineering Manager | Mobile &amp; Enterprise Architecture | Scalable Systems</p>
-        <p>Engineering Manager leading a 35+ engineer, budget-owning org at Accenture: 100% on-time milestones, release cycles cut from 3 weeks to 5 days, and attrition down 20%. Led Syngenta&rsquo;s Darwin Portal, whose AI assistant routes requests to specialist Claude AI agents, built with Claude Code agents under engineer oversight.</p>
-        <p class="nojs__muted">Open to Senior Engineering Manager, Head of Engineering and CTO roles · Bengaluru · Onsite / Hybrid / Remote · Open to relocation · Notice: 3 months</p>
-        <ul>
-          <li><a href="/resume.pdf" download>Download resume</a></li>
-          <li><a href="mailto:yadav.vinod579@gmail.com">yadav.vinod579@gmail.com</a></li>
-          <li><a href="https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943" rel="noopener noreferrer">LinkedIn</a></li>
-          <li><a href="https://github.com/vinodyadav5799" rel="noopener noreferrer">GitHub</a></li>
-        </ul>
-      </main>
-    </div>
+    <!-- npm run build prerenders the app into #root (vite.config.js, PERF-FE-007); the dev server renders it. -->
+    <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

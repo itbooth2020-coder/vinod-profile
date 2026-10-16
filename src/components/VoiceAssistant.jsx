@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { profile } from '../data.js'
 import { askAgent, offline } from '../agent/askAgent.js'
+import { append, getTurns, history, pendingElsewhere, subscribe, update } from '../agent/conversation.js'
 import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName } from '../agent/voice.js'
 import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
@@ -12,6 +13,9 @@ import Citations from './Citations.jsx'
 // aloud, then suggests what to ask next. He can also narrate a guided tour of the page.
 // The panel can be minimized to a small bar (the conversation carries on) or maximized to
 // a large, centered conversation view.
+// The conversation is shared with VINCE's text console (PromptConsole.jsx) through
+// agent/conversation.js: questions asked there show here, and follow-ups work across both. He only
+// speaks answers to questions asked in this panel.
 // Other components open him with: window.dispatchEvent(new Event('vince:open')).
 // The 30-second brief asks him to narrate it with 'vince:brief'.
 // Loaded on demand by Vince.jsx, which shows the launcher until then.
@@ -69,7 +73,7 @@ export default function VoiceAssistant({ onReady }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState('idle')
   const [muted, setMuted] = useState(() => stored(MUTE_KEY))
-  const [messages, setMessages] = useState([])
+  const turns = useSyncExternalStore(subscribe, getTurns)
   const [interim, setInterim] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [touring, setTouring] = useState(false)
@@ -83,7 +87,6 @@ export default function VoiceAssistant({ onReady }) {
 
   const energy = useRef(0) // pulses the orb on each spoken word
   const asked = useRef(new Set())
-  const history = useRef([])
   const greeted = useRef(false)
   const offeredTour = useRef(false) // the introduction just offered the tour, so a bare "yes" accepts it
   const autoMini = useRef(false) // the tour minimized the panel (phones), so restore it afterwards
@@ -102,7 +105,9 @@ export default function VoiceAssistant({ onReady }) {
   const wasOpen = useRef(false)
   const keepFocus = useRef(false) // set by an outside-click close, so focus stays where the visitor clicked
 
-  const addVince = (text) => setMessages((m) => [...m, { role: 'vince', text }])
+  // VINCE's own lines (introduction, tour stops, suggestions) are notes: shown in his panel only.
+  const note = (speaker, content) => append({ role: 'note', speaker, content, via: 'vince' })
+  const addVince = (text) => note('vince', text)
 
   // Stops whatever VINCE is doing: speaking, waiting, listening, fetching an answer or
   // narrating the brief.
@@ -191,6 +196,18 @@ export default function VoiceAssistant({ onReady }) {
     runTour(0)
   }
 
+  // Tour controls, in the full panel and in the captioned bar on phones (CHAT-010).
+  const nextStop = () => {
+    if (!tour.current) return
+    halt()
+    runTour(tour.current.i + 1)
+  }
+  // The tour controls disappear when it ends, so focus moves to the panel rather than being lost.
+  const endTour = () => {
+    stopAll()
+    panelRef.current?.focus()
+  }
+
   // The 30-second brief: VINCE narrates it from the minimized bar, one segment at a time,
   // highlighting each part of the brief (data-brief="…") as he speaks it. halt() ends it.
   function stopBrief() {
@@ -246,7 +263,8 @@ export default function VoiceAssistant({ onReady }) {
     stopTour()
     offeredTour.current = false
     const text = explainNode(node)
-    setMessages((m) => [...m, { role: 'you', text: `Explain ${node.type === 'root' ? 'the domain graph' : node.label}` }, { role: 'vince', text }])
+    note('you', `Explain ${node.type === 'root' ? 'the domain graph' : node.label}`)
+    addVince(text)
     setSuggestions(nodeQuestions(node))
     voice(toSpeech(text, 900), autoListen)
   }
@@ -260,7 +278,7 @@ export default function VoiceAssistant({ onReady }) {
     offeredTour.current = false
     if (WANTS_TOUR.test(question) || accepted) {
       setInput('')
-      setMessages((m) => [...m, { role: 'you', text: question }])
+      note('you', question)
       return startTour()
     }
     halt()
@@ -268,41 +286,36 @@ export default function VoiceAssistant({ onReady }) {
     markAsked(asked.current, question)
     setInput('')
     setSuggestions([])
-    setMessages((m) => [...m, { role: 'you', text: question }, { role: 'vince', text: '', rich: true }])
+    const earlier = history()
+    append({ role: 'user', content: question, via: 'vince' })
+    const id = append({ role: 'assistant', content: '', via: 'vince', pending: true })
     setMode('thinking')
 
     let answer = ''
-    let sig // the live agent's signature for this answer, kept in history (AI-005)
-    const setAnswer = (text) =>
-      setMessages((m) => {
-        const next = m.slice()
-        next[next.length - 1] = { ...next[next.length - 1], text }
-        return next
-      })
+    const setAnswer = (content) => update(id, { content })
+    // Stopped before or during the answer: keep what arrived, or say it stopped.
+    const stopped = () => update(id, { content: answer || 'Stopped.', pending: false })
     const ctrl = new AbortController()
     abort.current = ctrl
     try {
-      await askAgent(question, history.current, {
+      await askAgent(question, earlier, {
         voice: true,
         signal: ctrl.signal,
         onStatus: () => {},
         onSource: setSource,
         onText: (chunk) => setAnswer((answer += chunk)),
         onReset: () => setAnswer((answer = '')), // a fallback model took over mid-answer
-        onDone: (done) => {
-          sig = done.sig
-          // Resume passages the live answer cites (AI-006), listed under it.
-          if (done.citations?.length) setMessages((m) => m.map((x, i) => (i === m.length - 1 ? { ...x, citations: done.citations } : x)))
-        },
+        // The live agent's signature is kept with the answer for history (AI-005); the resume
+        // passages it cites (AI-006) are listed under it.
+        onDone: (done) => update(id, { sig: done.sig, ...(done.citations?.length ? { citations: done.citations } : {}) }),
       })
     } catch (err) {
-      if (err.name === 'AbortError') return
+      if (err.name === 'AbortError') return stopped()
       setAnswer((answer = 'Something went wrong on my side. Please try again.'))
     }
-    if (ctrl.signal.aborted) return
+    if (ctrl.signal.aborted) return stopped()
     abort.current = null
-
-    history.current = [...history.current, { role: 'user', content: question }, { role: 'assistant', content: answer, sig }].slice(-10)
+    update(id, { pending: false })
     const next = nextQuestions(question, answer, asked.current)
     const invite = followUpLine(next)
     setSuggestions(next)
@@ -348,10 +361,6 @@ export default function VoiceAssistant({ onReady }) {
     setInterim('')
     setMode('idle')
     setSuggestions((s) => (s.length ? s : nextQuestions('', '', asked.current)))
-    setMessages((m) => {
-      const last = m[m.length - 1]
-      return last?.rich && !last.text ? [...m.slice(0, -1), { role: 'vince', text: 'Stopped.' }] : m
-    })
   }
 
   const toggleMic = () => {
@@ -392,8 +401,9 @@ export default function VoiceAssistant({ onReady }) {
       greeted.current = true
       offeredTour.current = true
       const text = introduction(undefined, { offline: offline() })
-      // Keep anything VINCE already said elsewhere (e.g. explanations in the graph dialog).
-      setMessages((m) => [...m, { role: 'vince', text }])
+      // Anything already in the conversation stays: explanations from the graph dialog, and questions
+      // asked in the text console.
+      addVince(text)
       setSuggestions(nextQuestions('', '', asked.current))
       voice(toSpeech(text, 2000))
     } else if (!tour.current && !brief.current) {
@@ -562,7 +572,7 @@ export default function VoiceAssistant({ onReady }) {
   useEffect(() => {
     const log = logRef.current
     if (log) log.scrollTop = log.scrollHeight
-  }, [messages, open, size])
+  }, [turns, open, size])
 
   const onSubmit = (e) => {
     e.preventDefault()
@@ -651,7 +661,13 @@ export default function VoiceAssistant({ onReady }) {
           </header>
 
           {size === 'mini' && touring && caption && (
-            <p className="vince__caption" aria-live="polite">{caption}</p>
+            <>
+              <p className="vince__caption" aria-live="polite">{caption}</p>
+              <div className="vince__tourbar" role="group" aria-label="Tour controls">
+                <button type="button" onClick={nextStop}>Next stop <span aria-hidden="true">›</span></button>
+                <button type="button" onClick={endTour}>End tour</button>
+              </div>
+            </>
           )}
 
           {size !== 'mini' && (
@@ -667,24 +683,29 @@ export default function VoiceAssistant({ onReady }) {
                   )}
                 </div>
 
-                <div className="vince__log" ref={logRef} role="log" aria-label="Conversation with VINCE">
-                  {messages.map((m, i) => (
-                    <div key={i} className={`vmsg vmsg--${m.role}`}>
-                      <small>{m.role}</small>
-                      {m.rich ? (
-                        m.text ? <RichText text={m.text} /> : <p className="vmsg__wait">Accessing records…</p>
-                      ) : (
-                        <p>{m.text}</p>
-                      )}
-                      <Citations items={m.citations} />
-                    </div>
-                  ))}
+                {/* The shared conversation (agent/conversation.js), including questions asked in the text
+                    console; those answers aren't announced here as well as there. */}
+                <div className="vince__log" ref={logRef} role="log" aria-live={pendingElsewhere(turns, 'vince') ? 'off' : 'polite'} aria-label="Conversation with VINCE">
+                  {turns.map((t) => {
+                    const who = t.role === 'note' ? t.speaker : t.role === 'user' ? 'you' : 'vince'
+                    return (
+                      <div key={t.id} className={`vmsg vmsg--${who}`}>
+                        <small>{who}</small>
+                        {t.role === 'assistant' ? (
+                          t.content ? <RichText text={t.content} /> : <p className="vmsg__wait">{t.pending ? 'Accessing records…' : 'Stopped.'}</p>
+                        ) : (
+                          <p>{t.content}</p>
+                        )}
+                        <Citations items={t.citations} />
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {touring ? (
                   <div className="vince__chips" role="group" aria-label="Tour controls">
-                    <button type="button" onClick={() => (halt(), runTour(tour.current.i + 1))}>Next stop ›</button>
-                    <button type="button" onClick={stopAll}>End tour</button>
+                    <button type="button" onClick={nextStop}>Next stop <span aria-hidden="true">›</span></button>
+                    <button type="button" onClick={endTour}>End tour</button>
                   </div>
                 ) : (
                   <div className="vince__chips" role="group" aria-label="Suggested questions">

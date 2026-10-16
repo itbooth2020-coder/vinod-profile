@@ -144,7 +144,7 @@ if (hasSynthesis) whenVoicesReady()
 // or from the start when the build has no live server (VITE_LIVE_AGENT, see askAgent.js).
 let server = AudioCtx && liveAgent ? 'unknown' : 'off'
 
-export const voiceName = () => (server === 'on' ? 'Kokoro (British male), with JARVIS-style processing' : pickVoice()?.name ?? '')
+export const voiceName = () => (server === 'on' ? 'Kokoro (British male)' : pickVoice()?.name ?? '')
 
 // Browsers only allow audio that starts inside a tap or click. Call this from click handlers
 // so answers spoken later (after a network round trip) are allowed too. The Web Audio graph is

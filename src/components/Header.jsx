@@ -11,7 +11,7 @@ const links = [
   { href: '#fit', label: 'role fit' },
   { href: '#console', label: liveAgent ? 'ask AI' : 'ask' }, // "AI" only with the live agent (askAgent.js)
   { href: '#skills', label: 'skills' },
-  { href: '#blogs', label: 'blogs' },
+  { href: '#blogs', label: 'writing' },
   { href: '#contact', label: 'contact' },
 ]
 

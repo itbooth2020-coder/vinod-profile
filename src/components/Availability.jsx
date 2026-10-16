@@ -1,12 +1,12 @@
-import { availability as a } from '../data.js'
+import { availability as a, showAvailability } from '../data.js'
 
 // Open-to-work strip (hero and 30-second brief). The green dot is decorative; the pill's text
-// carries the status. Renders nothing when availability.open is false.
+// carries the status. Renders nothing (no element, no space) unless data.js showAvailability is true.
 const terms = () =>
   [a.location, a.workModes.join(' / '), a.relocation && 'Open to relocation', `Notice: ${a.notice}`].filter(Boolean)
 
 export default function Availability(props) {
-  if (!a.open) return null
+  if (!showAvailability) return null
   return (
     <div className="avail" {...props}>
       <p className="avail__status">

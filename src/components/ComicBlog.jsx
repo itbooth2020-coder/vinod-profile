@@ -1,7 +1,15 @@
 import { blogs } from '../data.js'
-import BlogCard, { BlogIcon } from './BlogCard.jsx'
 
-// Batman: The Legend: comic blog.
+// Batman: The Legend, his comic fan blog: a small "Outside work" line under the tech blog, with no
+// posts or thumbnails, so the Writing section leads with professional content (DES-001, ADS-004).
 export default function ComicBlog() {
-  return <BlogCard blog={blogs.comic} icon={<BlogIcon d="M4 5h16v11H10l-5 4v-4H4z" />} variant="comic" cta="Read Batman: The Legend" />
+  return (
+    <p className="blogs__outside">
+      <span className="blogs__outside-label">Outside work:</span>{' '}
+      <a href={blogs.comic.url} target="_blank" rel="noopener noreferrer">
+        {blogs.comic.name}<span className="sr-only"> (opens in a new tab)</span>
+      </a>
+      . A personal fan blog; characters belong to their owners.
+    </p>
+  )
 }

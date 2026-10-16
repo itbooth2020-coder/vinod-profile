@@ -1,7 +1,7 @@
 import { leadership, leadershipPhilosophy } from '../data.js'
 
-// "How I lead": four cards of manager evidence from the resume (data.js `leadership`), with an
-// optional pull-quote shown only once Vinod fills in `leadershipPhilosophy`.
+// "How I lead": four cards of manager evidence from the resume (data.js `leadership`), with a
+// pull-quote in his voice from `leadershipPhilosophy` (hidden if that is set to empty).
 export default function Leadership() {
   return (
     <section id="lead" aria-labelledby="lead-h">

@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { profile, suggestedPrompts } from '../data.js'
 import { askAgent, liveAgent } from '../agent/askAgent.js'
+import { append, getTurns, history, pendingElsewhere, subscribe, update } from '../agent/conversation.js'
 import RichText from './RichText.jsx'
 import Citations from './Citations.jsx'
 
-const GREETING = `Hi! I'm ${profile.firstName.split(' ')[0]}'s profile assistant. I answer questions about his experience, projects, skills and education from his resume${liveAgent ? ', with live AI answers when available' : ''}, with **photos, tables and charts**.`
+// VINCE's text interface (CHAT-001): the same assistant and the same conversation as the VINCE panel
+// (agent/conversation.js), shown as a console. Questions asked here appear in the panel too and the
+// other way round, but VINCE only speaks answers to questions asked in his panel.
+const FIRST = profile.firstName.split(' ')[0]
+const GREETING = `I'm VINCE, ${FIRST}'s assistant. Type a question about his experience, projects, skills or education; I answer from his resume${liveAgent ? ', with live AI answers when available' : ''}, with **photos, tables and charts**. This is the same conversation as the VINCE panel, so you can carry on there by voice.`
 const SOURCES = { live: 'Claude · resume + LinkedIn', local: 'resume search · offline' }
 
 export default function PromptConsole() {
-  const [messages, setMessages] = useState([{ role: 'assistant', content: GREETING }])
+  const turns = useSyncExternalStore(subscribe, getTurns)
+  const messages = turns.filter((t) => t.role === 'user' || t.role === 'assistant')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
@@ -24,52 +30,42 @@ export default function PromptConsole() {
   useEffect(() => {
     const log = logRef.current
     if (log) log.scrollTop = log.scrollHeight
-  }, [messages, status])
+  }, [turns, status])
 
   // fromInput: the question was typed, so focus goes back to the field afterwards. A suggestion
   // chip keeps focus, so keyboard users can try the next chip and phones don't open the keyboard.
   const ask = async (raw, { fromInput = false } = {}) => {
     const question = raw.trim()
     if (!question || busy) return
-    const history = messages.slice(1).filter((m) => m.content)
+    const earlier = history()
     setInput('')
     setBusy(true)
     setStatus('thinking')
-    setMessages((m) => [...m, { role: 'user', content: question }, { role: 'assistant', content: '' }])
-
-    const updateLast = (patch) =>
-      setMessages((m) => {
-        const next = m.slice()
-        next[next.length - 1] = { ...next[next.length - 1], ...patch }
-        return next
-      })
+    append({ role: 'user', content: question, via: 'console' })
+    const id = append({ role: 'assistant', content: '', via: 'console', pending: true })
 
     const appendText = (chunk) => {
       setStatus('')
-      setMessages((m) => {
-        const next = m.slice()
-        const last = next[next.length - 1]
-        next[next.length - 1] = { ...last, content: last.content + chunk }
-        return next
-      })
+      update(id, (t) => ({ content: t.content + chunk }))
     }
 
     abortRef.current = new AbortController()
     try {
-      await askAgent(question, history, {
+      await askAgent(question, earlier, {
         onStatus: setStatus,
         onText: appendText,
         onSource: setSource,
         // A fallback model took over mid-answer: start again rather than splice two answers.
-        onReset: () => updateLast({ content: '' }),
+        onReset: () => update(id, { content: '' }),
         // sig lets the live agent trust this answer as history; sources and citations are shown under it.
-        onDone: ({ sig, sources, citations }) => updateLast({ sig, sources, citations }),
+        onDone: ({ sig, sources, citations }) => update(id, { sig, sources, citations }),
         signal: abortRef.current.signal,
       })
     } catch (err) {
       if (err.name !== 'AbortError') appendText('Something went wrong. Please try again.')
       else if (stoppedRef.current) appendText('\n\nStopped.')
     } finally {
+      update(id, { pending: false })
       setBusy(false)
       setStatus('')
       if (fromInput || stoppedRef.current) inputRef.current?.focus()
@@ -90,31 +86,33 @@ export default function PromptConsole() {
 
   return (
     <div className="card chat" id="console">
-      <h3>Prompt console</h3>
-      <div className="log" ref={logRef} role="log" aria-live="polite" aria-label="Conversation" aria-busy={busy}>
-        {messages.map((m, i) => {
-          const streaming = busy && i === messages.length - 1 && m.role === 'assistant'
-          return (
-            <div key={i} className={`msg ${m.role === 'user' ? 'u' : 'a'}`}>
-              <small>{m.role === 'user' ? 'you' : 'profile-agent'}</small>
-              {m.role === 'user' ? <span className="msg__text">{m.content}</span> : <RichText text={m.content} />}
-              {m.sources?.length > 0 && <p className="msg__src">Source: {m.sources.join(' and ')}</p>}
-              <Citations items={m.citations} />
-              {streaming && (
-                <>
-                  {status && <span className="msg__status"> {status}…</span>}
-                  <span className="caret" aria-hidden="true" />
-                </>
-              )}
-            </div>
-          )
-        })}
+      <h3>Ask VINCE (text)</h3>
+      {/* Answers to questions asked in the VINCE panel also appear here; they aren't announced twice. */}
+      <div className="log" ref={logRef} role="log" aria-live={pendingElsewhere(turns, 'console') ? 'off' : 'polite'} aria-label="Conversation with VINCE" aria-busy={busy}>
+        <div className="msg a">
+          <small>VINCE</small>
+          <RichText text={GREETING} />
+        </div>
+        {messages.map((m) => (
+          <div key={m.id} className={`msg ${m.role === 'user' ? 'u' : 'a'}`}>
+            <small>{m.role === 'user' ? 'you' : 'VINCE'}</small>
+            {m.role === 'user' ? <span className="msg__text">{m.content}</span> : <RichText text={m.content} />}
+            {m.sources?.length > 0 && <p className="msg__src">Source: {m.sources.join(' and ')}</p>}
+            <Citations items={m.citations} />
+            {m.pending && (
+              <>
+                {busy && m.via === 'console' && status && <span className="msg__status"> {status}…</span>}
+                <span className="caret" aria-hidden="true" />
+              </>
+            )}
+          </div>
+        ))}
       </div>
       <div className="metrics">
         <span>source: {SOURCES[source]}</span>
       </div>
       <form className="prompt" onSubmit={onSubmit}>
-        <label htmlFor="prompt-input" className="sr-only">Ask a question about {profile.firstName}'s profile</label>
+        <label htmlFor="prompt-input" className="sr-only">Ask VINCE a question about {profile.firstName}'s profile</label>
         <span className="prompt__sigil" aria-hidden="true">&gt;</span>
         <input
           id="prompt-input"
@@ -122,7 +120,7 @@ export default function PromptConsole() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask about ${profile.firstName.split(' ')[0]}'s experience, projects, skills…`}
+          placeholder={`Ask about ${FIRST}'s experience, projects, skills…`}
           maxLength={500}
           autoComplete="off"
         />

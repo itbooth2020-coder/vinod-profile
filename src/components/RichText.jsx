@@ -1,5 +1,5 @@
 import { mediaById, LOGO_NOTE } from '../agent/media.js'
-import MediaTile from './MediaTile.jsx'
+import { Tile } from './LazyParts.jsx'
 import Chart from './Chart.jsx'
 
 // Renders the agent's answers: a small, safe Markdown subset built as React elements (no HTML injection).
@@ -128,7 +128,7 @@ function Gallery({ images }) {
   return (
     <>
       <div className={`gallery${items.length === 1 ? ' gallery--single' : ''}`}>
-        {items.map(({ alt, item }) => <MediaTile key={item.id} item={item} caption={alt} />)}
+        {items.map(({ alt, item }) => <Tile key={item.id} item={item} caption={alt} />)}
       </div>
       {logos && <p className="logo-note">{LOGO_NOTE}</p>}
     </>

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { experience, graphProjects } from '../data.js'
 import { mediaById, LOGO_NOTE } from '../agent/media.js'
 import { explainNode } from '../agent/vince.js'
-import { unlockSpeech } from '../agent/voice.js'
-import MediaTile from './MediaTile.jsx'
+import { loadVoice, unlockSpeech } from '../agent/voiceSafe.js'
+import { Tile } from './LazyParts.jsx'
+
+loadVoice() // so a tap on Ask VINCE can unlock speech straight away
 
 // Contents of the case-study dialog (Projects.jsx owns the <dialog>). Only shows what the
 // project's `caseStudy` in data.js states; empty sections are left out.
@@ -159,7 +161,7 @@ export default function CaseStudy({ project: p, titleId, onClose }) {
             {logos.length > 0 && (
               <>
                 <div className="case__logos">
-                  {logos.map((m) => <MediaTile key={m.id} item={m} />)}
+                  {logos.map((m) => <Tile key={m.id} item={m} />)}
                 </div>
                 <p className="logo-note">{LOGO_NOTE}</p>
               </>

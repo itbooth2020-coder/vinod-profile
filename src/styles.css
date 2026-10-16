@@ -913,6 +913,16 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
   .chat.lazy-ph { min-height: 700px; }
   .lazy-ph--graph { min-height: 560px; }
 }
+/* A lazy section, case study or VINCE's panel that couldn't load (FUNC-014, SectionBoundary.jsx):
+   its heading, a short note and Retry, at the placeholder's height. */
+.section-error { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.section-error :is(h2, h3, p) { margin: 0; }
+.section-error p, .case-fail p { color: var(--muted); }
+.case-fail { display: grid; gap: 12px; padding: 24px; }
+.case-fail :is(h2, p) { margin: 0; }
+.case-fail h2 { font-size: 20px; overflow-wrap: anywhere; }
+.case-fail__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.vince-hint--error { padding-right: 12px; }
 .logo-note { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 /* Phones: only a one-line bar (Ask VINCE + Close) stays pinned; the tag, title and meta scroll with
    the case study. The header's children join the article (display: contents) so the bar can stick

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ScrollProgress from './components/ScrollProgress.jsx'
 import Header from './components/Header.jsx'
 import Hero from './components/Hero.jsx'
@@ -14,15 +14,18 @@ import Contact from './components/Contact.jsx'
 import Blogs from './components/Blogs.jsx'
 import Footer from './components/Footer.jsx'
 import Vince from './components/Vince.jsx'
+import SectionBoundary, { lazyRetry } from './components/SectionBoundary.jsx'
 import { liveAgent } from './agent/askAgent.js'
 
 // Below-the-fold, interactive sections load as separate chunks after first paint (PERF-FE-002).
 // Each placeholder reserves the section's height (styles.css .lazy-ph), so nothing shifts when it
 // arrives, and keeps its anchor id for the header nav and deep links. The build-time prerender and
 // hydration show the placeholders; the sections load once the app has mounted.
-const RoleFit = lazy(() => import('./components/RoleFit.jsx'))
-const PromptConsole = lazy(() => import('./components/PromptConsole.jsx'))
-const DomainGraph = lazy(() => import('./components/DomainGraph.jsx'))
+// If a section's chunk can't load, its SectionBoundary shows "This section couldn't load." with a
+// Retry in its place, at the same height, and the rest of the page stays (FUNC-014).
+const RoleFit = lazyRetry(() => import('./components/RoleFit.jsx'))
+const PromptConsole = lazyRetry(() => import('./components/PromptConsole.jsx'))
+const DomainGraph = lazyRetry(() => import('./components/DomainGraph.jsx'))
 
 // 30-second brief: <html data-mode="brief"> hides everything but the header and the brief (styles.css).
 // Shareable via ?brief=1 (index.html applies it before first paint); not persisted.
@@ -133,26 +136,32 @@ export default function App() {
           <Leadership />
           <Projects />
           <Experience />
-          {mounted ? (
-            <Suspense fallback={fitPlaceholder}>
-              <RoleFit />
-            </Suspense>
-          ) : fitPlaceholder}
+          <SectionBoundary id="fit" className="lazy-ph lazy-ph--fit" title="Check role fit" onRetry={RoleFit.reset}>
+            {mounted ? (
+              <Suspense fallback={fitPlaceholder}>
+                <RoleFit />
+              </Suspense>
+            ) : fitPlaceholder}
+          </SectionBoundary>
           <div className="layout">
             {/* VINCE's text console: the same assistant and conversation as the VINCE panel (CHAT-001). */}
             <h2 className="sr-only">{liveAgent ? 'Ask VINCE, the AI assistant, about the profile' : 'Ask VINCE about the profile'}</h2>
-            {mounted ? (
-              <Suspense fallback={consolePlaceholder}>
-                <PromptConsole />
-              </Suspense>
-            ) : consolePlaceholder}
+            <SectionBoundary id="console" className="card chat lazy-ph" tag="div" level={3} title="Ask VINCE (text)" onRetry={PromptConsole.reset}>
+              {mounted ? (
+                <Suspense fallback={consolePlaceholder}>
+                  <PromptConsole />
+                </Suspense>
+              ) : consolePlaceholder}
+            </SectionBoundary>
             <div className="side">
               <ProfileCard />
-              {mounted ? (
-                <Suspense fallback={graphPlaceholder}>
-                  <DomainGraph />
-                </Suspense>
-              ) : graphPlaceholder}
+              <SectionBoundary className="card lazy-ph lazy-ph--graph" tag="div" level={3} title="Domain graph" onRetry={DomainGraph.reset}>
+                {mounted ? (
+                  <Suspense fallback={graphPlaceholder}>
+                    <DomainGraph />
+                  </Suspense>
+                ) : graphPlaceholder}
+              </SectionBoundary>
             </div>
           </div>
           <Skills />

@@ -3,7 +3,7 @@ import { profile, suggestedPrompts } from '../data.js'
 import { askAgent, liveAgent } from '../agent/askAgent.js'
 import { append, getTurns, history, pendingElsewhere, subscribe, update } from '../agent/conversation.js'
 import RichText from './RichText.jsx'
-import Citations from './Citations.jsx'
+import { Sources } from './LazyParts.jsx'
 
 // VINCE's text interface (CHAT-001): the same assistant and the same conversation as the VINCE panel
 // (agent/conversation.js), shown as a console. Questions asked here appear in the panel too and the
@@ -99,7 +99,7 @@ export default function PromptConsole() {
             <small>{m.role === 'user' ? 'you' : 'VINCE'}</small>
             {m.role === 'user' ? <span className="msg__text">{m.content}</span> : <RichText text={m.content} />}
             {m.sources?.length > 0 && <p className="msg__src">Source: {m.sources.join(' and ')}</p>}
-            <Citations items={m.citations} />
+            <Sources items={m.citations} />
             {m.pending && (
               <>
                 {busy && m.via === 'console' && status && <span className="msg__status"> {status}…</span>}

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { profile } from '../data.js'
 import { askAgent, offline } from '../agent/askAgent.js'
 import { append, getTurns, history, pendingElsewhere, subscribe, update } from '../agent/conversation.js'
-import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName } from '../agent/voice.js'
+import { voiceApi } from '../agent/voiceSafe.js'
 import { NAME, EXPANSION, acknowledge, isUnsure, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
 import RichText from './RichText.jsx'
-import Citations from './Citations.jsx'
+import { Sources } from './LazyParts.jsx'
 
 // VINCE, the voice assistant: a floating launcher that opens a HUD panel. VINCE introduces
 // himself, answers spoken or typed questions through the profile agent, reads the answers
@@ -70,6 +70,8 @@ function MicIcon() {
 }
 
 export default function VoiceAssistant({ onReady }) {
+  // Vince.jsx tries to load the voice first; without it, VINCE works by text alone (FUNC-014).
+  const [{ canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName }] = useState(voiceApi)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState('idle')
   const [muted, setMuted] = useState(() => stored(MUTE_KEY))
@@ -581,6 +583,31 @@ export default function VoiceAssistant({ onReady }) {
     ask(input)
   }
 
+  // Phones (CHAT-012): the open panel covers most of the screen, so an in-page link in an answer
+  // ("More in Projects") minimises VINCE to his bar, which stays available, and the section's heading
+  // takes focus once the page is there. The browser follows the link itself (App.jsx may first
+  // leave brief mode). Wider screens keep the panel beside the page, as before.
+  const onLogClick = (e) => {
+    const link = e.target instanceof Element && e.target.closest('a[href^="#"]')
+    if (!link || e.defaultPrevented || !narrow()) return
+    let id
+    try {
+      id = decodeURIComponent(link.getAttribute('href').slice(1))
+    } catch {
+      return
+    }
+    keepFocus.current = true
+    setSize('mini')
+    setTimeout(() => {
+      const el = id && document.getElementById(id)
+      if (!el || !el.getClientRects().length) return
+      el.scrollIntoView({ block: 'start' })
+      const heading = el.matches('h1, h2, h3') ? el : el.querySelector('h2, h3') || el
+      if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
+      heading.focus({ preventScroll: true })
+    })
+  }
+
   return (
     <>
       {!open && (
@@ -686,7 +713,7 @@ export default function VoiceAssistant({ onReady }) {
 
                 {/* The shared conversation (agent/conversation.js), including questions asked in the text
                     console; those answers aren't announced here as well as there. */}
-                <div className="vince__log" ref={logRef} role="log" aria-live={pendingElsewhere(turns, 'vince') ? 'off' : 'polite'} aria-label="Conversation with VINCE">
+                <div className="vince__log" ref={logRef} onClick={onLogClick} role="log" aria-live={pendingElsewhere(turns, 'vince') ? 'off' : 'polite'} aria-label="Conversation with VINCE">
                   {turns.map((t) => {
                     const who = t.role === 'note' ? t.speaker : t.role === 'user' ? 'you' : 'vince'
                     return (
@@ -697,7 +724,7 @@ export default function VoiceAssistant({ onReady }) {
                         ) : (
                           <p>{t.content}</p>
                         )}
-                        <Citations items={t.citations} />
+                        <Sources items={t.citations} />
                       </div>
                     )
                   })}

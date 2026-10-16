@@ -9,7 +9,7 @@
     "prebuild": "node scripts/fetch-blogs.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "test:agent": "node scripts/test-local-agent.mjs && node scripts/test-local-agent-fresh.mjs",
+    "test:agent": "node scripts/test-local-agent.mjs && node scripts/test-local-agent-fresh.mjs && node scripts/test-local-agent-confidence.mjs",
     "test:server": "node scripts/check-server.mjs"
   },
   "dependencies": {

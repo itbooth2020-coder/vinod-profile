@@ -711,7 +711,7 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .vince--mini .vince__icon { width: 32px; height: 32px; border-radius: 50%; }
 /* Minimized during the tour: a caption strip under the bar shows the stop being narrated */
 .vince--captioned { width: min(400px, calc(100vw - 32px)); border-radius: 18px; }
-.vince__caption { margin: 0; padding: 0 14px 10px; font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.vince__caption { margin: 0 0 10px; padding: 0 14px; font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 /* Next stop / End tour under the caption, so phone visitors can step through the tour (CHAT-010) */
 .vince__tourbar { display: flex; gap: 8px; padding: 0 12px 12px; }
 .vince__tourbar button { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 6px 10px; border: 1px solid var(--hud-line); border-radius: 999px; background: transparent; color: var(--text); font: 600 12.5px var(--mono); letter-spacing: 0.04em; white-space: nowrap; cursor: pointer; }

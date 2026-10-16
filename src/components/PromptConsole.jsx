@@ -9,7 +9,8 @@ import Citations from './Citations.jsx'
 // (agent/conversation.js), shown as a console. Questions asked here appear in the panel too and the
 // other way round, but VINCE only speaks answers to questions asked in his panel.
 const FIRST = profile.firstName.split(' ')[0]
-const GREETING = `I'm VINCE, ${FIRST}'s assistant. Type a question about his experience, projects, skills or education; I answer from his resume${liveAgent ? ', with live AI answers when available' : ''}, with **photos, tables and charts**. This is the same conversation as the VINCE panel, so you can carry on there by voice.`
+// Sets expectations for the offline resume search (AI-003): it searches, and points to Vinod when it can't find something.
+const GREETING = `I'm VINCE, ${FIRST}'s assistant. I search his profile${liveAgent ? ' (with live AI answers when available)' : ''}; for anything I can't find, contact ${FIRST}. Type a question about his experience, projects, skills or education; answers can include **photos, tables and charts**. This is the same conversation as the VINCE panel, so you can carry on there by voice.`
 const SOURCES = { live: 'Claude · resume + LinkedIn', local: 'resume search · offline' }
 
 export default function PromptConsole() {

@@ -33,7 +33,8 @@ function greeting() {
 export function introduction(greet = greeting(), { offline = false } = {}) {
   return (
     `${greet}. I'm VINCE: ${EXPANSION}. ` +
-    (offline ? `I answer from his resume, which covers ${YEARS} years of work. ` : `I know his ${YEARS} years of work inside out. `) +
+    // Offline answers are a search of his profile (AI-003): say so, and where to go when it falls short.
+    (offline ? `I search his profile; for anything I can't find, contact ${FIRST}. ` : `I know his ${YEARS} years of work inside out. `) +
     `What would you like to know about ${FIRST}? His experience, his projects, his skills? Or shall I take you on a guided tour?`
   )
 }
@@ -164,11 +165,18 @@ const speakDates = (s) =>
     .replace(new RegExp(`${MON}\\s*[–-]\\s*${MON}`, 'gi'), (_, m1, y1, m2, y2) => `from ${month(m1)} ${y1} to ${month(m2)} ${y2}`)
     .replace(new RegExp(`\\b${MON}`, 'g'), (_, m, y) => `${month(m)} ${y}`)
 
+// The offline agent's low-confidence answers open with this sentence (localAgent.js UNSURE; not
+// imported, so VINCE's chunk doesn't pull in the agent and its data).
+const UNSURE_LEAD = "I'm not certain I understood."
+export const isUnsure = (md = '') => md.trimStart().startsWith(UNSURE_LEAD)
+
 // Turns a Markdown answer into something worth hearing: visuals are mentioned, not read out,
 // button-style links are dropped (their labels read badly: "Email Vinod Open LinkedIn profile"),
 // symbols and dates are said as words, and long answers are cut at a sentence with a pointer to
 // the screen.
 export function toSpeech(md, max = 480) {
+  // A low-confidence answer (localAgent.js unsure): only its first sentence is spoken.
+  if (isUnsure(md)) return `${UNSURE_LEAD} The closest matches and links are on screen.`
   let shown = false
   let links = false
   let text = md

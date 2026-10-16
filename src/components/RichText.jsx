@@ -10,9 +10,10 @@ import Chart from './Chart.jsx'
 const IMAGE_LINE = /^\s*(!\[[^\]]*\]\([^)\s]+\)\s*)+$/
 const IMAGE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/
-// Bare URLs stop before trailing punctuation so "…/vinod." links without the period.
+// Bare URLs stop before trailing punctuation so "…/vinod." links without the period. Links can also
+// point to a section of this page ("[More in Experience](#experience)").
 const INLINE =
-  /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|mailto:)[^)\s]+\)|https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"]|[\w.+-]+@[\w-]+\.[\w.-]*\w)/g
+  /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((?:(?:https?:\/\/|mailto:)[^)\s]+|#[\w-]+)\)|https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"]|[\w.+-]+@[\w-]+\.[\w.-]*\w)/g
 const BARE_URL = /^https?:\/\/\S+$/
 const BARE_EMAIL = /^[\w.+-]+@[\w-]+\.[\w.-]*\w$/
 

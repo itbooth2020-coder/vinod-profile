@@ -74,14 +74,21 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
 7. **Apex → www redirect:** create, publish and associate the CloudFront Function from the guide (viewer-request) on the default behavior.
 8. **DNS:** add A and AAAA alias records for both names. Use the distribution domain and the CloudFront hosted zone ID `Z2FDTNDATAQYW2`.
 9. **Upload** (cache-friendly). Only Vite's hashed `/assets/*` files are immutable for a year; everything else in `dist/` keeps a fixed name (`index.html`, `404.html`, `privacy.html`, `sitemap.xml`, `robots.txt`, `og-image.jpg`, `profile*.{png,webp}`, `fonts/*`, `logos/*`, the favicons and `apple-touch-icon.png`), so it gets a short TTL:
+   Keep this order, so a visitor mid-deploy never gets an `index.html` that points at deleted assets (FUNC-013): the new hashed assets first **without** `--delete`, then the other files, then `index.html` and `404.html`, and only once the new `index.html` is live, a cleanup sync that deletes the previous release's assets.
    ```bash
-   aws s3 sync dist/assets s3://vinodyadav-com-site/assets --delete --cache-control "public,max-age=31536000,immutable"
-   aws s3 sync dist/ s3://vinodyadav-com-site --delete --exclude "assets/*" --cache-control "public,max-age=300"
+   # 1. New hashed assets next to the old ones (no --delete: the live index.html still uses the old ones)
+   aws s3 sync dist/assets s3://vinodyadav-com-site/assets --cache-control "public,max-age=31536000,immutable"
+   # 2. Everything else except the two entry pages
+   aws s3 sync dist/ s3://vinodyadav-com-site --delete --exclude "assets/*" --exclude "index.html" --exclude "404.html" --cache-control "public,max-age=300"
+   # 3. The new entry pages; invalidate them and wait until the invalidation has completed
    aws s3 cp dist/index.html s3://vinodyadav-com-site/index.html --cache-control "no-cache"
    aws s3 cp dist/404.html s3://vinodyadav-com-site/404.html --cache-control "no-cache"
-   aws cloudfront create-invalidation --distribution-id <ID> --paths "/index.html" "/404.html"
+   aws cloudfront create-invalidation --distribution-id <ID> --paths "/index.html" "/404.html"   # note Invalidation.Id
+   aws cloudfront wait invalidation-completed --distribution-id <ID> --id <INVALIDATION_ID>
+   # 4. Only now delete the previous release's assets
+   aws s3 sync dist/assets s3://vinodyadav-com-site/assets --delete --cache-control "public,max-age=31536000,immutable"
    ```
-   Invalidate `/index.html` and `/404.html` on **every** deploy. On the first deploy after the resume was unpublished, the `--delete` sync removes any old `resume.pdf` object from the bucket; also invalidate `"/resume.pdf"` that one time so CloudFront stops serving a cached copy. (`aws s3 sync` only uploads changed files, so a re-run doesn't refresh `Cache-Control` on unchanged objects; when changing cache headers, add `--exact-timestamps` or copy the objects again.)
+   Invalidate `/index.html` and `/404.html` on **every** deploy, and don't run step 4 before step 3 has completed. (Tabs opened on the old page may still lazy-load an old chunk; for extra margin, step 4 can be deferred to the next deploy. If a bundle is ever missing, the page falls back to its static view after a few seconds, see `index.html`.) On the first deploy after the resume was unpublished, the `--delete` sync in step 2 removes any old `resume.pdf` object from the bucket; also invalidate `"/resume.pdf"` that one time so CloudFront stops serving a cached copy. (`aws s3 sync` only uploads changed files, so a re-run doesn't refresh `Cache-Control` on unchanged objects; when changing cache headers, add `--exact-timestamps` or copy the objects again.)
 10. **Wait** with `aws cloudfront wait distribution-deployed --id <ID>`, then run the verification below.
 
 ## Phase 2 (optional, ask first): live Claude agent and Kokoro voice

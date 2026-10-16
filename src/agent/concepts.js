@@ -113,6 +113,9 @@ export const CONCEPTS = {
   pastStart: ['when did * start', 'when did * begin', 'when did * join', 'did he start', 'did he begin', 'did he join', 'has he start', 'since when'],
   notice: ['notice', 'notice period', 'serving notice', 'buyout', 'buy out', 'lead time'],
   available: ['available', 'availability', '=free to'],
+  // Setting up an interview or a call with him: an availability question (hidden on the site, so it gets
+  // the "contact Vinod directly" reply), not a question about how he interviews candidates (`hire`).
+  schedule: ['interview him', 'interview vinod', 'available for * interview', 'available for * call', 'free for * interview', 'free for * call', 'schedule * interview', 'schedule * call', 'schedule * meeting', 'book * interview', 'book * call', 'arrange * interview', 'arrange * call', 'line up * interview', 'set up * interview', 'set up * call', 'interview slot', 'interview * next week', 'interview * this week', 'interview * tomorrow', 'call * next week', 'meet him', 'meet vinod', 'meet with him'],
   open: ['open to', 'open for', '=offers', 'job offer', 'entertain*', 'accept * offer', 'take * offer', 'looking for', 'job hunting', 'job search', 'on the * market', 'job market', 'actively look', 'interested in * role', 'interested in * job', 'interested in * opportunit*', 'interested in * position', 'new opportunit*', 'opportunities', 'new role', 'new job', 'new position', 'change job', 'job change', 'consider * role', 'consider * offer', 'consider * job', 'consider * position', 'consider * opportunit*', 'up for * role', 'next opportunit*'],
   relocate: ['relocate', 'relocation', 'move to', 'move abroad', 'move overseas', 'move countr*', 'move cit*', 'willing to move', 'open to move', 'abroad', 'overseas', 'international', 'another country', 'other country', 'different country', 'other countries', 'outside india', 'emigrate', 'migrate', 'visa', 'work permit', 'shift to', 'another city', 'different city'],
   workmode: ['remote', 'hybrid', 'onsite', 'on site', 'in office', 'office', 'from home', 'wfh', 'in person', 'work mode', 'working arrangement'],
@@ -124,7 +127,7 @@ export const CONCEPTS = {
   first: ['first', 'earliest', 'initial', 'oldest', ...cross(['start', 'begin', 'kick off', 'launch', 'take off'], ['career'], ' * '), ...cross(['career'], ['start', 'begin', 'kick off', 'launch', 'take off'], ' * '), 'start out', 'entry level', 'fresher', 'out of college', 'after college', 'first ever'],
   previous: ['previous', 'prior', 'former', 'last job', 'last role', 'last employer', 'before accenture', 'past employer', 'before join*', 'leave * to go', 'leave * to join', 'leave * for'],
   career: ['job', 'role', 'position', 'employer', 'company', 'career', 'gig', 'workplace', 'organisation', 'organization', 'firm', 'work'],
-  current: ['currently', 'current', 'right now', 'at the moment', 'these days', 'nowadays', 'present role', 'present job', 'present position', 'present employer', 'where * he work', 'where do he work', 'who * he work for', 'who do he work for', 'employer now', 'do now', 'doing now', 'job now', 'role now'],
+  current: ['currently', 'current', 'right now', 'at the moment', 'these days', 'nowadays', 'present role', 'present job', 'present position', 'present employer', '=where =does he work', '=where =does vinod work', '=where =is he work', '=where =is vinod work', '=who =does he work for', '=who =is he work for', '=who =does vinod work for', 'he work * now', 'employer now', 'do now', 'doing now', 'job now', 'role now'],
 
   // Level and experience
   level: ['director', 'vp', 'vice president', 'executive', 'c level', 'c suite', 'head of', 'level', 'seniority', 'how senior', 'principal', 'senior enough', 'grade', 'band'],
@@ -152,7 +155,11 @@ export const CONCEPTS = {
   age: ['how old', '=age', '=aged', 'year old', 'birthday', 'birth date', 'birthdate', 'date of birth', 'dob', 'year of birth', 'birth year', 'when * born', 'what year * born', 'born in what year', 'born on'],
   personal: ['married', 'marital', 'wife', 'husband', 'spouse', 'kid', 'child', 'religion', 'caste', 'born', 'family'],
   salary: ['salary', 'compensation', 'ctc', 'remuneration', 'pay', 'package', 'expected pay', 'wage', 'earn'],
-  compare: ['rate him', 'rate vinod', 'rank him', 'score him', 'grade him', 'compare', 'versus', '=vs', 'evaluate', 'assess', 'better than'],
+  // Any comparison ("X versus Y", "compared with", "pros and cons"). Only `comparePerson` (Vinod against
+  // people or candidates) gets the "can't rate or compare candidates" reply; a comparison of
+  // technologies or approaches is answered from his profile's evidence, or honestly not at all.
+  compare: ['compare', 'comparison', 'versus', '=vs', 'better than', 'pros and con', 'trade off', 'tradeoff', 'prefer * over', 'preference between', 'difference between'],
+  comparePerson: ['rate him', 'rate vinod', 'rank him', 'rank vinod', 'score him', 'grade him', 'evaluate him', 'evaluate vinod', 'assess him', 'assess vinod', 'compare him', 'compare vinod', 'he compare', 'vinod compare', 'him * versus', 'him * =vs', 'him * against', 'vinod * versus', 'vinod * =vs', 'vinod * against', 'he * better than', 'him * better than', 'better than other', 'than * candidate', 'other candidate', 'versus * candidate', '=vs * candidate', 'compare * candidate', 'among * candidate', 'versus other', '=vs other', 'against other', 'compare * other', 'compare * typical', 'compare * peer', 'versus * typical', '=vs * typical', 'other applicant', 'other engineering manager', 'other manager'],
   whyLeave: ['why * leav*', 'why * left', 'why * quit*', 'why * look for', 'why * look', 'why * seek', 'why * chang*', 'why * switch*', 'why * mov*', 'why * want * new', 'why * open to', 'reason * leav*', 'reason * change', 'reason * switch', 'reason * move', 'reason * look'],
   phone: ['phone', 'telephone', 'cellphone', 'mobile number', 'mobile no', 'contact number', 'whatsapp', 'call him', 'call vinod', 'ring him'],
   ml: ['machine learning', '=ml', 'mlops', 'predictive model', 'predictive analytic', 'prediction model', 'model training', 'train * model', 'data science'],
@@ -168,9 +175,15 @@ export const CONCEPTS = {
   contact: ['linkedin', 'linked in', 'github', 'git hub', 'facebook', 'twitter', 'social', 'contact', 'reach him', 'reach vinod', 'reach out', 'to reach', 'can i reach', 'connect with', 'email', 'e mail', 'mail', 'get in touch', 'talk to him', 'speak to him', 'speak with him', 'message him', 'get hold', 'in touch'],
   timeline: ['timeline', 'journey', 'work history', 'career path', 'career history', 'career graph', 'career chart', 'career progress*', 'progress*', 'graph * career', 'chart * career', 'visuali* * career', 'graph * experience', 'chart * job'],
   impact: ['impact', 'metric', 'number', 'achievement', 'accomplish*', 'stats', 'statistic', 'improvement', 'kpi', 'result', 'biggest win', 'proudest', 'track record'],
-  companies: ['company', 'companies', 'employer', 'organisation', 'organization', 'firm', 'worked at', 'worked for', 'work at', 'work for', 'where * he work before'],
+  companies: ['company', 'companies', 'employer', 'organisation', 'organization', 'firm', 'worked at', 'worked for', 'work at', 'work for', 'where * he work before', '=where =did he work', '=where =did vinod work', '=where =has he work', '=who =did he work for'],
   education: ['school', 'college', 'education', 'educational', 'study', 'degree', 'university', 'mca', 'mms', 'bsc', 'b sc', 'qualification', 'academic', 'graduat*'],
-  location: ['address', 'located', 'location', 'live', 'based', 'city', 'hometown', 'where * he be', 'where * he live', 'where * he from', 'which city'],
+  // "Based" and "live" only as the words themselves ("based in", "where does he live"): the stemmer folds
+  // "base"/"based" and "live"/"living" together, but "for a living" isn't a place, and a user,
+  // customer or install base is a scale question, not his location.
+  location: ['address', 'located', 'location', '=live', '=lives', 'living in', 'where * =living', '=based', 'city', 'hometown', 'where * he be', 'where * he live', 'where * he from', 'which city'],
+  // The reach of his work: users, customers, devices or transactions served (the "30K+ users and
+  // devices" headline and the figures behind it).
+  scale: ['user base', 'customer base', 'install base', 'installed base', 'subscriber base', 'device base', 'how many user', 'number of user', 'how many customer', 'how many end user', 'user count', 'active user', 'user scale', 'serve * user', 'user * serve', 'reach * user', 'how many people use', 'how many transaction', 'transaction volume', 'how much scale', 'what scale', 'largest scale', 'biggest scale', 'scale of * work', 'scale of * product', 'scale of * solution'],
   photo: ['photo', 'pic', 'picture', 'image', 'headshot', 'avatar', 'look like'],
   summary: ['summary', 'summarise', 'summarize', 'overview', 'introduce', 'introduction', 'background', 'who be', 'bio', 'biography', 'describe him', 'describe vinod', 'describe * himself', 'about him', 'about vinod', 'profile summary', 'snapshot'],
   // Short-answer words that also suggest a summary when nothing else is asked ('Give me a tl;dr on Vinod'),

@@ -6,6 +6,11 @@
 //   L. Low confidence: deliberately vague or odd questions must get the "not certain" reply (the
 //      closest passages with "More in …" links, then three questions to try), never a confident
 //      answer to a different question.
+//   P. Patterns behind the confident-wrong answers of the 17 Oct (b) re-test, in our own wordings
+//      (never the UAT's): a user/customer base is scale, not location; years resolve to the employers
+//      of that time; a follow-up about "the team" or "the tech" uses the previous project or employer;
+//      only comparisons with people get the "can't compare candidates" reply; interview scheduling is
+//      an availability question.
 //   S. Every question the assistants suggest is answered with confidence.
 // Run with `npm run test:agent` (--verbose prints every answer); exits non-zero on any failure.
 import { answerLocally } from '../src/agent/localAgent.js'
@@ -64,6 +69,37 @@ const TABLE_D = [
   ['Has he worked with Metrolinx?', all(sure, has(/PRESTO/, /Metrolinx/))],
 ]
 
+const located = has(/based in \*\*Bengaluru/)
+const refusesCompare = has(/can't rate or compare candidates/)
+const PATTERNS = [
+  // Scale, not location ("base" is not "based"); location still works with real location wording.
+  ['How large is the customer base his products served?', all(sure, has(/30K\+ users/, /10,000\+/, /1M\+/), lacks(/Bengaluru/))],
+  ['What install base did his device management work cover?', all(sure, has(/30K\+ users/, /10,000\+ enterprise devices/), lacks(/Bengaluru/))],
+  ['Which city does Vinod live in?', all(sure, located)],
+  ['Where exactly is he based these days?', all(sure, located)],
+  // Years → the employers whose period overlaps them, oldest first; never the current job by default.
+  ['Who employed him from 2013 to 2015?', all(sure, has(/IT Gurus/, /Xoriant/, /3Cent/, /Clean Bill of Health/), lacks(/Accenture|HTC/))],
+  ['Which employers did he have during 2012?', all(sure, has(/Hurix/, /Yesha/, /IT Gurus/), lacks(/Accenture|Xoriant/))],
+  ['What was Vinod doing in 2019?', all(sure, has(/HTC Global Services/, /Senior Consultant/), lacks(/Accenture/))],
+  ['What job did he have back in 2009?', all(sure, has(/no job in 2009/, /MCA/, /Hurix/), lacks(/Accenture/))],
+  ['Where does he work?', all(sure, has(/currently/, /Accenture/))],
+  // Follow-ups about an aspect of the previous project or employer use that entity's own data.
+  [['Tell me about the Meijer delivery project', 'What was the team size?'], all(sure, has(/10 members/, /Meijer/), lacks(/35\+|15–25|20–50/))],
+  [['Describe the INTELITY work', 'How many people were in that team?'], all(sure, has(/12 members/, /INTELITY/), lacks(/35\+|15–25|20–50/))],
+  [['What did he do at HTC?', 'How large was the team there?'], all(sure, has(/15–25 engineers/, /HTC/), lacks(/35\+/))],
+  [['Tell me about the INTELITY platform', 'Which technologies did they rely on?'], all(sure, has(/INTELITY/, /Android/, /Jenkins/), lacks(/AI & Agents|skills cover/))],
+  [['What did he do at Xoriant?', 'What tech did he use there?'], all(sure, has(/Xoriant/, /Node\.js/, /PHP/, /MySQL/))],
+  // Comparing technologies is not comparing candidates; comparing him with people still is.
+  ['Is React Native better than Flutter in his opinion?', all(has(/doesn't state a view/, /Flutter/, /React Native/), lacks(/can't rate or compare/))],
+  ['Event-driven design versus REST APIs: where does he stand?', all(has(/doesn't state a view/), lacks(/can't rate or compare/))],
+  ['Rank him against other candidates', refusesCompare],
+  ['How does he compare with other engineering managers?', refusesCompare],
+  // Setting up an interview or a call is availability (hidden: contact him directly), not his hiring.
+  ['Is he free for a call next week?', hiddenAvail],
+  ['Can we schedule an interview with Vinod?', hiddenAvail],
+  ['How does he interview candidates?', all(sure, has(/hiring/i), lacks(/can't rate or compare|please contact Vinod directly/))],
+]
+
 // [question, a pattern the closest passages must match]
 const LOW = [
   ['Tell me something interesting about devices and people', /devices/],
@@ -109,6 +145,7 @@ function run(title, cases) {
 }
 
 const d = run(`D. Table D regression (${TABLE_D.length})`, TABLE_D)
+const pat = run(`P. Confident-wrong patterns (${PATTERNS.length})`, PATTERNS)
 const low = run(`L. Low confidence (${LOW.length})`, LOW.map(([q, topic]) => [q, unsureFormat(topic)]))
 
 // S. Every question the assistants suggest (console chips, VINCE's follow-ups, the domain graph's
@@ -122,5 +159,6 @@ const dead = suggested.filter((q) => /^I'm not certain|couldn't find that/.test(
 console.log(`\nS. Suggested questions (${suggested.length}): ${dead.length ? `FAIL, unsure for: ${dead.join(' | ')}` : 'all answered'}`)
 
 const line = (name, r, n) => `${name}: ${r.pass}/${n}${r.failures.length ? `; failed: ${r.failures.join(', ')}` : ''}`
-console.log(`\n${line('Table D', d, TABLE_D.length)}\n${line('Low confidence', low, LOW.length)}\nSuggested: ${suggested.length - dead.length}/${suggested.length}`)
-process.exit(d.pass === TABLE_D.length && low.pass === LOW.length && !dead.length ? 0 : 1)
+console.log(`\n${line('Table D', d, TABLE_D.length)}\n${line('Patterns', pat, PATTERNS.length)}
+${line('Low confidence', low, LOW.length)}\nSuggested: ${suggested.length - dead.length}/${suggested.length}`)
+process.exit(d.pass === TABLE_D.length && pat.pass === PATTERNS.length && low.pass === LOW.length && !dead.length ? 0 : 1)

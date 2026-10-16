@@ -1,5 +1,8 @@
-// The offline agent (and the resume data it searches) loads on the first question, not with the page.
-const loadLocal = () => import('./localAgent.js')
+import { importAgain } from '../importAgain.js'
+
+// The offline agent (and the resume data it searches) loads on the first question, not with the page;
+// a failed load is tried again on the next question (FUNC-014).
+const loadLocal = () => importAgain(() => import('./localAgent.js'))
 
 // VITE_LIVE_AGENT (build-time flag): whether the site has a server with /api/ask and /api/speak.
 // Production builds call them only when it is 'true'. The static site (S3 + CloudFront) leaves it

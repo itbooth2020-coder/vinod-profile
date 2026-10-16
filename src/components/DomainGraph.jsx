@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { explainNode } from '../agent/vince.js'
-import { unlockSpeech } from '../agent/voice.js'
+import { loadVoice, unlockSpeech } from '../agent/voiceSafe.js'
 import GraphView from './GraphView.jsx'
+
+loadVoice() // so a tap on Ask VINCE can unlock speech straight away
 
 const ROOT = { id: 'root', type: 'root', label: 'Vinod', children: [] }
 

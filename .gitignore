@@ -35,3 +35,6 @@ server/.voice-cache
 
 # UAT Doc
 docs/uat
+
+# Resume PDF: kept local only (contains personal contact details); read by the optional live agent
+server/resume.pdf

@@ -346,6 +346,86 @@ function clientAnswer(named) {
     .join(' ') + more('#projects')
 }
 
+// Years in a question ("between 2012 and 2014", "in 2015", "from 2016 to 2020", "since 2016",
+// "before 2014"): the span they cover as { from, to } in fractional years (to is exclusive), with a
+// label for the answer; null without a year.
+const NOW = new Date().getFullYear() + new Date().getMonth() / 12
+const yearsIn = (q) => (q.match(/\b(19[89]\d|20[0-4]\d)\b/g) || []).map(Number)
+function spanIn(q) {
+  const ys = yearsIn(q)
+  if (!ys.length) return null
+  const lo = Math.min(...ys)
+  const hi = Math.max(...ys)
+  if (lo !== hi) return { from: lo, to: hi + 1, label: `Between ${lo} and ${hi}` }
+  if (/\b(since|after)\s+\d{4}\b/.test(q)) return /\bafter\b/.test(q) ? { from: lo + 1, to: NOW, label: `After ${lo}` } : { from: lo, to: NOW, label: `Since ${lo}` }
+  if (/\b(before|until|till|up to|prior to)\s+\d{4}\b/.test(q)) return { from: -Infinity, to: /\b(before|prior to)\b/.test(q) ? lo : lo + 1, label: `${/\b(until|till|up to)\b/.test(q) ? 'Up to' : 'Before'} ${lo}` }
+  return { from: lo, to: lo + 1, label: `In ${lo}` }
+}
+// "Oct 2012" as a fractional year: the start of that month, or with end, the end of it ("Present" is now).
+const yearOf = (s, end = false) => (/present/i.test(s) ? NOW : Number(s.match(/\d{4}/)[0]) + (MONTHS[s.trim().slice(0, 3).toLowerCase()] - (end ? 0 : 1)) / 12)
+const overlaps = (from, to, span) => from < span.to && to > span.from
+
+// The experience entries (oldest first) whose period overlaps the span; with none, what the resume
+// does say about that time (his studies, or that it's before his first role).
+function periodAnswer(span) {
+  const jobs = experience.filter((e) => {
+    const [a, b] = e.period.split('–')
+    return overlaps(yearOf(a), yearOf(b, true), span)
+  }).reverse()
+  const when = lowerFirst(span.label)
+  if (!jobs.length) {
+    if (span.from >= NOW) return `That's in the future: ${FIRST} is currently **${profile.role}** at **${profile.company}**.` + more('#experience')
+    const studies = education.filter((s) => {
+      const [a, b] = (s.match(/\((\d{4})\s*[–-]\s*(\d{4})\)/) || []).slice(1).map(Number)
+      return a && overlaps(a, b + 1, span)
+    })
+    const first = experience.at(-1)
+    return (
+      `His resume lists no job ${when}` +
+      (studies.length ? `; he was studying then: ${list(studies.map((s) => s.split(' — ')[0]))}` : '') +
+      `. His first role was **${first.role}** at **${first.company}**, ${first.location} (${first.period}).` +
+      more(studies.length ? '#credentials' : '#experience')
+    )
+  }
+  if (jobs.length === 1) {
+    const e = jobs[0]
+    return img(e.media, e.company) + `\n\n${span.label}, ${FIRST} ${span.label.startsWith('Since') && e.current ? 'has been' : 'was'} **${e.role}** at **${e.company}**, ${e.location} (${e.period}). There, he ${lowerFirst(e.points[0])}` + more('#experience')
+  }
+  return `${span.label}, ${FIRST} ${span.label.startsWith('Since') ? 'has worked' : 'worked'} at ${jobs.length} companies:\n\n${bullets(jobs.map((e) => `**${e.company}**: ${e.role}, ${e.location} (${e.period})`))}` + more('#experience')
+}
+
+// The reach of his work: the headline user-scale figure, then the projects with the largest user,
+// device or transaction counts.
+const SCALE_FIGURE = /(\d[\d,.]*)([KM]?)\+?\s+(?:[\w-]+\s+){0,2}(?:users?|devices?|transactions?)\b/i
+const figure = (text) => {
+  const m = text.match(SCALE_FIGURE)
+  return m ? Number(m[1].replace(/,/g, '')) * ({ K: 1e3, M: 1e6 }[m[2].toUpperCase()] || 1) : 0
+}
+function scaleAnswer() {
+  const headline = highlights.find((h) => SCALE_FIGURE.test(h.text))
+  const work = graphProjects.filter((g) => figure(g.text)).sort((a, b) => figure(b.text) - figure(a.text)).slice(0, 4)
+  return (
+    (headline ? `${headline.title}: ${FIRST} has ${lowerFirst(headline.text)}.` : `${FIRST}'s profile lists these figures for the reach of his work:`) +
+    (work.length ? `\n\nThe largest figures, by project:\n\n${bullets(work.map((g) => `**${g.short}**: ${g.text}`))}` : '') +
+    more('#impact')
+  )
+}
+
+// Every technology name in his skills ("Android (Kotlin, Java, …)" gives Android, Kotlin and Java).
+const SKILL_NAMES = skills.flatMap((s) => s.items.flatMap((i) => i.split(/[(),]/)).map((n) => n.trim()).filter((n) => n.length > 1).map((n) => ({ n, re: termRe(n, false) })))
+// A comparison of technologies or approaches: his profile states no such views, so say so, name the
+// compared things it lists (or doesn't), then the closest passages in the low-confidence format.
+function compareAnswer(ctx) {
+  const listed = [...new Set(SKILL_NAMES.filter((x) => ((x.re.lastIndex = 0), x.re.test(ctx.question))).map((x) => x.n))]
+  const missing = missingIn(ctx.question)
+  const lead =
+    `His profile doesn't state a view on that comparison` +
+    (listed.length ? `; his skills list ${list(listed.map((n) => `**${n}**`))}${missing.length ? `, but not ${list(missing, 'or')}` : ''}` : missing.length ? `, and it doesn't mention ${list(missing, 'or')}` : '') +
+    '.'
+  const base = tokenize(ctx.question)
+  return unsure(ctx, new Set(base.flatMap((t) => [t, ...tokenize(SYNONYMS[t] || '')])), base, lead)
+}
+
 // Intent catalogue (AI-003). Each intent is scored by the concepts the question carries (concepts.js
 // maps synonyms and word forms to them): `concepts` gives each one's weight, `require` lists concepts
 // of which at least one must be present, `not` lists concepts that rule the intent out, and `boost`
@@ -417,8 +497,9 @@ const INTENTS = [
   },
   {
     // "Rate him as a CTO candidate", "Compare him with a typical EM": no opinions, just the evidence.
+    // Only for comparisons with people or candidates; other comparisons are 'tech-compare'.
     id: 'compare',
-    concepts: { compare: 5 },
+    concepts: { comparePerson: 6 },
     note: false,
     answer: ({ q }) => {
       const role = q.match(ROLE_NAMES) && availability.roles.find((r) => r.toLowerCase() === q.match(ROLE_NAMES)[1])
@@ -428,6 +509,36 @@ const INTENTS = [
         `To check him against a specific job, paste it into the role-fit checker.\n\n[Check role fit](#fit)`
       )
     },
+  },
+  {
+    // Two technologies or approaches compared ("Kotlin or Java: which does he prefer?", "monolith vs
+    // microservices"): his profile states no such views, so say that, with what it does list.
+    id: 'tech-compare',
+    concepts: { compare: 4 },
+    not: ['comparePerson'],
+    note: false,
+    answer: (ctx) => compareAnswer(ctx),
+  },
+  {
+    // Years asked about ("Who employed him from 2013 to 2015?", "What was he doing in 2018?"): the
+    // experience entries whose period overlaps them, never the current job by default.
+    id: 'period',
+    boost: (ctx) =>
+      spanIn(ctx.q) && !companiesIn(ctx.q).length && !named(ctx.q) &&
+      !has(ctx, 'education', 'certs', 'blog', 'age', 'personal', 'start', 'notice', 'available', 'open', 'relocate', 'workmode', 'target', 'schedule') &&
+      (has(ctx, 'career', 'companies', 'current', 'city', 'first', 'previous') || /\b(work\w*|employ\w*|jobs?|roles?|doing|did he do|where was he|positions?)\b/.test(ctx.q))
+        ? 8
+        : 0,
+    explains: ({ q }) => [...yearsIn(q).map(String), 'between', 'during', 'since', 'until', 'before', 'after', 'year'],
+    answer: ({ q }) => periodAnswer(spanIn(q)),
+  },
+  {
+    // "How large a user base has his work served?": the users, devices and transactions his work reached.
+    id: 'scale',
+    // Device words only say which reach is meant ("the install base of his device work").
+    concepts: { scale: 6, devices: 1, mdm: 1 },
+    require: ['scale'],
+    answer: () => scaleAnswer(),
   },
   {
     // A named employer ("What was his role at HTC?"): that company's entry, never the current job's.
@@ -552,7 +663,7 @@ const INTENTS = [
     // then his "Hiring & growth" points. Not "hire him" (that's contact).
     id: 'people',
     concepts: { mentor: 4, hire: 4, attrition: 4, okr: 4 },
-    not: ['hireHim'],
+    not: ['hireHim', 'schedule'],
     answer: (ctx) => {
       const asked = [has(ctx, 'mentor') && /mentor/i, has(ctx, 'hire') && /hiring|hired|recruit/i, has(ctx, 'attrition') && /attrition|retention/i, has(ctx, 'okr') && /OKR|performance review/i].filter(Boolean)
       const lead = pointsWhere({ test: (p) => asked.some((re) => re.test(p)) }).slice(0, 2).map(({ e, p }) => lineOf(e, p))
@@ -638,7 +749,7 @@ const INTENTS = [
     // Open to work, notice period and start date, relocation, work modes and target roles: one
     // availability answer that leads with what was asked.
     id: 'availability',
-    concepts: { start: 3, notice: 4, available: 3, open: 3, relocate: 4, workmode: 4, target: 3 },
+    concepts: { start: 3, notice: 4, available: 3, open: 3, relocate: 4, workmode: 4, target: 3, schedule: 5 },
     not: ['pastStart'],
     // A place together with job-seeking words is about where he would work (availability), not his address.
     boost: (ctx) => (has(ctx, 'location') && has(ctx, 'open', 'relocate', 'workmode') ? 2 : 0),
@@ -851,7 +962,8 @@ const INTENTS = [
   },
   {
     id: 'location',
-    concepts: { location: 4 },
+    // Above current-role: "where is he based these days" asks for a place, not his job.
+    concepts: { location: 5 },
     note: false,
     answer: () =>
       img('location/bengaluru', 'Bengaluru, Karnataka, India') +
@@ -986,7 +1098,7 @@ const ASPECT = new Set('role roles job jobs title skill skills tool tools techno
 const ASPECT_CONCEPTS = new Set(['impact', 'measure', 'count', 'career', 'projects', 'companies', 'current'])
 
 // Intents whose answer is right whatever the wording: refusals, contact details and owner decisions.
-const SAFE = new Set(['injection', 'age', 'personal', 'salary', 'resume', 'why-leave', 'phone', 'compare', 'role-fit', 'contact', 'location', 'photo'])
+const SAFE = new Set(['injection', 'age', 'personal', 'salary', 'resume', 'why-leave', 'phone', 'compare', 'tech-compare', 'role-fit', 'contact', 'location', 'photo'])
 const ENTITY_NAMES = new RegExp(`^(${[...COMPANY_WORDS, ...PROJECT_NAMES.source.match(/\(([^)]*)\)/)[1].split('|'), ...CITIES.map((c) => c.toLowerCase()), 'bangalore', 'bombay'].join('|')})$`)
 
 // true when the picked intent may answer: it explains every profile word of the question, or all but
@@ -1035,7 +1147,8 @@ const clip = (s, n = 220) => (s.length <= n ? s : `${s.slice(0, s.lastIndexOf(' 
 // The low-confidence reply: the best sentence of the one or two passages that match the question
 // best, each with a "More in …" link, then three questions to try. Without a match it says so.
 // The question's own words count fully; synonyms added for retrieval (SYNONYMS) count half.
-function unsure(ctx, terms, base) {
+// lead replaces the opening when the question was understood but the profile has no answer to it.
+function unsure(ctx, terms, base, lead = UNSURE) {
   const own = new Set(base)
   const weight = (t) => (own.has(t) ? 1 : 0.5)
   const hits = (s) => {
@@ -1056,8 +1169,8 @@ function unsure(ctx, terms, base) {
     picked.push({ text: best.s, line: `**${label}**: ${clip(best.s)}${link}` })
   }
   const tryThese = `You could ask:\n\n${bullets(suggestions(ctx.has))}`
-  if (!picked.length) return `${UNSURE} I couldn't find a close match in his profile.\n\n${tryThese}\n\nOr ask ${FIRST} directly at [${profile.email}](mailto:${profile.email}).`
-  return `${UNSURE} Here's what his profile says that seems closest:\n\n${picked.map((p) => p.line).join('\n\n')}\n\n${tryThese}`
+  if (!picked.length) return `${lead} I couldn't find a close match in his profile.\n\n${tryThese}\n\nOr ask ${FIRST} directly at [${profile.email}](mailto:${profile.email}).`
+  return `${lead} Here's what his profile says that seems closest:\n\n${picked.map((p) => p.line).join('\n\n')}\n\n${tryThese}`
 }
 
 // A short answer for "in one sentence", "tl;dr", "briefly" (CHAT-003): the first n sentences of prose,
@@ -1196,6 +1309,73 @@ const BEFORE = /\b(before (that|this|then|there)|previous(ly)?|prior to (that|th
 const AFTER = /\b(after (that|this|there|then)|next (role|job|company|employer|position)|what came next|then what|what next)\b/
 const PRONOUN = /\b(there|it|that (role|job|company|project|one)|this (role|job|company|project)|them|those)\b|^(and|what about|how about)\b/
 
+// A reference back to something already named ("the team", "they", "that project"), and words that
+// widen the question beyond it ("the biggest team he has ever led", "the team he manages now").
+const DEFINITE = /\b(the|they|their|them|it|its|that|this|there|those|these)\b/
+const BROADER = /\b(now|currently|today|these days|biggest|largest|ever|overall|career|in total|altogether|all (his|of his))\b/
+// The aspect a follow-up asks about, or null.
+function aspectOf(question, q) {
+  const c = conceptsOf(question)
+  if (c.has('teamSize') || /\bteam\b.*\b(big|large|size|many)\b|\bhow many (people|engineers|members|developers)\b/.test(q)) return 'team'
+  if (/\b(tech\w*|stack|tools?|languages?|frameworks?|platforms?|libraries|built (it |that )?(with|on|in)|use[ds]? to build)\b/.test(q)) return 'tech'
+  if (c.has('impact') || /\b(results?|outcomes?|achieve\w*|deliver(ed)?|numbers?|metrics?)\b/.test(q)) return 'outcome'
+  if (/^when\b|\bhow long\b|\bwhat (years?|dates?)\b|\b(dates?|period|timeframe)\b/.test(q)) return 'when'
+  if (/\b(his|he) (role|title|position|job|responsibilit\w*)\b|\bwhat did he do\b/.test(q)) return 'role'
+  return null
+}
+// The one project (else the one employer) a passage is about; null when it names several.
+function soleEntityIn(text = '') {
+  const t = text.toLowerCase()
+  const p = PROJECT_REFS.filter((e) => e.re.test(t))
+  if (p.length) return p.length === 1 ? p[0] : null
+  const c = COMPANY_NAMES.filter((e) => e.re.test(t))
+  return c.length === 1 ? c[0] : null
+}
+// What the profile says about a project or an employer: its name, texts, technologies and employer.
+function entityFacts(ent) {
+  if (ent.type === 'company') {
+    const e = experience[ent.i]
+    return { name: e.company, texts: e.points, tech: [], company: e, href: '#experience' }
+  }
+  const p = projects[ent.i]
+  const key = p.name.split(/[\s(–]/)[0].toLowerCase()
+  const g = graphProjects.find((x) => x.name.toLowerCase().startsWith(key))
+  const cs = p.caseStudy || {}
+  return {
+    name: p.name.split(' – ')[0],
+    texts: [...sentencesOf(p.text), cs.role, ...(cs.approach || []), ...(cs.outcomes || []), g?.text].filter(Boolean),
+    tech: g?.tech || [],
+    company: experience.find((e) => e.company === cs.company),
+    href: '#projects',
+  }
+}
+const TEAM_SIZE = /\b(\d+(?:[–-]\d+)?\+?)-member team\b|\bteams? of (\d+(?:[–-]\d+)?\+?) engineers\b/
+function aspectAnswer(aspect, ent) {
+  const f = entityFacts(ent)
+  const on = ent.type === 'company' ? `At **${f.name}**` : `On **${f.name}**`
+  if (aspect === 'team') {
+    const s = f.texts.find((t) => TEAM_SIZE.test(t))
+    if (!s) return `His profile doesn't state the team size for ${f.name}.` + more(f.href)
+    const m = s.match(TEAM_SIZE)
+    return `${on}, ${FIRST}'s team was **${m[1] ? `${m[1]} members` : `${m[2]} engineers`}**. The profile says: ${s.replace(/\.?$/, '.')}` + more(f.href)
+  }
+  if (aspect === 'tech') {
+    const named = f.tech.length ? f.tech : [...new Set(SKILL_NAMES.filter((x) => f.texts.some((t) => ((x.re.lastIndex = 0), x.re.test(t)))).map((x) => x.n))]
+    return named.length ? `${on}, the profile lists these technologies: ${list(named.map((n) => `**${n}**`))}.` + more(f.href) : `His profile doesn't list the technologies used for ${f.name}.` + more(f.href)
+  }
+  if (aspect === 'outcome') {
+    const results = [...new Set(f.texts.filter((t) => /\d/.test(t)))].slice(0, 2)
+    return results.length ? `${on}, the profile records:\n\n${bullets(results.map((t) => t.replace(/\.$/, '')))}` + more(f.href) : `His profile doesn't give measured results for ${f.name}.` + more(f.href)
+  }
+  if (aspect === 'when') {
+    if (ent.type === 'company') return `${FIRST} was at **${f.name}** from ${f.company.period.replace('–', 'to')}.` + more(f.href)
+    return (f.company ? `${f.name} was part of his work at ${f.company.company} (${f.company.period}); the profile doesn't give the project's own dates.` : `His profile doesn't give dates for ${f.name}.`) + more(f.href)
+  }
+  // role
+  if (ent.type === 'company') return `At **${f.name}**, ${FIRST} ${f.company.current ? 'is' : 'was'} **${f.company.role}** (${f.company.period}). There, he ${lowerFirst(f.texts[0])}` + more(f.href)
+  return `${on}: ${f.texts.find((t) => /^(Led|Managed|Architected|Built|Owned)\b/.test(t)) || f.texts[0]}` + more(f.href)
+}
+
 function describeCompany(i, intro) {
   const e = experience[i]
   if (!e) return null
@@ -1214,6 +1394,14 @@ function followUp(question, q, history) {
     const ent = entityIn(prevQ) || entityIn(prevA.slice(0, 400))
     const work = ent?.type === 'project' ? [projects[ent.i]] : ent ? projects.filter((p) => p.caseStudy?.company === experience[ent.i].company) : []
     if (work.length) return clientAnswer(work)
+  }
+  // An aspect of the previous answer's project or employer ("How big was the team?", "What tech did
+  // they use?", "What were the results?"), asked by reference rather than by name: from that entity's
+  // own data, not the general answer.
+  const aspect = !isMore && !before && !after && DEFINITE.test(q) && !entityIn(q) && !BROADER.test(q) && aspectOf(question, q)
+  if (aspect) {
+    const ent = entityIn(prevQ) || soleEntityIn(prevA.slice(0, 400))
+    if (ent) return aspectAnswer(aspect, ent)
   }
   if (!isMore && !before && !after && !PRONOUN.test(q)) return null
   if (entityIn(q)) return null // names its own subject

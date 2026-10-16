@@ -115,6 +115,25 @@
       try {
         if (new URLSearchParams(location.search).get('brief') === '1') document.documentElement.dataset.mode = 'brief'
       } catch (e) {}
+      // Fail open (FUNC-013): if the app hasn't mounted because its bundle failed to load (blocked,
+      // deploy race) or threw before mounting, show the whole prerendered page like the no-JavaScript
+      // view (data-app="failed", styles below). The brief needs the app, so this also leaves brief mode. A late mount
+      // still takes over (App.jsx removes data-app and reads ?brief=1 itself).
+      ;(function () {
+        var r = document.documentElement
+        var fail = function () {
+          if (r.dataset.app !== 'pending') return
+          r.dataset.app = 'failed'
+          delete r.dataset.mode
+        }
+        setTimeout(fail, 4000)
+        addEventListener('error', function (e) {
+          var t = e.target
+          if (t === window || (t && t.tagName === 'SCRIPT')) fail()
+        }, true)
+        // Hydration waits a frame after the bundle runs (main.jsx), so allow a moment after load.
+        addEventListener('load', function () { setTimeout(fail, 1500) })
+      })()
     </script>
     <style>
       /* Inter (SIL OFL 1.1, public/fonts/OFL.txt): one self-hosted variable file, Latin subset, weights
@@ -122,6 +141,10 @@
          Other Customize fonts load from Google Fonts only when a visitor picks one (ThemePicker.jsx). */
       @font-face { font-family: Inter; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/inter-latin-var.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
       @font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('ArialMT'), local('Helvetica'), local('Arimo'); size-adjust: 107.12%; ascent-override: 90.44%; descent-override: 22.52%; line-gap-override: 0%; }
+      /* The app failed to mount (data-app="failed", script above): the same static page as <noscript>. */
+      :root[data-app='failed'] .counter__final { visibility: visible !important; } :root[data-app='failed'] .counter__live { visibility: hidden !important; }
+      :root[data-app='failed'] .hero .lede { display: block !important; }
+      :root[data-app='failed'] :is(.header__tools, .hero__top, .lede__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress) { display: none !important; }
     </style>
     <noscript>
       <!-- Without JavaScript the prerendered page (vite.config.js) is static: show the counters' final

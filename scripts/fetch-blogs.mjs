@@ -1,4 +1,4 @@
-// Fetches the latest posts of both Blogger blogs at build time (ADS-002, PERF-BE-005), so the page
+// Fetches the latest posts of the tech blog at build time (ADS-002, PERF-BE-005), so the page
 // never loads anything from Google at runtime: posts go to src/data/blogs.json and their thumbnails
 // to public/blog-thumbs/. Runs as `prebuild` (npm run build) and on its own: `node scripts/fetch-blogs.mjs`.
 // If a feed can't be fetched, the existing blogs.json and thumbnails are kept and a warning is printed;
@@ -13,6 +13,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = path.join(ROOT, 'src/data/blogs.json')
 const THUMBS = path.join(ROOT, 'public/blog-thumbs')
 const MAX = 3
+// Only the blogs whose posts the page renders (TechBlog.jsx → BlogCard). The comic blog is just an
+// "Outside work" link (ComicBlog.jsx, data.js), so its posts aren't fetched or bundled (PERF-FE-010).
+const FEEDS = ['tech']
 const TIMEOUT_MS = 15000
 
 const warn = (msg) => console.warn(`fetch-blogs: ${msg}`)
@@ -98,10 +101,12 @@ function previousThumb(id) {
   return thumb && existsSync(path.join(ROOT, 'public', thumb)) ? thumb : null
 }
 
-const next = { fetched: previous.fetched || null, blogs: { ...previous.blogs } }
+// Blogs no longer in FEEDS are dropped from blogs.json.
+const next = { fetched: previous.fetched || null, blogs: Object.fromEntries(FEEDS.filter((k) => previous.blogs[k]).map((k) => [k, previous.blogs[k]])) }
 let fetchedAny = false
 
-for (const [key, blog] of Object.entries(blogs)) {
+for (const key of FEEDS) {
+  const blog = blogs[key]
   try {
     next.blogs[key] = await postsOf(blog.url)
     fetchedAny = true
@@ -117,10 +122,13 @@ if (raw === null) {
   mkdirSync(path.dirname(OUT), { recursive: true })
   writeFileSync(OUT, serialise(next))
   if (!fetchedAny) warn('no feed could be fetched; wrote an empty blogs.json')
-} else if (!fetchedAny) {
-  warn('no feed could be fetched; blogs.json left unchanged')
 } else if (stable(next.blogs) === stable(previous.blogs)) {
-  console.log('fetch-blogs: no changes; blogs.json left unchanged')
+  if (!fetchedAny) warn('no feed could be fetched; blogs.json left unchanged')
+  else console.log('fetch-blogs: no changes; blogs.json left unchanged')
+} else if (!fetchedAny) {
+  // Offline, but a blog was dropped from FEEDS: remove its posts, keep the rest and the fetch date.
+  writeFileSync(OUT, serialise(next))
+  warn('no feed could be fetched; removed blogs that are no longer shown from blogs.json')
 } else {
   next.fetched = new Date().toISOString().slice(0, 10)
   writeFileSync(OUT, serialise(next))

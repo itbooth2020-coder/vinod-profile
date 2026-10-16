@@ -3,7 +3,7 @@ import { profile } from '../data.js'
 import { askAgent, offline } from '../agent/askAgent.js'
 import { append, getTurns, history, pendingElsewhere, subscribe, update } from '../agent/conversation.js'
 import { canListen, canSpeak, listen, speak, stopSpeaking, unlockSpeech, voiceName } from '../agent/voice.js'
-import { NAME, EXPANSION, acknowledge, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
+import { NAME, EXPANSION, acknowledge, isUnsure, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
 import RichText from './RichText.jsx'
 import Citations from './Citations.jsx'
@@ -320,7 +320,8 @@ export default function VoiceAssistant({ onReady }) {
     const invite = followUpLine(next)
     setSuggestions(next)
     addVince(invite)
-    voice(`${acknowledge()} ${toSpeech(answer)} ${invite}`, autoListen)
+    // No "Certainly." before "I'm not certain I understood."
+    voice(`${isUnsure(answer) ? '' : `${acknowledge()} `}${toSpeech(answer)} ${invite}`, autoListen)
   }
 
   function startListening() {

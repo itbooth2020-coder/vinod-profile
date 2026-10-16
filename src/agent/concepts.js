@@ -80,6 +80,24 @@ function matchAt(parts, raw, stems, i, k = 0) {
   return ok && matchAt(parts, raw, stems, i + 1, k + 1)
 }
 const contains = (parts, raw, stems) => raw.some((_, i) => matchAt(parts, raw, stems, i))
+// The word positions a term covers, wherever it matches (for the answer's confidence, localAgent.js).
+function spansOf(parts, raw, stems) {
+  const out = new Set()
+  const walk = (i, k, path) => {
+    if (k === parts.length) return path.forEach((j) => out.add(j)), true
+    const p = parts[k]
+    if (p.gap) {
+      let ok = false
+      for (let j = i; j <= Math.min(stems.length, i + GAP); j++) ok = walk(j, k + 1, path) || ok
+      return ok
+    }
+    if (i >= stems.length) return false
+    const hit = p.exact ? raw[i] === p.exact : p.prefix ? stems[i].startsWith(p.prefix) : stems[i] === p.stem
+    return hit && walk(i + 1, k + 1, [...path, i])
+  }
+  raw.forEach((_, i) => walk(i, 0, []))
+  return out
+}
 
 // Word families used to build phrase variants: 'kind of position', 'how large * org'…
 const ROLE_NOUNS = ['role', 'job', 'position', 'opportunity', 'title', 'opening', 'post']
@@ -89,24 +107,28 @@ const cross = (as, bs, join = ' ') => as.flatMap((a) => bs.map((b) => `${a}${joi
 // Concept vocabulary: what a question can be about, by every wording we expect for it.
 export const CONCEPTS = {
   // Availability and the next role
-  start: ['start', 'begin', 'commence', 'join', 'onboard', 'start date', 'joining date', 'how soon', 'how quickly', 'how fast', 'when can', 'when could', 'when would', 'when will', 'come on board', 'immediate joiner', 'immediately', 'asap', 'right away'],
+  // "Onboard" only with Vinod as the one joining ("onboard him", "when can he be onboarded", "come on
+  // board"): device, user or employee onboarding is one of his impact metrics, not a start date.
+  start: ['start', 'begin', 'commence', 'join', 'onboard him', 'onboard vinod', 'he be onboard', 'he get onboard', 'come on board', 'come onboard', 'get him on board', 'get him onboard', 'start date', 'joining date', 'how soon', 'when can he', 'when could he', 'when would he', 'when will he', 'immediate joiner', 'immediately', 'asap', 'right away'],
   pastStart: ['when did * start', 'when did * begin', 'when did * join', 'did he start', 'did he begin', 'did he join', 'has he start', 'since when'],
   notice: ['notice', 'notice period', 'serving notice', 'buyout', 'buy out', 'lead time'],
   available: ['available', 'availability', '=free to'],
-  open: ['open to', 'open for', 'looking for', 'job hunting', 'job search', 'on the * market', 'job market', 'actively look', 'interested in * role', 'interested in * job', 'interested in * opportunit*', 'interested in * position', 'new opportunit*', 'opportunities', 'new role', 'new job', 'new position', 'change job', 'job change', 'consider * role', 'consider * offer', 'consider * job', 'consider * position', 'consider * opportunit*', 'up for * role', 'next opportunit*'],
+  open: ['open to', 'open for', '=offers', 'job offer', 'entertain*', 'accept * offer', 'take * offer', 'looking for', 'job hunting', 'job search', 'on the * market', 'job market', 'actively look', 'interested in * role', 'interested in * job', 'interested in * opportunit*', 'interested in * position', 'new opportunit*', 'opportunities', 'new role', 'new job', 'new position', 'change job', 'job change', 'consider * role', 'consider * offer', 'consider * job', 'consider * position', 'consider * opportunit*', 'up for * role', 'next opportunit*'],
   relocate: ['relocate', 'relocation', 'move to', 'move abroad', 'move overseas', 'move countr*', 'move cit*', 'willing to move', 'open to move', 'abroad', 'overseas', 'international', 'another country', 'other country', 'different country', 'other countries', 'outside india', 'emigrate', 'migrate', 'visa', 'work permit', 'shift to', 'another city', 'different city'],
   workmode: ['remote', 'hybrid', 'onsite', 'on site', 'in office', 'office', 'from home', 'wfh', 'in person', 'work mode', 'working arrangement'],
-  target: ['target', 'title', ...cross(['kind of', 'type of', 'sort of', 'what', 'which', 'next', 'ideal', 'dream'], ROLE_NOUNS), 'next move', 'next step', 'aspire', 'aspiration', 'ambition', 'career goal', 'want to be', 'what * be he look', 'what * he look for', 'what * he after', 'be he after', 'next for him', 'next for vinod', 'what next', 'seek'],
+  // A role he wants, in person-role wording ("what role is he looking for", "next position", "target
+  // title"), not any "what role" or "title" ("what role did the team take", "his title at HTC").
+  target: ['target', ...cross(['kind of', 'type of', 'sort of', 'next', 'ideal', 'dream', 'target'], ROLE_NOUNS), ...cross(ROLE_NOUNS, ['be he look', 'be he seek', 'be he after', 'do he want', 'would he want', 'would suit', 'he want', 'he be look', 'he be seek', 'he be after'], ' '), 'what position', 'which position', 'next move', 'next step', 'aspire', 'aspiration', 'ambition', 'career goal', 'want to be', 'what * be he look', 'what * he look for', 'what * he after', 'be he after', 'next for him', 'next for vinod', 'what next', 'seek'],
 
   // Career history
   first: ['first', 'earliest', 'initial', 'oldest', ...cross(['start', 'begin', 'kick off', 'launch', 'take off'], ['career'], ' * '), ...cross(['career'], ['start', 'begin', 'kick off', 'launch', 'take off'], ' * '), 'start out', 'entry level', 'fresher', 'out of college', 'after college', 'first ever'],
-  previous: ['previous', 'prior', 'former', 'last job', 'last role', 'last employer', 'before accenture', 'past employer'],
+  previous: ['previous', 'prior', 'former', 'last job', 'last role', 'last employer', 'before accenture', 'past employer', 'before join*', 'leave * to go', 'leave * to join', 'leave * for'],
   career: ['job', 'role', 'position', 'employer', 'company', 'career', 'gig', 'workplace', 'organisation', 'organization', 'firm', 'work'],
   current: ['currently', 'current', 'right now', 'at the moment', 'these days', 'nowadays', 'present role', 'present job', 'present position', 'present employer', 'where * he work', 'where do he work', 'who * he work for', 'who do he work for', 'employer now', 'do now', 'doing now', 'job now', 'role now'],
 
   // Level and experience
-  level: ['director', 'vp', 'vice president', 'executive', 'c level', 'c suite', 'level', 'seniority', 'how senior', 'principal', 'senior enough', 'grade', 'band'],
-  directorQ: ['director', 'vp', 'vice president', 'executive', 'c level', 'c suite'],
+  level: ['director', 'vp', 'vice president', 'executive', 'c level', 'c suite', 'head of', 'level', 'seniority', 'how senior', 'principal', 'senior enough', 'grade', 'band'],
+  directorQ: ['director', 'vp', 'vice president', 'executive', 'c level', 'c suite', 'head of'],
   years: ['how many year', 'year of experience', 'years experience', 'total experience', 'overall experience', 'professional experience', 'how long * =been', 'how experienced', 'experience level', 'career length', 'in the industry', 'in industry', 'in this field', 'in the field', 'how long * career', 'how long * work'],
   inIndustry: ['in the industry', 'in industry', 'this industry'],
 
@@ -118,7 +140,7 @@ export const CONCEPTS = {
   okr: ['okr', 'objective and key', 'set * goal', 'team goal', 'quarterly goal', 'performance review', 'review cycle', 'appraisal', 'underperform*', 'low perform*', 'poor perform*', 'one on one', '1 on 1', 'performance management'],
   teamSize: [...cross(TEAM_NOUNS, ['size']), ...cross(['size of', 'how big', 'how large', 'biggest', 'largest', 'big', 'large'], TEAM_NOUNS, ' * '), 'how many people', 'how many engineer', 'how many report', 'how many direct', 'direct report', 'span of control', 'number of engineer', 'number of people', 'how many * manage', 'how many * lead'],
   managers: ['manage * manager', 'manager of manager', 'managers of manager', 'lead * manager', 'manage * em'],
-  ic: ['people manager', 'individual contributor', 'player coach', 'still code', 'write code', 'do he code', 'he still', 'code himself', 'hands on code', 'hands on manager', 'program himself', 'still program', 'technical manager'],
+  ic: ['people manager', 'individual contributor', 'player coach', 'still code', 'write code', 'do he code', 'he still', 'vinod still', 'hands dirty', 'code himself', 'hands on code', 'hands on manager', 'program himself', 'still program', 'technical manager'],
   techLead: ['tech lead', 'technical lead', 'team lead', 'engineering lead', 'lead engineer', 'lead developer'],
   certs: ['certified', 'certification', 'certificate', 'accredited', 'accreditation', 'credential', 'course', 'udemy', 'coursiv'],
   budget: ['budget', 'p and l', 'pnl', 'profit and loss', 'cost', 'spend', 'financial', 'headcount plan*', 'resource allocation'],
@@ -140,8 +162,10 @@ export const CONCEPTS = {
   language: ['language'],
   speak: ['speak', 'fluent', 'mother tongue', 'hindi', 'marathi', 'english'],
   industry: ['industry', 'vertical', 'sector', 'domain'],
-  blog: ['blog', 'article', 'write', 'comic', 'batman', 'android super nerd*', 'androidsupernerd*'],
-  contact: ['linkedin', 'linked in', 'github', 'git hub', 'facebook', 'twitter', 'social', 'contact', 'reach', 'connect with', 'email', 'e mail', 'mail', 'get in touch', 'talk to him', 'speak to him', 'speak with him', 'message him', 'get hold', 'in touch'],
+  // Writing as an author ("does he write a blog", "his writing", "published articles"), not any
+  // "write" ("write unit tests", "write code").
+  blog: ['blog', 'article', 'comic', 'batman', 'android super nerd*', 'androidsupernerd*', '=writing', '=writings', '=writer', 'write about', 'write * post', 'write * tutorial', 'publish', 'tutorial'],
+  contact: ['linkedin', 'linked in', 'github', 'git hub', 'facebook', 'twitter', 'social', 'contact', 'reach him', 'reach vinod', 'reach out', 'to reach', 'can i reach', 'connect with', 'email', 'e mail', 'mail', 'get in touch', 'talk to him', 'speak to him', 'speak with him', 'message him', 'get hold', 'in touch'],
   timeline: ['timeline', 'journey', 'work history', 'career path', 'career history', 'career graph', 'career chart', 'career progress*', 'progress*', 'graph * career', 'chart * career', 'visuali* * career', 'graph * experience', 'chart * job'],
   impact: ['impact', 'metric', 'number', 'achievement', 'accomplish*', 'stats', 'statistic', 'improvement', 'kpi', 'result', 'biggest win', 'proudest', 'track record'],
   companies: ['company', 'companies', 'employer', 'organisation', 'organization', 'firm', 'worked at', 'worked for', 'work at', 'work for', 'where * he work before'],
@@ -158,8 +182,14 @@ export const CONCEPTS = {
   mdm: ['mdm', 'emm', 'device management', 'mobility management', 'provision'],
   count: ['how many', 'number of', 'how much', 'scale', 'how large', 'how big'],
   llm: ['llm', 'large language model', 'gpt', 'chatgpt', 'openai', 'genai', 'generative ai', 'language model', 'model provider', 'ai vendor', 'llm vendor', 'vendor * agent', 'which model', 'foundation model', 'anthropic', 'claude'],
-  agents: ['ai agent', 'agent', 'agentic', 'multi agent', 'orchestrat*'],
+  agents: ['ai agent', 'agent', 'agentic', 'multi agent', 'orchestrat*', 'coding assistant', 'code assistant', 'ai assistant', 'ai coding', 'ai tool', 'copilot*', 'claude code'],
   ai: ['ai', 'artificial intelligence'],
+  // A number asked about: "by how much did X drop", "what percent", "how many devices".
+  measure: ['how much', 'by how much', 'what percent*', 'percentage', 'percent', 'by what', 'how many', 'faster', 'quicker', 'slower', 'speed up', 'reduce', 'reduction', 'cut', 'improve', 'improvement', 'increase', 'decrease', 'save', 'saving', 'drop', 'shorten'],
+  // The client of a project ("the client for PRESTO", "which customer was it for").
+  client: ['client', 'customer', 'who * for', 'for whom'],
+  // A city ("employers in Bengaluru"); the cities themselves are matched in localAgent.js.
+  city: ['city', 'cities', 'in which city', 'where * work'],
 }
 
 const COMPILED = Object.fromEntries(Object.entries(CONCEPTS).map(([k, terms]) => [k, terms.map(compileTerm)]))
@@ -171,6 +201,20 @@ export function conceptsOf(text) {
   const found = new Set()
   for (const [k, terms] of Object.entries(COMPILED)) if (terms.some((t) => contains(t, raw, stems))) found.add(k)
   return found
+}
+
+// The question's words (as words() splits them), their stems, and for each concept it carries the
+// positions of the words that matched it: { raw, stems, spans: Map(concept → Set of positions) }.
+export function analyse(text) {
+  const raw = words(text)
+  const stems = raw.map(stem)
+  const spans = new Map()
+  for (const [k, terms] of Object.entries(COMPILED)) {
+    const at = new Set()
+    for (const t of terms) for (const i of spansOf(t, raw, stems)) at.add(i)
+    if (at.size) spans.set(k, at)
+  }
+  return { raw, stems, spans }
 }
 
 // Length modifiers (CHAT-003): "in one sentence", "tl;dr", "briefly", "pitch him in two sentences".

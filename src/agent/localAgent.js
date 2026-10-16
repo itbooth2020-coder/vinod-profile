@@ -7,7 +7,7 @@
 // Regression tests: scripts/test-local-agent.mjs and scripts/test-local-agent-fresh.mjs (npm run test:agent).
 import { profile, profileCard, stats, availability, showAvailability, leadership, highlights, experience, projects, graphProjects, otherProjects, skills, certifications, learning, education, languages, blogs, suggestedPrompts } from '../data.js'
 import { LEXICON } from './fitLexicon.js'
-import { conceptsOf, brevity } from './concepts.js'
+import { conceptsOf, brevity, analyse, stem as conceptStem } from './concepts.js'
 
 const FIRST = profile.firstName.split(' ')[0]
 const YEARS = profile.tagline.match(/\d+\+?/)[0] // e.g. '14+'
@@ -106,11 +106,16 @@ const chunks = [
     company: i,
   })),
   ...projects.map((p) => ({
-    title: `${p.name} ${p.tag} project`,
+    title: `${p.name} ${p.tag} ${p.caseStudy?.client || ''} project`,
     leadFirst: true,
     source: `${p.name} (${p.tag})`,
-    // Case-study approach points add detail the short card text doesn't have (e.g. Darwin's prompt engineering).
-    sentences: [...sentencesOf(p.text), ...(p.caseStudy?.approach || []).filter((a) => !p.text.includes(a))],
+    // Case-study approach points add detail the short card text doesn't have (e.g. Darwin's prompt engineering),
+    // and the case study's client ("Client: Metrolinx" in CaseStudy.jsx).
+    sentences: [
+      ...sentencesOf(p.text),
+      ...(p.caseStudy?.client ? [`The client is ${p.caseStudy.client}.`] : []),
+      ...(p.caseStudy?.approach || []).filter((a) => !p.text.includes(a)),
+    ],
     media: p.media,
     label: p.name,
     href: '#projects',
@@ -233,6 +238,44 @@ const PROGRAMMING = ['Kotlin', 'Java', 'Swift', 'JavaScript', 'TypeScript', 'Pyt
   new RegExp(`\\b${l}\\b`).test(skills.flatMap((s) => s.items).join(' ')),
 )
 
+// A project's client: the case study's client field (PRESTO: Metrolinx), else the client its resume
+// bullet names ("program for Syngenta", "platform for Meijer"); null when the profile doesn't say.
+const clientOf = (p) => p.caseStudy?.client || p.caseStudy?.role?.match(/\b(?:program|platform|portal|solution|app) for ([A-Z][\w-]+)/)?.[1] || null
+const PROJECT_RES = projects.map((p) => new RegExp(`\\b(${[p.name.toLowerCase().split(/[\s(–]/)[0], clientOf(p)?.toLowerCase()].filter(Boolean).join('|')})\\b`))
+const projectsIn = (q) => projects.filter((_, i) => PROJECT_RES[i].test(q))
+
+// Cities he has worked in, from the experience entries.
+const CITIES = [...new Set(experience.map((e) => e.location))]
+const CITY_ALIASES = { Bengaluru: 'bengaluru|bangalore', Mumbai: 'mumbai|bombay' }
+const cityIn = (q) => CITIES.find((c) => new RegExp(`\\b(${CITY_ALIASES[c] || c.toLowerCase()})\\b`).test(q))
+
+// Facts with a number in them (resume bullets first, then projects, highlights and "How he leads"),
+// for questions that ask for a number about a topic: the facts that best match that topic.
+const FACTS = [
+  ...experience.flatMap((e) => e.points.map((p) => ({ text: `At ${e.company}, he ${lowerFirst(p)}`, href: '#experience' }))),
+  ...graphProjects.map((g) => ({ text: `${g.short}: ${g.text}`, href: '#projects' })),
+  ...highlights.map((h) => ({ text: `${h.text}.`, href: '#impact' })),
+  ...leadership.flatMap((l) => l.points.map((p) => ({ text: `${l.title}: ${p}.`, href: '#lead' }))),
+]
+  .filter((f) => /\d/.test(f.text))
+  .map((f) => ({ ...f, words: tokenize(f.text).map(stem), change: /\b(by \d|from \d.* to \d|reduc|cut|improv|down\b|faster)/i.test(f.text) }))
+// Question words that only say "a number, please".
+const MEASURE_WORDS = new Set('much many percentage percent faster quicker slower speed up reduce reduced reduction cut improve improved improvement increase increased decrease decreased save saved saving savings drop shorten shortened thanks number figure exactly by'.split(' '))
+// { score: topic words the best fact matches, facts: the best facts }.
+function bestFacts(question) {
+  const topic = tokenize(question).filter((t) => !MEASURE_WORDS.has(t) && !GENERIC.has(t) && !COMPANY_WORDS.has(t)).map(stem)
+  if (!topic.length) return { score: 0, topic: [], facts: [] }
+  const comparative = /\b(faster|quicker|percent(age)?|reduc\w*|cut|improv\w*|by how much|how much)\b/.test(question.toLowerCase())
+  const scored = FACTS.map((f, i) => {
+    const hit = topic.filter((t) => f.words.some((w) => w === t || (t.length > 3 && w.length > 3 && (w.startsWith(t) || t.startsWith(w)))))
+    return { f, i, hit, n: hit.length }
+  })
+    .filter((x) => x.n)
+    .map((x) => ({ ...x, rank: x.n + (comparative && x.f.change ? 0.5 : 0) }))
+    .sort((a, b) => b.rank - a.rank || a.i - b.i)
+  return { score: scored[0]?.n || 0, topic: scored[0]?.hit || [], facts: scored.filter((x) => x.rank === scored[0]?.rank).map((x) => x.f) }
+}
+
 const strengths = (n = 6) => [
   `**${YEARS} years** in software engineering; now ${profile.role} at ${profile.company}`,
   ...stats.map(statLine),
@@ -272,6 +315,35 @@ function companyAnswer(i, question) {
     picked.map((r, k) => (k ? r.p : `There, he ${lowerFirst(r.p)}`)).join(' ') +
     more('#experience')
   )
+}
+
+// The domain-graph projects whose technologies or description name the question's topic words (at
+// least 60% of them, and the most of any project): { projects, words: the topic words matched }.
+function projectsUsing(question) {
+  const topic = [...new Set(tokenize(question).filter((t) => !ASPECT.has(t) && !GENERIC.has(t)))]
+  if (!topic.length) return { projects: [], words: [] }
+  const scored = graphProjects.map((g) => {
+    const words = tokenize(`${g.tech.join(' ')} ${g.text}`)
+    return { g, hit: topic.filter((t) => words.some((w) => matches(w, t))) }
+  })
+  const best = Math.max(...scored.map((s) => s.hit.length))
+  const kept = best >= Math.max(1, Math.ceil(topic.length * 0.6)) ? scored.filter((s) => s.hit.length === best) : []
+  return { projects: kept.map((s) => s.g), words: kept[0]?.hit || [] }
+}
+// A domain-graph project named by its short name ("Medicine Reminder", "Enterprise MDM").
+const graphNamed = (q) => graphProjects.some((g) => new RegExp(`\\b${escapeRe(g.short.toLowerCase())}\\b`).test(q))
+
+// The named projects' clients, or every project whose client the profile names.
+function clientAnswer(named) {
+  const short = (p) => p.name.split(' – ')[0]
+  if (!named.length) {
+    const known = projects.filter(clientOf)
+    return `His featured projects name these clients:\n\n${bullets(known.map((p) => `**${short(p)}**: ${clientOf(p)}`))}\n\nThe other projects don't name a client.` + more('#projects')
+  }
+  return named
+    .slice(0, 2)
+    .map((p) => (clientOf(p) ? `The client for **${short(p)}** is **${clientOf(p)}**${p.caseStudy?.company ? `; ${FIRST} worked on it at ${p.caseStudy.company}` : ''}.` : `His profile doesn't name the client for **${short(p)}**.`))
+    .join(' ') + more('#projects')
 }
 
 // Intent catalogue (AI-003). Each intent is scored by the concepts the question carries (concepts.js
@@ -363,6 +435,30 @@ const INTENTS = [
     id: 'company',
     boost: ({ q }) => (companiesIn(q).length && !named(q) && !/\b(compan(y|ies)|employers)\b.*\b(worked|has he|did he)\b|\bwhich compan/.test(q) ? 5 : 0),
     answer: ({ q }) => companiesIn(q).slice(0, 2).map((i) => companyAnswer(i, q)).join('\n\n'),
+  },
+  {
+    // A city he worked in, asked about with work words: the employers in that city, from the experience entries.
+    id: 'city',
+    boost: (ctx) =>
+      cityIn(ctx.q) && /\b(work(ed|s)?|employ\w*|employers?|compan(y|ies)|firms?|for whom|jobs? (in|at))\b/.test(ctx.q) && !has(ctx, 'open', 'relocate', 'workmode', 'start') ? 5 : 0,
+    answer: ({ q }) => {
+      const city = cityIn(q)
+      const here = experience.filter((e) => e.location === city)
+      return (
+        `In ${city}, ${FIRST} worked at ${here.length === 1 ? 'one company' : `${here.length} companies`}:\n\n` +
+        bullets(here.map((e) => `**${e.company}**: ${e.role} (${e.period})`)) +
+        (city === profile.location.split(',')[0] ? `\n\nHe is based in ${profile.location}.` : '') +
+        more('#experience')
+      )
+    },
+  },
+  {
+    // The client of a named project, or the list of clients: from the case studies.
+    id: 'client',
+    concepts: { client: 3 },
+    require: ['client'],
+    boost: ({ q }) => (projectsIn(q).length ? 3 : /\b(clients|customers)\b/.test(q) ? 1 : -10),
+    answer: ({ q }) => clientAnswer(projectsIn(q)),
   },
   {
     // "Is he a people manager or an individual contributor?", "Does he still code?"
@@ -518,10 +614,11 @@ const INTENTS = [
   {
     // "Who did he work for before Accenture?", "Where did he go after Xoriant?": the neighbouring entry.
     id: 'adjacent-company',
-    boost: ({ q }) => (companiesIn(q).length === 1 && /\b(before|prior to|preceding|after|following|next|left)\b/.test(q) && !named(q) ? 6 : 0),
+    boost: ({ q }) => (companiesIn(q).length === 1 && /\b(before|prior to|preceding|after|following|next|left|leave|quit)\b/.test(q) && !named(q) ? 6 : 0),
     answer: ({ q }) => {
       const i = companiesIn(q)[0]
-      const before = /\b(before|prior to|preceding)\b/.test(q)
+      // Leaving one employer "to go to / to join" the named one asks for the one before it.
+      const before = /\b(before|prior to|preceding)\b|\b(leave|left|quit)\b.*\bto (go to|join|move to)\b|\b(leave|left|quit)\b.*\bfor\b/.test(q)
       const j = before ? i + 1 : i - 1
       const c = experience[i].company
       if (j >= experience.length) return `${c} was his first role on the resume (${experience[i].period}).` + more('#experience')
@@ -543,6 +640,8 @@ const INTENTS = [
     id: 'availability',
     concepts: { start: 3, notice: 4, available: 3, open: 3, relocate: 4, workmode: 4, target: 3 },
     not: ['pastStart'],
+    // A place together with job-seeking words is about where he would work (availability), not his address.
+    boost: (ctx) => (has(ctx, 'location') && has(ctx, 'open', 'relocate', 'workmode') ? 2 : 0),
     answer: (ctx) => {
       const { q } = ctx
       // Hidden on the site (data.js availability.public): no notice period, places, work modes or titles.
@@ -604,7 +703,9 @@ const INTENTS = [
     // "Has he worked with LLMs?", "Which LLM vendor's agents did he use?": his Claude agent work.
     id: 'ai',
     concepts: { llm: 3, agents: 2, ai: 1 },
-    boost: ({ q }) => (named(q) && !/\b(darwin|syngenta)\b/.test(q) ? -10 : 0),
+    // AI asked about in the work it was used on (Darwin, for Syngenta) is this answer; the project
+    // itself ("Tell me about the Darwin Portal AI project") is its own passage, and other projects aren't AI.
+    boost: (ctx) => (named(ctx.q) ? (/\b(darwin|syngenta)\b/.test(ctx.q) && !/\b(projects?|portal)\b/.test(ctx.q) && has(ctx, 'ai', 'llm', 'agents') ? 2 : -10) : 0),
     answer: () => {
       const lead = experience[0].points.find((p) => /Darwin Portal program/.test(p))
       const build = experience[0].points.find((p) => /Claude Code agents/.test(p))
@@ -641,6 +742,7 @@ const INTENTS = [
     // "Any experience in healthcare?", "Tell me about his transit payments work"
     id: 'vertical',
     boost: ({ q }) => (verticalIn(q) && !named(q) ? 4 : 0),
+    explains: ({ q }) => q.match(new RegExp(`\\b(${VERTICAL_WORDS[verticalIn(q)] || verticalIn(q).toLowerCase()})\\b`))[0].split(/\s+/),
     answer: ({ q }) => {
       const v = verticalIn(q)
       const work = graphProjects.filter((p) => p.vertical === v)
@@ -698,6 +800,9 @@ const INTENTS = [
   {
     id: 'impact',
     concepts: { impact: 3 },
+    // The impact of one project or one area ("What impact did Darwin Portal have?") is that passage.
+    not: ['devices', 'mdm', 'llm', 'agents'],
+    boost: ({ q }) => (named(q) || graphNamed(q) || verticalIn(q) ? -10 : 0),
     answer: () =>
       `Here are the headline numbers: ${stats.map(statLine).join('; ')}.\n\n` +
       'Measured improvements from the resume (percent change):\n\n' +
@@ -780,6 +885,38 @@ const INTENTS = [
     },
   },
   {
+    // A number about a topic ("how far did build failures drop", "what percent on X"): the resume
+    // facts with a number that best match the question's topic.
+    id: 'metric',
+    concepts: { measure: 2 },
+    require: ['measure'],
+    boost: ({ question }) => {
+      const n = bestFacts(question).score
+      return n >= 2 ? 3 : n
+    },
+    explains: ({ question }) => bestFacts(question).topic,
+    answer: ({ question }) => {
+      const [first, ...rest] = bestFacts(question).facts
+      // A second fact only when it adds a different number (not the same figure from "How he leads").
+      const nums = (f) => f.text.match(/\d[\d,.]*\+?%?/g).join(' ')
+      const second = rest.find((f) => !nums(f).split(' ').some((n) => nums(first).split(' ').includes(n)))
+      return [first, second].filter(Boolean).map((f) => f.text).join('\n\n') + more(first.href)
+    },
+  },
+  {
+    // "Which projects used CopilotKit?", "Projects with smart cards": the domain-graph projects whose
+    // technologies or description name the topic.
+    id: 'projects-with',
+    concepts: { projects: 2 },
+    require: ['projects'],
+    boost: ({ question }) => (projectsUsing(question).projects.length ? 3 : -10),
+    explains: ({ question }) => projectsUsing(question).words,
+    answer: ({ question }) => {
+      const { projects: found } = projectsUsing(question)
+      return `${found.length === 1 ? 'One project in his profile matches' : `${found.length} projects in his profile match`}:\n\n${bullets(found.slice(0, 4).map((g) => `**${g.name}**: ${g.text}`))}` + more('#projects')
+    },
+  },
+  {
     // "Show me his projects": a short list (CHAT-003), with the full set in the Projects section.
     id: 'projects',
     concepts: { projects: 3 },
@@ -798,17 +935,129 @@ const INTENTS = [
   },
 ]
 
-// The best-scoring intent for a question, or null.
+// The best-scoring intent for a question, or null: { intent, score, min, second (the runner-up's
+// score), boosted (named-entity evidence) }. ctx.topicOnly (a summary word plus a topic, see
+// answerQuestion) leaves out the summary and lets the topic win on less evidence.
 function pickIntent(ctx) {
   let best = null
+  let second = 0
   for (const intent of INTENTS) {
+    if (ctx.topicOnly && intent.id === 'summary') continue
     if (intent.not?.some((c) => ctx.has.has(c))) continue
     if (intent.require && !intent.require.some((c) => ctx.has.has(c))) continue
-    let score = intent.boost ? intent.boost(ctx) : 0
+    const boost = intent.boost ? intent.boost(ctx) : 0
+    let score = boost
     for (const [c, w] of Object.entries(intent.concepts || {})) if (ctx.has.has(c)) score += w
-    if (score >= (intent.min ?? 3) && (!best || score > best.score)) best = { intent, score }
+    const min = ctx.topicOnly ? Math.min(intent.min ?? 3, 1) : intent.min ?? 3
+    if (score < min) {
+      second = Math.max(second, score)
+      continue
+    }
+    if (!best || score > best.score) {
+      if (best) second = Math.max(second, best.score)
+      best = { intent, score, min, boosted: boost > 0 }
+    } else second = Math.max(second, score)
   }
-  return best?.intent || null
+  return best && { ...best, second }
+}
+
+// Confidence (AI-003). Offline matching is a keyword search, so an intent only answers as if certain
+// when the question's evidence supports it; otherwise the visitor gets the closest passages and
+// questions to try (unsure below), never a confident answer to a different question.
+//
+// Topic words: question words that name something in the profile or carry a concept, other than
+// stop, generic and short-answer words. An intent explains the words its own concepts matched, and,
+// when a named employer, project or city boosted it, those names.
+const PLAIN = new Set('ok okay yes no thanks thank hi hello hey please quick quickly short brief exactly'.split(' '))
+// Of the GENERIC words, these still name a topic ("his skills", "his projects").
+const TOPICAL = new Set('skill skills tool tools people team teams project projects app apps'.split(' '))
+function topicWords(question) {
+  const { raw, spans } = analyse(question)
+  const inConcept = new Set([...spans.values()].flatMap((s) => [...s]))
+  const topic = raw
+    .map((w, i) => ({ w, i }))
+    .filter(({ w, i }) => w.length > 1 && !STOP.has(w) && (!GENERIC.has(w) || TOPICAL.has(w)) && !BRIEF_WORDS.has(w) && !PLAIN.has(w) && (inConcept.has(i) || VOCAB.has(stem(w))))
+  return { topic, spans }
+}
+
+// Aspect words and concepts: what kind of answer is wanted (a role, projects, impact, a number), not
+// what it's about.
+const ASPECT = new Set('role roles job jobs title skill skills tool tools technology technologies tech stack project projects impact app apps'.split(' '))
+const ASPECT_CONCEPTS = new Set(['impact', 'measure', 'count', 'career', 'projects', 'companies', 'current'])
+
+// Intents whose answer is right whatever the wording: refusals, contact details and owner decisions.
+const SAFE = new Set(['injection', 'age', 'personal', 'salary', 'resume', 'why-leave', 'phone', 'compare', 'role-fit', 'contact', 'location', 'photo'])
+const ENTITY_NAMES = new RegExp(`^(${[...COMPANY_WORDS, ...PROJECT_NAMES.source.match(/\(([^)]*)\)/)[1].split('|'), ...CITIES.map((c) => c.toLowerCase()), 'bangalore', 'bombay'].join('|')})$`)
+
+// true when the picked intent may answer: it explains every profile word of the question, or all but
+// one with a margin over its threshold (or a named entity, or a clear lead over the runner-up).
+// Two or more profile words it doesn't explain mean the question is about something else as well
+// (a question about an onboarding metric isn't a start-date question).
+function confident(ctx, pick) {
+  const { intent, score, min, boosted, second } = pick
+  if (SAFE.has(intent.id) || (intent.id === 'availability' && !showAvailability)) return true
+  const { topic, spans } = topicWords(ctx.question)
+  const covered = new Set(Object.keys(intent.concepts || {}).flatMap((c) => [...(spans.get(c) || [])]))
+  const explained = new Set((intent.explains?.(ctx) || []).flatMap((w) => w.split(/[^a-z0-9+#]+/)).map(stem))
+  // Words that only say what kind of answer is wanted ("his role in…", "what impact…") aren't a topic.
+  const aspectOnly = new Set([...spans].filter(([c]) => ASPECT_CONCEPTS.has(c)).flatMap(([, at]) => [...at]))
+  for (const [c, at] of spans) if (!ASPECT_CONCEPTS.has(c)) for (const i of at) aspectOnly.delete(i)
+  const unexplained = topic.filter(
+    ({ w, i }) => !covered.has(i) && VOCAB.has(stem(w)) && !explained.has(stem(w)) && !ASPECT.has(w) && !aspectOnly.has(i) && !(boosted && ENTITY_NAMES.test(w)),
+  )
+  pick.unexplained = unexplained.map(({ w }) => w)
+  if (unexplained.length === 0) return true
+  if (unexplained.length === 1) return score - min >= 1 || boosted || score - second >= 2
+  return score - min >= 2 && score - second >= 3
+}
+
+// Questions to try after an unsure answer: ones about the concepts the question carries, then the
+// console's suggested prompts. Each has a confident answer.
+const SUGGEST = [
+  [['ai', 'llm', 'agents', 'ml'], 'How does he use AI agents in his work?'],
+  [['impact', 'measure', 'count'], 'What impact has he had?'],
+  [['mentor', 'hire', 'attrition', 'okr', 'teamSize', 'managers', 'ic', 'techLead', 'level'], 'How does he hire and mentor engineers?'],
+  [['budget'], 'Has he owned an engineering budget?'],
+  [['companies', 'career', 'previous', 'first', 'current', 'timeline', 'years', 'city'], 'Which companies has he worked for?'],
+  [['projects', 'client', 'devices', 'mdm', 'industry'], 'Show me his projects'],
+  [['education', 'certs'], 'Where did he study?'],
+  [['contact', 'phone', 'resume', 'start', 'open', 'available', 'notice', 'relocate', 'workmode', 'target'], 'How can I contact him?'],
+  [['blog'], 'Does he write a blog?'],
+  [['location'], 'Where is he based?'],
+]
+const suggestions = (has) =>
+  [...new Set([...SUGGEST.filter(([cs]) => cs.some((c) => has.has(c))).map(([, s]) => s), ...suggestedPrompts.slice(1)])].slice(0, 3)
+
+// The opening of an unsure answer; vince.js speaks only this sentence and points to the screen.
+export const UNSURE = "I'm not certain I understood."
+const clip = (s, n = 220) => (s.length <= n ? s : `${s.slice(0, s.lastIndexOf(' ', n - 1))}…`)
+
+// The low-confidence reply: the best sentence of the one or two passages that match the question
+// best, each with a "More in …" link, then three questions to try. Without a match it says so.
+// The question's own words count fully; synonyms added for retrieval (SYNONYMS) count half.
+function unsure(ctx, terms, base) {
+  const own = new Set(base)
+  const weight = (t) => (own.has(t) ? 1 : 0.5)
+  const hits = (s) => {
+    const words = tokenize(s)
+    return [...terms].reduce((n, t) => n + (words.some((w) => matches(w, t)) ? weight(t) : 0), 0)
+  }
+  const passages = chunks
+    .map((c) => ({ c, score: [...terms].reduce((n, t) => n + (c.textTokens.some((w) => matches(w, t)) ? 2 * weight(t) : c.titleTokens.has(t) ? weight(t) : 0), 0) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+  const picked = []
+  for (const { c } of passages) {
+    if (picked.length === 2) break
+    const best = c.sentences.map((s, i) => ({ s, i, n: hits(s) })).sort((a, b) => b.n - a.n || a.i - b.i)[0]
+    if (!best.n || picked.some((p) => p.text === best.s)) continue
+    const label = c.source || SECTIONS[c.href] || 'Profile'
+    const link = SECTIONS[c.href] ? ` [More in ${SECTIONS[c.href]}](${c.href})` : ''
+    picked.push({ text: best.s, line: `**${label}**: ${clip(best.s)}${link}` })
+  }
+  const tryThese = `You could ask:\n\n${bullets(suggestions(ctx.has))}`
+  if (!picked.length) return `${UNSURE} I couldn't find a close match in his profile.\n\n${tryThese}\n\nOr ask ${FIRST} directly at [${profile.email}](mailto:${profile.email}).`
+  return `${UNSURE} Here's what his profile says that seems closest:\n\n${picked.map((p) => p.line).join('\n\n')}\n\n${tryThese}`
 }
 
 // A short answer for "in one sentence", "tl;dr", "briefly" (CHAT-003): the first n sentences of prose,
@@ -831,7 +1080,10 @@ function shorten(answer, n) {
 }
 
 const SKILL_QUESTION = /\b(skills?|stack|tech\w*|tools?|platforms?|frameworks?|languages?|libraries|know|knows|used?|experience|familiar|hands-on|proficient|expertise)\b/
+// One sentence first, so a one-sentence request about his skills (shorten) has prose to keep.
+const CURRENT_SKILLS = skills.filter((s) => !s.earlier)
 const fullSkills = () =>
+  `His skills cover ${CURRENT_SKILLS.length} areas: ${list(CURRENT_SKILLS.map((s) => s.area))}.\n\n` +
   cappedTable(['Area', 'Technologies'], skills.map((s) => [`**${s.area}**`, s.items.join(', ')]), `areas: ${list(skills.slice(MAX_ITEMS).map((s) => s.area))}. [See all in Skills](#skills)`)
 
 // "Does he know Python?", "Which mobile platforms does he know?": the matching skill areas or
@@ -864,8 +1116,8 @@ function skillAnswer(base, terms) {
 
 // The best passages for the question's terms: whole passages when detail is asked for ("tell me
 // more"), otherwise the two or three best sentences, about 600 characters at most.
-function retrieve(terms, { detail = false } = {}) {
-  const scored = chunks
+const scoreChunks = (terms) =>
+  chunks
     .map((c) => {
       let score = 0
       for (const t of terms) {
@@ -876,6 +1128,19 @@ function retrieve(terms, { detail = false } = {}) {
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
+
+// How much of the question the best passage covers: the share of its content words (with their
+// synonyms) found in that passage. Below half, retrieval is a guess (AI-003).
+function coverage(base, terms) {
+  const top = scoreChunks(terms)[0]?.c
+  const content = base.filter((t) => !GENERIC.has(t) && !BRIEF_WORDS.has(t) && !PLAIN.has(t))
+  if (!top || !content.length) return 0
+  const inTop = (t) => [t, ...tokenize(SYNONYMS[t] || '')].some((x) => top.titleTokens.has(x) || top.textTokens.some((w) => matches(w, x)))
+  return content.filter(inTop).length / content.length
+}
+
+function retrieve(terms, { detail = false } = {}) {
+  const scored = scoreChunks(terms)
   if (!scored.length) return null
 
   // Skill questions get every matching skill area.
@@ -944,6 +1209,12 @@ function followUp(question, q, history) {
   const isMore = MORE.test(q)
   const before = BEFORE.test(q)
   const after = AFTER.test(q)
+  // A client question right after a project (or an employer's projects) is about that project.
+  if (conceptsOf(question).has('client') && !projectsIn(q).length && !companiesIn(q).length) {
+    const ent = entityIn(prevQ) || entityIn(prevA.slice(0, 400))
+    const work = ent?.type === 'project' ? [projects[ent.i]] : ent ? projects.filter((p) => p.caseStudy?.company === experience[ent.i].company) : []
+    if (work.length) return clientAnswer(work)
+  }
   if (!isMore && !before && !after && !PRONOUN.test(q)) return null
   if (entityIn(q)) return null // names its own subject
   const ent = entityIn(prevQ) || entityIn(prevA.slice(0, 400))
@@ -988,29 +1259,56 @@ export function answerLocally(question, history = [], { detail = false } = {}) {
   // "In one sentence", "tl;dr", "briefly" shorten any answer, not only the summary (CHAT-003).
   const n = brevity(question)
   const answer = answerQuestion(question, q, n, detail)
-  return n ? shorten(answer, n) : answer
+  // An unsure answer is already short, and its passages and suggestions are the point.
+  return n && !answer.startsWith(UNSURE) ? shorten(answer, n) : answer
 }
+
+// For tests and tuning: the intent a question picks, its scores, and whether it answers with confidence.
+export function explain(question) {
+  const ctx = { q: question.toLowerCase().trim(), question, has: conceptsOf(question), brief: brevity(question) }
+  const pick = pickIntent(ctx)
+  return pick ? { intent: pick.intent.id, score: pick.score, min: pick.min, second: pick.second, confident: confident(ctx, pick), unexplained: pick.unexplained || [], concepts: [...ctx.has] } : { intent: null, concepts: [...ctx.has] }
+}
+
+// Summary concepts and the words that, with them, still mean the whole person ("summarise his career").
+const SUMMARY_CONCEPTS = ['summary', 'summaryShort', 'pitch']
+const WHOLE = new Set('career background profile journey life story overall person himself experience'.split(' '))
 
 function answerQuestion(question, q, brief, detail) {
   // Technology or skill terms the profile never uses ("Has he used Kubernetes?", "Go or Rust") get an
   // honest note. Only named technology, domain or qualification terms count (missingIn above).
   const names = missingIn(question)
   const missingWords = new Set(names.flatMap((t) => tokenize(t)))
-  const base = tokenize(question).filter((t) => !missingWords.has(t))
+  const ctx = { q, question, has: conceptsOf(question), brief }
+
+  // A summary or short-answer word with a topic (a short version of one area of his work) is about
+  // the topic, shortened: the summary words don't pick the answer (CHAT-003).
+  let skip = new Set()
+  if (brief || SUMMARY_CONCEPTS.some((c) => ctx.has.has(c))) {
+    const { topic, spans } = topicWords(question)
+    const at = new Set(SUMMARY_CONCEPTS.flatMap((c) => [...(spans.get(c) || [])]))
+    if (topic.some(({ w, i }) => !at.has(i) && !WHOLE.has(w))) {
+      ctx.has = new Set([...ctx.has].filter((c) => !SUMMARY_CONCEPTS.includes(c)))
+      ctx.topicOnly = true
+      skip = new Set(analyse(question).raw.filter((_, i) => at.has(i)))
+    }
+  }
+
+  const base = tokenize(question).filter((t) => !missingWords.has(t) && !skip.has(t))
   const terms = new Set(base.flatMap((t) => [t, ...tokenize(SYNONYMS[t] || '')]))
   const note = names.length ? `His profile doesn't mention **${list(names, 'or')}**` : ''
   const withNote = (answer) => (note ? `${note}. Here's what it does say:\n\n${answer}` : answer)
+  const cannotConfirm = () => `${note}, so I can't confirm it. You can see what his profile does list under [Skills](#skills) and [Experience](#experience).`
 
-  const ctx = { q, question, has: conceptsOf(question), brief }
-  const intent = pickIntent(ctx)
-  if (intent) {
+  const pick = pickIntent(ctx)
+  if (pick) {
+    const { intent } = pick
+    if (!confident(ctx, pick)) return note ? cannotConfirm() : unsure(ctx, terms, base)
     const noted = typeof intent.note === 'function' ? intent.note(ctx) : intent.note !== false
     return noted ? withNote(intent.answer(ctx)) : intent.answer(ctx)
   }
 
-  if (note && base.every((t) => GENERIC.has(t))) {
-    return `${note}, so I can't confirm it. You can see what his profile does list under [Skills](#skills) and [Experience](#experience).`
-  }
+  if (note && base.every((t) => GENERIC.has(t))) return cannotConfirm()
   // Questions made only of stop words ("Who is Vinod?") or of short-answer words ("Vinod in one line")
   // get the summary.
   if (!terms.size || (brief && base.every((t) => BRIEF_WORDS.has(t)))) return INTENTS.find((i) => i.id === 'summary').answer(ctx)
@@ -1021,7 +1319,13 @@ function answerQuestion(question, q, brief, detail) {
   }
   if (/\b(skills?|stack|tech\w*|tools)\b/.test(q)) return withNote(fullSkills())
 
-  const answer = retrieve(terms, { detail })
+  // Aspect words ("role", "projects", "impact") say what kind of answer is wanted; with a real topic
+  // ("his role in Medicine Reminder"), the passage is found by the topic.
+  const topical = base.filter((t) => !ASPECT.has(t))
+  const find = topical.length && topical.length < base.length ? new Set(topical.flatMap((t) => [t, ...tokenize(SYNONYMS[t] || '')])) : terms
+  const answer = retrieve(find, { detail })
+  // Retrieval that covers less than half of the question is a guess: say so (AI-003).
+  if (answer && !detail && coverage(topical.length ? topical : base, find) < 0.5) return note ? cannotConfirm() : unsure(ctx, terms, base)
   if (answer) return withNote(answer)
   const tryThese = suggestedPrompts.slice(1, 5).map((p) => `“${p.replace(/\?$/, '')}”`).join(', ')
   return (

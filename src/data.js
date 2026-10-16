@@ -1,4 +1,5 @@
-// All site content lives here, taken from public/resume.pdf.
+// All site content lives here, taken from server/resume.pdf (kept out of public/: the resume isn't
+// published on the site; it's available on request).
 // The runtime agent (server/profileAgent.js) reads the PDF itself; this file powers the page
 // and the offline fallback agent (src/agent/localAgent.js).
 
@@ -26,13 +27,12 @@ export const profile = {
   x: 'https://x.com/yadavvinod579',
   github: 'https://github.com/vinodyadav5799',
   source: 'https://github.com/itbooth2020-coder/vinod-profile', // this site's source code
-  resume: 'resume.pdf',
   domains: ['Mobile', 'IoT', 'MDM / EMM', 'AI Agents', 'Enterprise', 'Web'],
   summary:
     'Results-driven Engineering Manager with 14+ years of experience leading cross-functional teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered, and web platforms at scale. Proven track record of improving system performance by 30%+, shipping solutions supporting 30K+ users and devices, and reducing time-to-market through CI/CD automation. Deep expertise in Android/iOS, MDM/EMM, prompt engineering, Claude AI agent integration, agentic development, system architecture, and Agile delivery across Retail, Transit, Healthcare, Agri-Tech, and Enterprise Mobility verticals. Adept at hiring, mentoring, setting OKRs, managing stakeholder relationships, budget ownership, and aligning engineering roadmaps with business strategy.',
 }
 
-// empty. Only the year and month are kept: the full date of birth isn't needed and shouldn't be public.
+// Profile dialog. Vinod's age and date of birth are deliberately not stored or shown anywhere.
 export const personal = {
   photo: 'profile.webp',
   nationality: 'Indian',
@@ -40,13 +40,13 @@ export const personal = {
   languages: 'English (Professional), Hindi (Native), Marathi (Native)',
 }
 
-// One is picked at random each time the profile dialog opens.
+// One is picked at random each time the profile dialog opens. Each is a well-known line from the
+// person it's attributed to (DES-001: no film quotes).
 export const quotes = [
   { text: 'Simplicity is prerequisite for reliability.', by: 'Edsger W. Dijkstra' },
   { text: 'The best way to predict the future is to invent it.', by: 'Alan Kay' },
   { text: 'Make it work, make it right, make it fast.', by: 'Kent Beck' },
   { text: 'Talk is cheap. Show me the code.', by: 'Linus Torvalds' },
-  { text: "It's not who I am underneath, but what I do that defines me.", by: 'Batman Begins (2005)' },
 ]
 
 export const profileCard = [
@@ -60,9 +60,14 @@ export const profileCard = [
   ['verticals', 'Retail, Transit, Healthcare, Agri-Tech, Enterprise Mobility'],
 ]
 
-// Availability, confirmed by Vinod (not in the resume). Shown in the hero, the 30-second brief,
-// Contact and role fit, and used by the offline agent.
+// Availability, confirmed by Vinod (not in the resume). When shown: the hero and 30-second brief strip
+// (Availability.jsx), Contact, role fit, VINCE's brief narration and the assistants' answers.
+// `public` is the single switch for all of them. Vinod asked to hide it, so it's false: nothing renders
+// (no empty space), and the offline and live assistants answer availability, notice, relocation,
+// work-mode and target-role questions with "please contact Vinod directly". The details below are
+// kept so setting `public: true` brings everything back.
 export const availability = {
+  public: false,
   open: true,
   roles: ['Senior Engineering Manager', 'Head of Engineering', 'CTO'],
   notice: '3 months',
@@ -70,6 +75,8 @@ export const availability = {
   workModes: ['Onsite', 'Hybrid', 'Remote'],
   relocation: true,
 }
+// True only when the availability details may be shown (switched on, and he's looking).
+export const showAvailability = availability.public && availability.open
 
 // Manager metrics ("At a glance" and the brief's proof points), all from the Accenture entry of the resume.
 // Counter.jsx counts up a leading number only when the rest has no digits; `sr` is the screen-reader
@@ -78,7 +85,8 @@ export const stats = [
   // "managing a team of 35+ engineers"; "Managed engineering budget and resource allocation for a 35-engineer org"
   { value: '35+', label: 'Engineers led in a budget-owning org' },
   // "Spearheaded end-to-end delivery of 3 enterprise mobility programs simultaneously … achieving 100% on-time milestone delivery"
-  { value: '100%', label: 'On-time milestones across 3 concurrent programs' },
+  // Scoped "at Accenture" so it doesn't read as contradicting the career-wide "5+ concurrent programs" highlight (UX-005).
+  { value: '100%', label: 'On-time milestones across 3 concurrent programs at Accenture' },
   // "reducing release cycle time from 3 weeks to 5 days"
   { value: '3 wk → 5 days', sr: '3 weeks to 5 days', label: 'Release cycle, via CI/CD' },
   // "drove hiring of 8 senior engineers, reducing team attrition by 20%"
@@ -123,21 +131,14 @@ export const leadership = [
   },
 ]
 
-// Optional pull-quote above the "How I lead" cards; hidden while empty. DRAFTS for Vinod to pick and
-// edit (not rendered):
-// 1. "I grow engineers and hold teams to outcomes, not activity. Clear OKRs, regular feedback and
-//    honest reviews keep people improving, and strong engineering practice — CI/CD, code reviews,
-//    shared standards — keeps quality from depending on heroics."
-// 2. "Good delivery comes from good people and good habits. I hire carefully, mentor deliberately and
-//    measure what ships: on-time milestones, shorter release cycles and fewer defects. AI agents speed
-//    up the work; engineers stay accountable for every line."
-// 3. "My job is to build teams that deliver predictably without burning out. That means investing in
-//    people, setting outcome-driven goals and automating the path to production — and adopting
-//    AI-assisted engineering with human review at every step."
-export const leadershipPhilosophy = ''
+// Pull-quote above the "How I lead" cards, in Vinod's voice (owner-approved, UX-006). Editable: change
+// the text freely, or set it to '' to hide the quote.
+export const leadershipPhilosophy =
+  'I grow engineers and hold teams to outcomes, not activity. Clear OKRs, regular feedback and honest reviews keep people improving, and strong engineering practice — CI/CD, code reviews, shared standards — keeps quality from depending on heroics.'
 
 export const highlights = [
-  { title: 'Team Scale', text: 'Led cross-functional teams of 20–50 engineers across 5+ concurrent enterprise programs' },
+  // The resume's career-wide summary line; "over his career" scopes it against the Accenture stat (UX-005).
+  { title: 'Team Scale', text: 'Led cross-functional teams of 20–50 engineers across 5+ concurrent enterprise programs over his career' },
   { title: 'Performance', text: 'Improved system performance by 30%+ across Android, iOS, and web platforms' },
   { title: 'User Scale', text: 'Delivered production-grade solutions serving 30K+ users/devices globally' },
   { title: 'Architecture', text: 'Architected scalable MDM, IoT, AI-agent, transit payment, and retail mobility platforms from 0 to production' },
@@ -447,23 +448,31 @@ export const otherProjects = [
   'Ciber Connect Enterprise App',
 ]
 
+// Every skill in the resume's Technical skills section, ordered leadership first (UX-008). Older
+// items sit in the last group (earlier: true), which Skills.jsx shows as a collapsed "Earlier
+// experience" group; the assistant and role fit still use every item. Resume group of each moved item:
+// Xamarin (Mobile), jQuery and PHP (Frontend / Web), Singleton and Observer (Architecture), Google Ads (Cloud & IoT).
 export const skills = [
-  { area: 'Mobile', items: ['Android (Kotlin, Java, Jetpack Compose)', 'iOS (Swift, SwiftUI)', 'Flutter', 'React Native', 'Xamarin'] },
-  { area: 'Frontend / Web', items: ['React JS', 'Next.js', 'TypeScript', 'JavaScript', 'HTML5', 'jQuery', 'PHP'] },
+  { area: 'Leadership & Methodologies', items: ['Agile/Scrum', 'OKR Frameworks', 'Budget Management', 'Sprint Planning', 'SDLC', 'Waterfall'] },
   { area: 'AI & Agents', items: ['Claude AI Agent Integration', 'Claude Agent SDK', 'Claude Code (Agentic Development)', 'Multi-Agent Orchestration', 'Tool/Function Calling', 'CopilotKit', 'AG-UI', 'A2UI', 'Generative AI', 'NLP', 'Data Analysis & Model Training'] },
   { area: 'Prompt Engineering', items: ['System Prompt Design', 'Few-Shot Prompting', 'Structured JSON Outputs', 'Context Management', 'Guardrails & Grounding', 'Prompt Evaluation & Iteration'] },
+  { area: 'Architecture', items: ['MVVM', 'MVC', 'Microservices', 'MDM/EMM'] },
+  { area: 'Mobile', items: ['Android (Kotlin, Java, Jetpack Compose)', 'iOS (Swift, SwiftUI)', 'Flutter', 'React Native'] },
+  { area: 'Frontend / Web', items: ['React JS', 'Next.js', 'TypeScript', 'JavaScript', 'HTML5'] },
   { area: 'Backend & APIs', items: ['Node.js', 'RESTful APIs', 'Python', 'Databricks', 'XML', 'JSON', 'MySQL', 'SQLite'] },
   { area: 'DevOps & CI/CD', items: ['Jenkins', 'GitHub', 'GitLab', 'Azure DevOps', 'Git'] },
-  { area: 'Architecture', items: ['MVVM', 'MVC', 'Singleton', 'Observer', 'Microservices', 'MDM/EMM'] },
-  { area: 'Cloud & IoT', items: ['Firebase', 'Google Maps', 'Google Ads', 'Azure', 'NFC', 'Bluetooth', 'Wi-Fi modules'] },
-  { area: 'Methodologies', items: ['Agile/Scrum', 'Waterfall', 'OKR Frameworks', 'SDLC', 'Sprint Planning', 'Budget Management'] },
+  { area: 'Cloud & IoT', items: ['Firebase', 'Google Maps', 'Azure', 'NFC', 'Bluetooth', 'Wi-Fi modules'] },
   { area: 'Libraries', items: ['Dagger 2', 'Hilt', 'RxJava', 'Rx Android', 'OpenTok', 'PayPal SDK'] },
+  { area: 'Earlier experience', earlier: true, items: ['Xamarin', 'jQuery', 'PHP', 'Singleton', 'Observer', 'Google Ads'] },
 ]
 
-export const certifications = [
-  'Claude Code AI Tools Certified — Coursiv, 2026',
-  'AI Tools for Business & Productivity (In Progress) — Coursiv, 2025',
-  'Generative AI — Fundamentals to Advanced (In Progress) — Udemy, 2025',
+// Completed certifications. The resume lists the courses in `learning` as "(In Progress) … 2025"; the
+// page shows them under "Currently learning" instead (UX-007). Keep server/resume.pdf in step.
+export const certifications = ['Claude Code AI Tools Certified — Coursiv, 2026']
+
+export const learning = [
+  'AI Tools for Business & Productivity — Coursiv · started 2025',
+  'Generative AI — Fundamentals to Advanced — Udemy · started 2025',
 ]
 
 export const education = [
@@ -473,7 +482,9 @@ export const education = [
 
 export const languages = ['English (Professional)', 'Hindi (Native)', 'Marathi (Native)']
 
-// Blogs section. The latest posts are fetched at build time (scripts/fetch-blogs.mjs → src/data/blogs.json).
+// Writing section (Blogs.jsx). The latest posts are fetched at build time (scripts/fetch-blogs.mjs →
+// src/data/blogs.json). The tech blog is the main card; the comic blog is a small "Outside work" line
+// with no posts or thumbnails (DES-001, ADS-004).
 export const blogs = {
   tech: {
     name: 'AndroidSuperNerds',

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ScrollProgress from './components/ScrollProgress.jsx'
 import Header from './components/Header.jsx'
 import Hero from './components/Hero.jsx'
@@ -18,7 +18,8 @@ import { liveAgent } from './agent/askAgent.js'
 
 // Below-the-fold, interactive sections load as separate chunks after first paint (PERF-FE-002).
 // Each placeholder reserves the section's height (styles.css .lazy-ph), so nothing shifts when it
-// arrives, and keeps its anchor id for the header nav and deep links.
+// arrives, and keeps its anchor id for the header nav and deep links. The build-time prerender and
+// hydration show the placeholders; the sections load once the app has mounted.
 const RoleFit = lazy(() => import('./components/RoleFit.jsx'))
 const PromptConsole = lazy(() => import('./components/PromptConsole.jsx'))
 const DomainGraph = lazy(() => import('./components/DomainGraph.jsx'))
@@ -27,8 +28,15 @@ const DomainGraph = lazy(() => import('./components/DomainGraph.jsx'))
 // Shareable via ?brief=1 (index.html applies it before first paint); not persisted.
 const briefInUrl = () => new URLSearchParams(window.location.search).get('brief') === '1'
 
+const fitPlaceholder = <div id="fit" className="lazy-ph lazy-ph--fit" aria-busy="true" />
+const consolePlaceholder = <div id="console" className="card chat lazy-ph" aria-busy="true" />
+const graphPlaceholder = <div className="card lazy-ph lazy-ph--graph" aria-busy="true" />
+
 export default function App() {
-  const [brief, setBrief] = useState(briefInUrl)
+  // The prerendered HTML (vite.config.js) is the full profile and hydration must render the same, so
+  // ?brief=1 and the lazy sections apply right after it, before the browser paints the hydrated page.
+  const [brief, setBrief] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const toggleRef = useRef(null)
   const headingRef = useRef(null)
   const moveFocus = useRef(false) // only after the visitor toggles, not on load
@@ -43,7 +51,23 @@ export default function App() {
     setBrief(on)
   }
 
+  useLayoutEffect(() => {
+    // Show the rest of the page (hidden until now: index.html data-app, styles.css). A deep link to a
+    // section couldn't scroll while it was hidden, so go there now unless the visitor has scrolled.
+    delete document.documentElement.dataset.app
+    if (briefInUrl()) setBrief(true)
+    else if (window.scrollY === 0 && /^#(?!case-)./.test(window.location.hash)) {
+      try {
+        document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView({ behavior: 'instant' })
+      } catch {
+        /* malformed hash: stay at the top */
+      }
+    }
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
+    if (!mounted) return // until the URL has been read: keep index.html's data-mode and ?brief=1
     const root = document.documentElement
     if (brief) root.dataset.mode = 'brief'
     else delete root.dataset.mode
@@ -71,7 +95,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'instant' })
     if (brief) headingRef.current?.focus()
     else if (!keep) toggleRef.current?.focus()
-  }, [brief])
+  }, [brief, mounted])
 
   useEffect(() => {
     // In-page links (header nav, skip link) to sections hidden by brief mode leave it first.
@@ -109,19 +133,26 @@ export default function App() {
           <Leadership />
           <Projects />
           <Experience />
-          <Suspense fallback={<div id="fit" className="lazy-ph lazy-ph--fit" aria-busy="true" />}>
-            <RoleFit />
-          </Suspense>
-          <div className="layout">
-            <h2 className="sr-only">{liveAgent ? 'Ask the AI about the profile' : 'Ask about the profile'}</h2>
-            <Suspense fallback={<div id="console" className="card chat lazy-ph" aria-busy="true" />}>
-              <PromptConsole />
+          {mounted ? (
+            <Suspense fallback={fitPlaceholder}>
+              <RoleFit />
             </Suspense>
+          ) : fitPlaceholder}
+          <div className="layout">
+            {/* VINCE's text console: the same assistant and conversation as the VINCE panel (CHAT-001). */}
+            <h2 className="sr-only">{liveAgent ? 'Ask VINCE, the AI assistant, about the profile' : 'Ask VINCE about the profile'}</h2>
+            {mounted ? (
+              <Suspense fallback={consolePlaceholder}>
+                <PromptConsole />
+              </Suspense>
+            ) : consolePlaceholder}
             <div className="side">
               <ProfileCard />
-              <Suspense fallback={<div className="card lazy-ph lazy-ph--graph" aria-busy="true" />}>
-                <DomainGraph />
-              </Suspense>
+              {mounted ? (
+                <Suspense fallback={graphPlaceholder}>
+                  <DomainGraph />
+                </Suspense>
+              ) : graphPlaceholder}
             </div>
           </div>
           <Skills />

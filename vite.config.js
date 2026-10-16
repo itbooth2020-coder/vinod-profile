@@ -1,8 +1,9 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 // Server-side settings read from .env / the environment (never bundled). See .env.example.
 const SERVER_ENV = [
@@ -57,7 +58,7 @@ const sha256 = (text) => `'sha256-${createHash('sha256').update(text.replace(/\r
 function contentSecurityPolicy() {
   return {
     name: 'content-security-policy',
-    apply: 'build',
+    apply: (_, env) => env.command === 'build' && !env.isSsrBuild,
     enforce: 'post',
     // On the final HTML: during transformIndexHtml Vite still holds inline <style> as a placeholder.
     generateBundle(_, bundle) {
@@ -84,8 +85,50 @@ function withPolicy(html) {
   return html.replace(charset, (m) => `${m}\n    ${meta}`)
 }
 
+// Build-time prerender (PERF-FE-007): renders <App /> (src/entry-server.jsx) to HTML and puts it in
+// dist/index.html's #root, so the hero paints from the HTML instead of after the JS bundle, and
+// src/main.jsx hydrates it. It is also the page for crawlers and visitors without JavaScript.
+// Runs before the CSP plugin (listed first); it adds no inline <script> or <style> to hash.
+// The server bundle is built into dist-ssr/ (gitignored) and removed afterwards.
+function prerender() {
+  let config
+  return {
+    name: 'prerender',
+    apply: (_, env) => env.command === 'build' && !env.isSsrBuild,
+    enforce: 'post',
+    configResolved(resolved) {
+      config = resolved
+    },
+    async generateBundle(_, bundle) {
+      const asset = bundle['index.html']
+      if (asset?.type !== 'asset') throw new Error('prerender: dist/index.html not found in the bundle')
+      const outDir = path.resolve(config.root, 'dist-ssr')
+      const { build } = await import('vite')
+      try {
+        await build({
+          configFile: config.configFile,
+          mode: config.mode,
+          logLevel: 'warn',
+          build: { ssr: 'src/entry-server.jsx', outDir, emptyOutDir: true, copyPublicDir: false },
+        })
+        const { render } = await import(`${pathToFileURL(path.join(outDir, 'entry-server.js')).href}?t=${Date.now()}`)
+        const html = render()
+        // A prerendered <script>/<style> would need a CSP hash, and style="" attributes are blocked
+        // by style-src without 'unsafe-inline' (React sets styles from JS after hydration instead).
+        if (/<script|<style|\sstyle="/i.test(html)) throw new Error('prerender: inline script or style in the app HTML')
+        const root = '<div id="root"></div>'
+        const source = String(asset.source)
+        if (!source.includes(root)) throw new Error(`prerender: ${root} not found in index.html`)
+        asset.source = source.replace(root, () => `<div id="root">${html}</div>`)
+      } finally {
+        rmSync(outDir, { recursive: true, force: true })
+      }
+    },
+  }
+}
+
 // `vite preview` only: unknown page paths get dist/404.html with status 404, like CloudFront's
-// custom error response (PERF-BE-008). Real files (/, assets, /resume.pdf, /privacy.html) and /api
+// custom error response (PERF-BE-008). Real files (/, assets, /privacy.html) and /api
 // are untouched.
 function preview404() {
   return {
@@ -115,5 +158,7 @@ function preview404() {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), contentSecurityPolicy(), preview404(), profileAgent(loadEnv(mode, process.cwd(), ''))],
+  plugins: [react(), prerender(), contentSecurityPolicy(), preview404(), profileAgent(loadEnv(mode, process.cwd(), ''))],
+  // The footer's © year: the prerendered HTML and the hydrating app must render the same one.
+  define: { __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()) },
 }))

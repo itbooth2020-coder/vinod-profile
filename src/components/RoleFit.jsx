@@ -4,7 +4,6 @@ import { matchRole, fitSummaryText, availabilityNote, SAMPLE_JD, MIN_WORDS, MAX_
 
 // Role-fit matcher: a recruiter pastes a job description and sees which requirements the profile
 // backs with evidence, related experience, and what isn't evident. Runs entirely in the browser.
-const resumeHref = `${import.meta.env.BASE_URL}${profile.resume}`
 const FIRST = profile.firstName.split(' ')[0]
 const statusOf = (result) =>
   !result
@@ -68,7 +67,7 @@ export default function RoleFit() {
     check(SAMPLE_JD)
   }
   const copy = async () => {
-    const text = fitSummaryText(result, new URL(resumeHref, window.location.href).href)
+    const text = fitSummaryText(result)
     try {
       await navigator.clipboard.writeText(text)
       setCopied('Copied summary to the clipboard.')
@@ -184,7 +183,6 @@ export default function RoleFit() {
 
             <div className="actions fit__actions">
               <button type="button" className="btn" onClick={copy}>Copy summary</button>
-              <a className="btn" href={resumeHref} download>Download resume</a>
               <span className="fit__copied" role="status" aria-live="polite">{copied}</span>
             </div>
           </>

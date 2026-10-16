@@ -1,19 +1,17 @@
-// Offline fallback agent: direct answers for the questions recruiters ask most, rich answers
-// (images, tables, charts) for common requests, then keyword retrieval over the resume data in
-// src/data.js, answered with the best two or three sentences rather than whole entries.
+// Offline fallback agent: a catalogue of intents scored by concept (concepts.js maps synonyms and
+// word forms to concepts, so new wordings still match), rich answers (images, tables, charts) for
+// common requests, then keyword retrieval over the resume data in src/data.js, answered with the
+// best two or three sentences rather than whole entries.
 // Used when the live Claude agent (/api/ask) isn't available, e.g. on static hosting.
 // Answers use the same Markdown subset as the live agent (see components/RichText.jsx).
-// Regression test: scripts/test-local-agent.mjs (npm run test:agent).
-import { profile, profileCard, stats, availability, leadership, highlights, experience, projects, graphProjects, otherProjects, skills, certifications, education, languages, blogs, suggestedPrompts } from '../data.js'
+// Regression tests: scripts/test-local-agent.mjs and scripts/test-local-agent-fresh.mjs (npm run test:agent).
+import { profile, profileCard, stats, availability, showAvailability, leadership, highlights, experience, projects, graphProjects, otherProjects, skills, certifications, learning, education, languages, blogs, suggestedPrompts } from '../data.js'
 import { LEXICON } from './fitLexicon.js'
+import { conceptsOf, brevity } from './concepts.js'
 
 const FIRST = profile.firstName.split(' ')[0]
 const YEARS = profile.tagline.match(/\d+\+?/)[0] // e.g. '14+'
 const CARD = Object.fromEntries(profileCard)
-const BASE = import.meta.env?.BASE_URL ?? '/'
-// An absolute link in the browser, so the answer can show it as a button (RichText links only web URLs).
-const resumeUrl = () =>
-  typeof location !== 'undefined' ? new URL(`${BASE}${profile.resume}`, location.href).href : `${BASE}${profile.resume}`
 
 // Words that carry no topic. "used", "worked", "know" and "experience" are here so that in
 // "Has he used Kubernetes?" only the technology counts.
@@ -56,10 +54,16 @@ const SYNONYMS = {
   located: 'location bengaluru',
   live: 'location bengaluru',
   healthcare: 'health medicine hipaa',
+  recruit: 'hiring', recruited: 'hiring', recruiting: 'hiring', hire: 'hiring', hired: 'hiring',
+  coach: 'mentored', coaching: 'mentored', coached: 'mentored', mentor: 'mentored', mentoring: 'mentored',
+  retention: 'attrition', retain: 'attrition', turnover: 'attrition',
+  appraisal: 'performance reviews', appraisals: 'performance reviews',
+  org: 'team engineers', organisation: 'team engineers', organization: 'team engineers',
 }
 
 const tokenize = (s) =>
   s.toLowerCase()
+    .replace(/\b(front|back)[\s-]end\b/g, '$1end') // "front-end" is the "Frontend" skill area
     .replace(/[^a-z0-9+#./ ]/g, ' ')
     .split(/\s+/)
     .map((w) => w.replace(/^[./]+|[./]+$/g, ''))
@@ -67,6 +71,11 @@ const tokenize = (s) =>
 
 const sentencesOf = (text) => text.split(/(?<=[.!?])\s+(?=[A-Z0-9“"(])/).filter(Boolean)
 const lowerFirst = (s) => (/^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1))
+// The words a skill group is searched by. The "Earlier experience" group goes by "earlier legacy", so
+// a question with "experience" in it doesn't pull in the whole group.
+// 'Leadership' is left out of 'Leadership & Methodologies', so leadership questions reach How he leads.
+const skillWords = (s) => (s.earlier ? 'earlier legacy older' : s.area.replace(/^Leadership & /, ''))
+const areaName = (s) => (s.earlier ? 'earlier-career' : s.area) // "his earlier-career skills"
 const list = (items, and = 'and') => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} ${and} ${items.at(-1)}`)
 
 // Sections a passage can point to for more.
@@ -107,8 +116,8 @@ const chunks = [
     href: '#projects',
   })),
   { title: 'Other notable projects portfolio', sentences: [`Other notable projects: ${otherProjects.join(', ')}.`], href: '#projects' },
-  ...skills.map((s) => ({ title: `${s.area} skills technologies stack`, sentences: [`${s.area}: ${s.items.join(', ')}.`], href: '#skills', skill: true })),
-  { title: 'Certifications courses learning', sentences: [`Certifications: ${certifications.join('; ')}.`], href: '#credentials' },
+  ...skills.map((s) => ({ title: `${skillWords(s)} skills technologies stack`, sentences: [`${s.earlier ? 'Earlier in his career' : s.area}: ${s.items.join(', ')}.`], href: '#skills', skill: true })),
+  { title: 'Certifications courses learning', sentences: [`Certifications: ${certifications.join('; ')}.`, `Currently learning: ${learning.join('; ')}.`], href: '#credentials' },
   { title: 'Education degree college university', sentences: [`Education: ${education.join('; ')}.`], href: '#credentials' },
   { title: 'Languages spoken', sentences: [`Languages: ${languages.join(', ')}.`] },
   { title: 'Contact email linkedin github facebook twitter x social reach location', sentences: [`You can reach ${FIRST} by email at ${profile.email} or on LinkedIn: ${profile.linkedin}.`, `He is based in ${profile.location}.`], href: '#contact' },
@@ -124,7 +133,7 @@ const GENERIC_SKILL_WORDS = new Set(['management', 'engineering', 'development',
 const VOCAB = new Set(
   [...chunks.flatMap((c) => [...c.titleTokens, ...c.textTokens]), ...tokenize(JSON.stringify([graphProjects, availability, profile, profileCard, blogs]))].map(stem),
 )
-// Words that can be missing from the profile without the question being about something it lacks.
+// Words that can sit next to a missing term without the question being about anything else.
 const GENERIC = new Set((
   'hands on familiar proficient comfortable good strong expert skilled solid deep exposure background knowledge ' +
   'expertise skill skills tool tools tech done held hold holds own owned lead led manage managed handled handle ' +
@@ -133,42 +142,56 @@ const GENERIC = new Set((
   'available fully actively currently still kind sort type lot lots well people team teams year years time project ' +
   'projects app apps move relocate join start other others ones one'
 ).split(' '))
-const CONCEPTS = new Set(['llm', 'llms', 'genai', 'ai', 'ml'])
-const known = (t) => VOCAB.has(stem(t)) || GENERIC.has(t) || CONCEPTS.has(t) || /^\d/.test(t)
 
-// "His profile doesn't mention X" is only said for real technology, skill, domain or qualification
-// terms (AI-003), never for ordinary words ("next", "individual", "machine"). The vocabulary is the
-// role-fit lexicon (fitLexicon.js) plus common terms it doesn't list. Single words count from every
-// category; multi-word terms ("Spring Boot") only from the technical ones, so leadership phrasing like
-// "people manager" or "tech lead" is never reported as missing.
+// "His profile doesn't mention X" is only said for technology, domain or qualification terms that the
+// question names and the profile never uses (AI-003): the role-fit lexicon (fitLexicon.js), matched
+// with its own case rules, so "Go or Rust" is about languages but "go abroad" isn't, plus common
+// terms it doesn't list. Ordinary words ("first", "next", "abroad", "individual") never are.
+const NOTE_CATS = new Set(['Languages', 'Mobile', 'Web', 'Backend', 'Data', 'Cloud', 'DevOps', 'AI/ML', 'IoT', 'Devices', 'Education', 'Domain'])
 const EXTRA_TOPICS = (
   'mba phd doctorate startup startups crisis blockchain web3 crypto solidity ethereum jira confluence figma ' +
   'selenium appium cypress jest junit espresso hadoop hive unity cobol perl haskell elixir erlang clojure lua ' +
   'matlab sas sharepoint servicenow shopify magento wordpress drupal laravel symfony nestjs nuxt gatsby bootstrap ' +
   'tailwind webgl threejs opengl cuda pandas numpy scikit keras langchain llamaindex pinecone gemini mistral ' +
   'openshift heroku vercel netlify cloudflare nginx apache tomcat weblogic websphere sap abap cissp pmp itil ' +
-  'togaf prince2 csm aws gcp'
-).split(' ')
-const COMMON_WORDS = new Set(['safe', 'express', 'spark', 'go', 'mobile', 'web', 'cloud', 'delivery', 'programs', 'clients', 'strategy'])
-const TECH_CATS = new Set(['Languages', 'Mobile', 'Web', 'Backend', 'Data', 'Cloud', 'DevOps', 'AI/ML', 'IoT', 'Devices', 'Education', 'Domain'])
-const termsOf = (e) => [e.label, ...(e.aliases || []), ...(e.exact || [])].map((s) => s.toLowerCase())
-const TOPICS = new Set([
-  ...LEXICON.flatMap(termsOf).filter((s) => !/\s/.test(s)).flatMap((s) => tokenize(s)).filter((t) => !COMMON_WORDS.has(t)),
-  ...EXTRA_TOPICS,
-])
-const PROFILE_TEXT = JSON.stringify([profile, experience, projects, graphProjects, otherProjects, skills, certifications, education, highlights, leadership]).toLowerCase()
+  'togaf prince2 csm aws gcp banking'
+).split(' ').concat(['deep learning', 'neural network', 'data science', 'reinforcement learning'])
+const PROFILE_RAW = JSON.stringify([profile, experience, projects, graphProjects, otherProjects, skills, certifications, learning, education, highlights, leadership])
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
-const hasPhrase = (text, p) => new RegExp(`(^|[^a-z0-9])${escapeRe(p)}($|[^a-z0-9])`).test(text)
-// Multi-word terms of lexicon entries with no evidence at all in the profile (none of the entry's
-// names appear), so "cloud platforms" isn't reported missing when "Cloud" is evidenced.
-const PHRASES = [
-  ...new Set([
-    ...LEXICON.filter((e) => TECH_CATS.has(e.cat) && ![...termsOf(e), ...(e.also || []).map((s) => s.toLowerCase())].some((t) => hasPhrase(PROFILE_TEXT, t)))
-      .flatMap(termsOf)
-      .filter((s) => /^[a-z0-9.+# -]+$/.test(s) && /\s/.test(s)),
-    'deep learning', 'neural networks', 'neural network', 'data science', 'reinforcement learning',
-  ]),
-]
+// Same word-boundary rules as the role-fit matcher (roleFit.js): spaces match spaces or hyphens,
+// a plural 's'/'es' is allowed, and '+' or '#' can't follow ('C++', 'C#').
+const termRe = (term, cs) => {
+  const body = escapeRe(term).replace(/\\-/g, '[\\s-]?').replace(/ +/g, '[\\s-]+')
+  const plural = /[a-z]$/i.test(term) && term.length > 2 ? '(?:e?s)?' : ''
+  return new RegExp(`(?<![A-Za-z0-9])${body}${plural}(?![A-Za-z0-9+#])`, cs ? 'g' : 'gi')
+}
+const inProfile = (re) => ((re.lastIndex = 0), re.test(PROFILE_RAW))
+// Never noted: Claude is an LLM, and the machine-learning intent explains his model-training work.
+const COVERED = new Set(['LLMs', 'Machine learning'])
+const MISSING_TERMS = [
+  ...LEXICON.filter((e) => NOTE_CATS.has(e.cat) && !COVERED.has(e.label)).map((e) => {
+    const res = [e.re ? new RegExp(e.re, e.cs ? 'g' : 'gi') : termRe(e.label, e.cs), ...(e.aliases || []).map((a) => termRe(a, false)), ...(e.exact || []).map((a) => termRe(a, true))]
+    // An English-word name ('Rust', 'Dart') also counts in a lower-case question; 'Go', 'C' and 'R' don't.
+    if (e.cs && !e.re && e.label.length > 2) res.push(termRe(e.label, false))
+    return { res, evidenced: [...res, ...(e.also || []).map((a) => termRe(a, false))].some(inProfile) }
+  }),
+  ...EXTRA_TOPICS.map((t) => ({ res: [termRe(t, false)], evidenced: inProfile(termRe(t, false)) || VOCAB.has(stem(t)) })),
+].filter((t) => !t.evidenced)
+
+// The missing terms a question names, as it spells them, longest first and without overlaps.
+function missingIn(question) {
+  const spans = []
+  for (const t of MISSING_TERMS) {
+    for (const re of t.res) {
+      re.lastIndex = 0
+      for (const m of question.matchAll(re)) spans.push({ start: m.index, end: m.index + m[0].length, text: m[0] })
+    }
+  }
+  spans.sort((a, b) => b.end - b.start - (a.end - a.start) || a.start - b.start)
+  const kept = []
+  for (const s of spans) if (!kept.some((k) => s.start < k.end && k.start < s.end)) kept.push(s)
+  return [...new Map(kept.sort((a, b) => a.start - b.start).map((s) => [s.text.toLowerCase(), s.text])).values()]
+}
 
 // Companies by every name a visitor might use: "HTC", "Infosys", "3Cent", "Xoriant", "IT Gurus"…
 const LEGAL = /\b(pvt|ltd|private|limited|inc|llc|solutions|systems|software|services|global|consultancy)\b\.?/g
@@ -183,8 +206,6 @@ const COMPANY_RES = COMPANY_ALIASES.map((a) => new RegExp(`(^|[^a-z0-9])(${a.map
 const companiesIn = (q) => COMPANY_RES.flatMap((re, i) => (re.test(q) ? [i] : []))
 const COMPANY_WORDS = new Set(COMPANY_ALIASES.flat().flatMap((a) => tokenize(a)))
 const YES_NO = /^(has|have|does|did|is|was|can|could|would|will|any)\b/
-// The question's own spelling of a word, e.g. "Kubernetes" or "AWS".
-const asAsked = (question, t) => question.match(new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\\b`, 'i'))?.[0] || t
 
 // Markdown helpers
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 }
@@ -200,7 +221,7 @@ const bullets = (items) => items.map((i) => `- ${i}`).join('\n')
 const email = () => `[Email ${FIRST}](mailto:${profile.email})`
 const statLine = (s) => `**${s.sr || s.value}** ${lowerFirst(s.label)}`
 
-const PROJECT_NAMES = /\b(darwin|presto|vusion|meijer|meta|intelity|bayer|elder|clinic)\b/
+const PROJECT_NAMES = /\b(darwin|syngenta|presto|metrolinx|vusion|vusiongroup|meijer|meta|facebook|qculous|intelity|bayer|elder|clinic)\b/
 const ROLE_NAMES = new RegExp(`\\b(${availability.roles.map((r) => r.toLowerCase()).join('|')})s?\\b`)
 
 // Verticals from the domain graph, with the words visitors use for them.
@@ -248,65 +269,105 @@ function companyAnswer(i, question) {
   return (
     img(e.media, e.company) +
     `\n\nAt **${e.company}** (${e.location}, ${when}), ${FIRST} ${e.current ? 'is' : 'was'} **${e.role}**. ` +
-    picked.map((r) => r.p).join(' ') +
+    picked.map((r, k) => (k ? r.p : `There, he ${lowerFirst(r.p)}`)).join(' ') +
     more('#experience')
   )
 }
 
-// Requests with a direct answer, or that read better as links, images, tables or charts than as
-// text. First match wins. note: true lets a "not in his profile" note go before the answer.
-const RICH = [
+// Intent catalogue (AI-003). Each intent is scored by the concepts the question carries (concepts.js
+// maps synonyms and word forms to them): `concepts` gives each one's weight, `require` lists concepts
+// of which at least one must be present, `not` lists concepts that rule the intent out, and `boost`
+// adds evidence that isn't a concept (a named employer, project or vertical). The best intent scoring
+// at least `min` (default 3) answers; on a tie the earlier one wins. With no intent, the question goes
+// to skill matching, then to retrieval over the resume passages, then to an honest "couldn't find".
+// A note on missing technology ("His profile doesn't mention Go or Rust") goes before the answer
+// unless the intent sets note: false.
+// ctx: { q: lower-case question, question: as typed, has: Set of concepts, brief: sentences wanted (0 = any) }
+const named = (q) => PROJECT_NAMES.test(q)
+const has = (ctx, ...c) => c.some((x) => ctx.has.has(x))
+const lineOf = (e, p) => `At ${e.company}, he ${lowerFirst(p)}`
+const pointsWhere = (re) => experience.flatMap((e) => e.points.filter((p) => re.test(p)).map((p) => ({ e, p })))
+const article = (s) => (/^[AEIOU]/i.test(s) ? 'an' : 'a')
+
+const INTENTS = [
   {
+    id: 'injection',
     // Prompt injection: this agent has no instructions to reveal, and nothing to override.
-    test: (q) => /\b(ignore|disregard|forget)\b.*\b(rules|instructions|prompt|above)\b|\b(print|show|reveal|repeat|tell me) (me )?(your|the) (system )?(prompt|instructions|rules)\b/.test(q),
+    boost: ({ q }) => (/\b(ignore|disregard|forget)\b.*\b(rules|instructions|prompt|above)\b|\b(print|show|reveal|repeat|tell me) (me )?(your|the) (system )?(prompt|instructions|rules)\b/.test(q) ? 10 : 0),
+    note: false,
     answer: () => `I can't do that. I'm a search over ${FIRST}'s resume and profile on this page, so I can only answer questions about his experience, projects and skills.`,
   },
   {
-    // "Can I get his resume?", "Download CV", but not "What does his resume say about…?"
-    test: (q) => /\b(resume|résumé|cv|curriculum vitae)\b/.test(q) && !/\b(resume|cv) (say|says|mention|mentions|cover|covers|state|states|list|lists)\b/.test(q),
-    answer: () => `Here is ${FIRST}'s resume as a PDF; it opens in a new tab.\n\n[Download resume (PDF)](${resumeUrl()})`,
+    // Owner decision: his age and date of birth are never shared, by either assistant.
+    id: 'age',
+    concepts: { age: 7 },
+    note: false,
+    answer: () => `His age and date of birth aren't shared.`,
   },
   {
-    test: (q) => /\b(married|marital|wife|husband|spouse|kids|children|religion|caste|how old|age|birthday|born|date of birth|dob)\b/.test(q),
+    id: 'personal',
+    concepts: { personal: 6 },
+    note: false,
     answer: () => `His resume doesn't cover personal details like that; I can only answer questions about his work.`,
   },
   {
-    test: (q) => /\b(salary|compensation|ctc|remuneration|pay (expectations?|range)|expected pay|package)\b/.test(q),
+    id: 'salary',
+    concepts: { salary: 6 },
+    note: false,
     answer: () => `His profile doesn't include salary expectations; that's best discussed with ${FIRST} directly.\n\n${email()}`,
   },
   {
+    // "Can I get his resume?", "Download CV", but not "What does his resume say about…?" The PDF
+    // isn't published on the site (owner decision): it's available on request.
+    id: 'resume',
+    concepts: { resume: 5 },
+    not: ['resumeSays'],
+    note: false,
+    answer: () =>
+      `${FIRST}'s resume is available on request: email him or connect on LinkedIn.\n\n${email()}\n\n[Open LinkedIn profile ↗](${profile.linkedin})`,
+  },
+  {
+    // "Why is he leaving Accenture?", "What's his reason for a change?": the profile gives no reasons.
+    id: 'why-leave',
+    concepts: { whyLeave: 7 },
+    note: false,
+    answer: () =>
+      `His profile doesn't state his reasons for looking for a new role, so that's best asked of ${FIRST} directly. ` +
+      (showAvailability ? `What it does say: he is open to ${list(availability.roles, 'or')} roles, and his notice period is ${availability.notice}.` : '') +
+      `\n\n${email()}\n\n[Open LinkedIn profile ↗](${profile.linkedin})`,
+  },
+  {
+    // Neither assistant ever gives a phone number (AI-004, owner decision); point to email and LinkedIn.
+    id: 'phone',
+    concepts: { phone: 6 },
+    note: false,
+    answer: () => `I don't share a phone number here. The best way to reach ${FIRST} is email or LinkedIn.\n\n${email()}\n\n[Open LinkedIn profile ↗](${profile.linkedin})`,
+  },
+  {
     // "Rate him as a CTO candidate", "Compare him with a typical EM": no opinions, just the evidence.
-    test: (q) => /\b(rate|rank|score|grade|evaluate|assess|compare|compared|versus|vs)\b/.test(q),
-    answer: (q) => {
+    id: 'compare',
+    concepts: { compare: 5 },
+    note: false,
+    answer: ({ q }) => {
       const role = q.match(ROLE_NAMES) && availability.roles.find((r) => r.toLowerCase() === q.match(ROLE_NAMES)[1])
       return (
         `I can't rate or compare candidates, but here is what his profile shows:\n\n${bullets(strengths(4))}\n\n` +
-        (role && availability.open ? `He is open to ${role} roles. ` : '') +
+        (role && showAvailability ? `He is open to ${role} roles. ` : '') +
         `To check him against a specific job, paste it into the role-fit checker.\n\n[Check role fit](#fit)`
       )
     },
   },
   {
-    // "Why is he leaving Accenture?", "Why is he looking for a change?": the profile gives no reasons,
-    // so say so neutrally and point to what it does say.
-    test: (q) =>
-      /\bwhy (is|was|did|would|does|has) (he|vinod) (\w+ )?(leav\w*|left|quit\w*|look\w*|seek\w*|chang\w*|mov\w*|switch\w*|want\w*|open)\b|\breasons? (for|behind|why) (he|him|his|leaving|the (move|change|switch)|looking|a change)\b/.test(q),
-    answer: () =>
-      `His profile doesn't state his reasons for looking for a new role, so that's best asked of ${FIRST} directly. ` +
-      (availability.open
-        ? `What it does say: he is open to ${list(availability.roles, 'or')} roles, and his notice period is ${availability.notice}.`
-        : '') +
-      `\n\n${email()}\n\n[Open LinkedIn profile ↗](${profile.linkedin})`,
-  },
-  {
-    // A named employer: answer from that company's entry, before any current-role or keyword rule (AI-003).
-    // Projects ("What did he build for Syngenta?") and "which companies…" lists are handled below.
-    test: (q) => companiesIn(q).length > 0 && !PROJECT_NAMES.test(q) && !/\b(compan(y|ies)|employers)\b.*\b(worked|has he|did he)\b|\bwhich compan/.test(q),
-    answer: (q) => companiesIn(q).slice(0, 2).map((i) => companyAnswer(i, q)).join('\n\n'),
+    // A named employer ("What was his role at HTC?"): that company's entry, never the current job's.
+    // Projects ("What did he build for Syngenta?") and "which companies…" lists are answered elsewhere.
+    id: 'company',
+    boost: ({ q }) => (companiesIn(q).length && !named(q) && !/\b(compan(y|ies)|employers)\b.*\b(worked|has he|did he)\b|\bwhich compan/.test(q) ? 5 : 0),
+    answer: ({ q }) => companiesIn(q).slice(0, 2).map((i) => companyAnswer(i, q)).join('\n\n'),
   },
   {
     // "Is he a people manager or an individual contributor?", "Does he still code?"
-    test: (q) => /\bpeople manager\b|\bindividual contributor\b|\bplayer[- ]coach\b|\b(does|do) (he|vinod) (still )?(code|write code|program)\b/.test(q),
+    id: 'people-manager',
+    concepts: { ic: 6 },
     answer: () => {
       const darwin = experience[0].points.find((p) => /Darwin/.test(p))
       return (
@@ -319,7 +380,8 @@ const RICH = [
   },
   {
     // "Is he a tech lead?": his lead and manager titles, not the skills table ("tech" is a skill word).
-    test: (q) => /\b(tech|technical|team|engineering) lead\b/.test(q),
+    id: 'tech-lead',
+    concepts: { techLead: 5 },
     answer: () => {
       const lead = experience.find((e) => /\blead\b/i.test(e.role))
       const point = lead?.points.find((p) => /teams? of/i.test(p))
@@ -331,13 +393,10 @@ const RICH = [
     },
   },
   {
-    // Phone numbers aren't shared by the assistants (AI-004 is an owner decision); point to email and LinkedIn.
-    test: (q) => /\b(phone|telephone|cell ?phone|mobile (number|no)|contact number|whats ?app)\b|\bcall (him|vinod)\b/.test(q),
-    answer: () => `I don't share a phone number here. The best way to reach ${FIRST} is email or LinkedIn.\n\n${email()}\n\n[Open LinkedIn profile ↗](${profile.linkedin})`,
-  },
-  {
     // "Has he done any machine learning?": the resume's model-training skill and Darwin's prediction models.
-    test: (q) => /\b(machine learning|ml|mlops|predictive (model\w*|analytics)|prediction models?|model training|train(ed|ing)? models?)\b/.test(q),
+    id: 'machine-learning',
+    concepts: { ml: 5 },
+    note: false,
     answer: () => {
       const area = skills.find((s) => s.items.some((i) => /model training/i.test(i)))
       const item = area?.items.find((i) => /model training/i.test(i))
@@ -352,76 +411,154 @@ const RICH = [
     },
   },
   {
-    test: (q) => /\bwhy (should|would|do|must) (we|i|you|anyone|they) hire\b|\bstrengths?\b|\bstands? out\b|\bwhat makes (him|vinod)\b|\bbest qualities\b|\bunique\b/.test(q),
-    answer: (q) =>
+    // "Why should we hire him?", "What makes him stand out?", "What are his strengths?"
+    id: 'why-hire',
+    concepts: { whyHire: 6 },
+    answer: ({ q }) =>
       `${/strength/.test(q) ? 'His resume points to these strengths' : `Here's the short case for ${FIRST}, from his resume`}:\n\n${bullets(strengths())}\n\n` +
       `To check him against a specific job, paste it into the role-fit checker.\n\n[Check role fit](#fit)`,
   },
   {
-    test: (q) => /\bhow (many|much) years\b|\byears of (experience|work)\b|\b(total|overall|professional) experience\b|\bhow (senior|experienced)\b|\bseniority\b|\bexperience level\b|\bhow long has (he|vinod) been\b/.test(q),
-    answer: (q) =>
+    // "How many years of experience?", "How long has he been in the industry?"
+    id: 'years',
+    concepts: { years: 4 },
+    answer: () =>
       `${FIRST} has **${YEARS} years** of experience, starting in ${experience.at(-1).period.match(/\d{4}/)[0]}. ` +
       `He is now ${profile.role} at ${profile.company}, and has ${lowerFirst(highlights[0].text)}.` +
-      (/senior|seniority|level/.test(q) && availability.open ? ` He is looking for ${list(availability.roles, 'or')} roles.` : '') +
+      (showAvailability ? ` He is looking for ${list(availability.roles, 'or')} roles.` : '') +
+      more('#experience'),
+  },
+  {
+    // "Is he at director level yet?", "How senior is he?", "What seniority would suit him?": his title,
+    // scope and target roles as the resume states them, never a level it doesn't.
+    id: 'level',
+    concepts: { level: 4, directorQ: 1 },
+    answer: (ctx) =>
+      (has(ctx, 'directorQ') ? `His resume doesn't list a Director, VP or executive title. ` : '') +
+      `${FIRST}'s current title is **${profile.role}** at ${profile.company}, where he manages a team of **35+ engineers** and owns the engineering budget for that org. ` +
+      `He has **${YEARS} years** of experience and has ${lowerFirst(highlights[0].text)}.` +
+      (showAvailability ? ` He is looking for ${list(availability.roles, 'or')} roles.` : '') +
       more('#experience'),
   },
   {
     // "Biggest team he has managed?", "How large are the teams he has led?", "Does he manage managers?"
-    test: (q) =>
-      /\b(biggest|largest|size of|how (big|large))\b.*\bteams?\b|\bteams? sizes?\b|\bhow many (people|engineers|reports|direct reports)\b|\bmanag\w* (other |engineering |multiple |several |people )?managers\b|\bmanagers? of managers\b/.test(q),
-    answer: (q) =>
-      (/managers/.test(q) ? `His resume doesn't say whether he manages other managers. ` : '') +
+    id: 'team-size',
+    concepts: { teamSize: 4, managers: 4 },
+    not: ['mentor', 'hire'],
+    answer: (ctx) =>
+      (has(ctx, 'managers') ? `His resume doesn't say whether he manages other managers. ` : '') +
       `${FIRST} has ${lowerFirst(highlights[0].text)}. At ${profile.company} he manages a team of **35+ engineers** across Android, iOS and web, ` +
       `and owns the engineering budget for that 35-engineer org. At HTC Global Services he led teams of 15–25 engineers.` +
       more('#lead'),
   },
   {
-    // "How does he hire engineers?" (not "hire him": that's contact, below).
-    test: (q) => /\b(hir(e|es|ing)|recruit\w*|mentor\w*|interview\w*|grow(s|ing)? (engineers|people|talent))\b/.test(q) && !/\bhire (him|vinod)\b|\b(i|we) hire\b/.test(q),
-    answer: (q) => {
+    // Hiring, mentoring, attrition, OKRs and reviews: the resume bullets that answer the question first,
+    // then his "Hiring & growth" points. Not "hire him" (that's contact).
+    id: 'people',
+    concepts: { mentor: 4, hire: 4, attrition: 4, okr: 4 },
+    not: ['hireHim'],
+    answer: (ctx) => {
+      const asked = [has(ctx, 'mentor') && /mentor/i, has(ctx, 'hire') && /hiring|hired|recruit/i, has(ctx, 'attrition') && /attrition|retention/i, has(ctx, 'okr') && /OKR|performance review/i].filter(Boolean)
+      const lead = pointsWhere({ test: (p) => asked.some((re) => re.test(p)) }).slice(0, 2).map(({ e, p }) => lineOf(e, p))
       const group = leadership.find((l) => /hiring/i.test(l.title)) || leadership[0]
       return (
+        (lead.length ? `${lead.join(' ')}\n\n` : '') +
         `On ${group.title.replace(' & ', ' and ').toLowerCase()}, his resume lists:\n\n${bullets(group.points)}` +
-        (/hir|recruit|interview/.test(q) ? `\n\nIt doesn't describe his interview process.` : '') +
+        (has(ctx, 'hire') && /interview|recruit|hir/.test(ctx.q) ? `\n\nIt doesn't describe his interview process.` : '') +
         more('#lead')
       )
     },
   },
   {
-    test: (q) => /\b(budget|p\s?&\s?l|p and l|profit and loss|costs?)\b/.test(q),
-    answer: (q) => {
+    id: 'certifications',
+    concepts: { certs: 4 },
+    // Completed certifications, then the courses the resume lists as in progress (UX-007).
+    answer: () =>
+      `${FIRST} holds ${certifications.length === 1 ? 'this certification' : 'these certifications'}:\n\n${bullets(certifications)}` +
+      (learning.length ? `\n\nHe is currently learning:\n\n${bullets(learning)}` : '') +
+      more('#credentials'),
+  },
+  {
+    id: 'budget',
+    concepts: { budget: 4 },
+    answer: ({ q }) => {
       const group = leadership.find((l) => /budget/i.test(l.title))
       const htc = experience[1].points.find((p) => /budget/i.test(p))
       return (
-        `Yes, ${FIRST} has owned engineering budgets:\n\n${bullets([...(group?.points || []).filter((p) => /budget|cost/i.test(p)),...(htc ? [`At ${experience[1].company}: ${lowerFirst(htc)}`] : [])])}` +
+        `Yes, ${FIRST} has owned engineering budgets:\n\n${bullets([...(group?.points || []).filter((p) => /budget|cost/i.test(p)), ...(htc ? [`At ${experience[1].company}: ${lowerFirst(htc)}`] : [])])}` +
         (/p\s?&\s?l|p and l|profit/.test(q) ? `\n\nThe resume describes engineering budget ownership; it doesn't mention P&L responsibility.` : '') +
         more('#lead')
       )
     },
   },
   {
-    // "Is he a fit for this role?", "match this job": point to the role-fit checker (components/RoleFit.jsx).
-    test: (q) =>
-      /\b(fit|match(es)?|suitable|qualified)\b.*\b(job|role|position|opening|jd|vacanc\w*|description)\b|\b(is|would) (he|vinod) (be )?(a )?(good |right |strong )?fit\b/.test(q),
+    // "Is he a fit for this role?": point to the role-fit checker (components/RoleFit.jsx).
+    id: 'role-fit',
+    concepts: { fit: 3, career: 1 },
+    require: ['fit'],
     answer: () =>
       `Paste the job description into the role-fit checker. It lists the requirements ${FIRST}'s experience covers, with evidence from his roles and projects, and what isn't evident in the profile. It runs in your browser.\n\n[Check role fit](#fit)`,
   },
   {
-    // "Is he open to work?", "notice period?", "how soon could he join us?", "would he move to Dubai?",
-    // "remote?", "what roles is he targeting?"
-    test: (q) =>
-      /\b(availab\w*|notice|relocat\w*|open to (work|new|roles?|opportunit\w*|offers?|remote|hybrid|on-?site)|looking for (a )?(new )?(job|role|opportunit\w*)|job hunting|join(ing)? date|start date|how soon|join (us|the team|our team|a new|our company)|move to|target(s|ing|ed)?|seeking|(kind|type|sort) of (roles?|jobs?|positions?)|what (roles?|positions?)|(remote|hybrid|on-?site) (work|role|job|position|option)s?|work(ing)? (remotely|from home))\b|when (can|could|would) (he|vinod) (start|join)|\b(can|could) (he|vinod) (start|join)\b|\bstart(ing)? (date|next|in|immediately|soon|right away|asap)\b|\b(available|ready) to (start|join)\b|\bearliest (start|joining)\b|\bimmediate joiner\b|\b(what|which) (job )?titles?\b|\btitles?\b.*\b(looking|seeking|want\w*|target\w*|next|open)\b|\b(roles?|positions?|jobs?) (is|are) (he|vinod) (looking|seeking|open)\b|\b(he|vinod) (is )?(looking|seeking) for\??$|\b(remote|hybrid|on-?site)\W*$/.test(q),
-    answer: (q) => {
+    // "What was his first job?", "Where did he begin his career?": the oldest experience entry.
+    id: 'first-job',
+    concepts: { first: 3, career: 2 },
+    require: ['first'],
+    min: 5,
+    answer: () => {
+      const e = experience.at(-1)
+      return (
+        img(e.media, e.company) +
+        `\n\n${FIRST}'s first role on his resume is **${e.role}** at **${e.company}**, ${e.location} (${e.period}). There, he ${lowerFirst(e.points[0])} ` +
+        `Since then he has worked at ${experience.length - 1} more companies, up to ${profile.role} at ${profile.company}.` +
+        more('#experience')
+      )
+    },
+  },
+  {
+    // "Who did he work for before Accenture?", "Where did he go after Xoriant?": the neighbouring entry.
+    id: 'adjacent-company',
+    boost: ({ q }) => (companiesIn(q).length === 1 && /\b(before|prior to|preceding|after|following|next|left)\b/.test(q) && !named(q) ? 6 : 0),
+    answer: ({ q }) => {
+      const i = companiesIn(q)[0]
+      const before = /\b(before|prior to|preceding)\b/.test(q)
+      const j = before ? i + 1 : i - 1
+      const c = experience[i].company
+      if (j >= experience.length) return `${c} was his first role on the resume (${experience[i].period}).` + more('#experience')
+      if (j < 0) return `${c} is his current employer (${experience[i].period}).` + more('#experience')
+      return describeCompany(j, before ? `Before ${c}, he was ` : `After ${c}, he became `)
+    },
+  },
+  {
+    // "What was his previous job?": the entry before the current one.
+    id: 'previous-job',
+    concepts: { previous: 3, career: 2 },
+    require: ['previous'],
+    min: 5,
+    answer: () => describeCompany(1, `Before ${experience[0].company}, he was `),
+  },
+  {
+    // Open to work, notice period and start date, relocation, work modes and target roles: one
+    // availability answer that leads with what was asked.
+    id: 'availability',
+    concepts: { start: 3, notice: 4, available: 3, open: 3, relocate: 4, workmode: 4, target: 3 },
+    not: ['pastStart'],
+    answer: (ctx) => {
+      const { q } = ctx
+      // Hidden on the site (data.js availability.public): no notice period, places, work modes or titles.
+      // The links are inline so "briefly…" answers (shorten) keep them.
+      if (!availability.public) return `For availability and role discussions, please contact ${FIRST} directly: email [${profile.email}](mailto:${profile.email}) or connect on [LinkedIn](${profile.linkedin}).`
       const modes = availability.workModes.map((m) => m.toLowerCase())
       if (!availability.open) return `${FIRST} isn't actively looking right now. You can still reach him at [${profile.email}](mailto:${profile.email}).`
-      // Lead with a direct answer to what was asked, then the full picture.
+      const askedModes = modes.filter((m) => new RegExp(`\\b${m.replace('onsite', 'on-?site|office')}\\b`).test(q))
+      // A place named after "to" or "in" ("relocate to Canada"), not "willing to relocate".
+      const place = /\b(to|in) (?!(relocat|mov|work|be|join|start|consider|shift)\w*\b)[a-z]/.test(q.replace(/\b(open|willing|able|ready|want|like|happy|keen|prepared)\s+to\b/g, '')) || has(ctx, 'relocate') && /abroad|overseas|international|countr/.test(q)
       const lead =
-        /\b(can|could|when|ready|available|earliest|immediate)\b.*\b(start|join)|\bstart(ing)? (date|next|in|immediately|soon|right away|asap)/.test(q)
-          ? `${FIRST}'s notice period is **${availability.notice}**, so that's the earliest start his profile indicates; for exact dates, ask him directly.`
-        : /notice|join|start|how soon/.test(q) ? `${FIRST}'s notice period is **${availability.notice}**.`
-        : /relocat|move to/.test(q) ? (availability.relocation ? `Yes, ${FIRST} is **open to relocation**.${/\b(to|in) [a-z]/.test(q.replace(/open to/, '')) ? " His profile doesn't name preferred places." : ''}` : `${FIRST} isn't looking to relocate.`)
-        : /remote|hybrid|on-?site|from home/.test(q) ? `${FIRST} is based in ${availability.location} and open to **${list(modes, 'or')}** work.`
-        : /target|seeking|kind of|type of|sort of|titles?|what (roles?|positions?)/.test(q) ? `${FIRST} is looking for **${list(availability.roles, 'or')}** roles.`
+        has(ctx, 'start') ? `${FIRST}'s notice period is **${availability.notice}**, so that's the earliest start his profile indicates; for exact dates, ask him directly.`
+        : has(ctx, 'notice') ? `${FIRST}'s notice period is **${availability.notice}**.`
+        : has(ctx, 'relocate') ? (availability.relocation ? `Yes, ${FIRST} is **open to relocation**.${place ? " His profile doesn't name preferred places." : ''}` : `${FIRST} isn't looking to relocate.`)
+        : has(ctx, 'workmode') ? `${askedModes.length ? `Yes, ${FIRST} is open to **${list(askedModes, 'or')}** work. ` : ''}He is based in ${availability.location} and open to **${list(modes, 'or')}** work.`
+        : has(ctx, 'target') ? `${FIRST} is looking for **${list(availability.roles, 'or')}** roles.`
         : `Yes. ${FIRST} is **open to new opportunities** as ${list(availability.roles, 'or')}.`
       return (
         `${lead}\n\n` +
@@ -436,8 +573,11 @@ const RICH = [
     },
   },
   {
-    // "What is he doing right now?", "Where does he work currently?", "What is his current role?"
-    test: (q) => /\b(right now|currently|current(ly)? (role|job|position|employer|company)|these days|at the moment|nowadays|present (role|job|position))\b|\bwhere does (he|vinod) work\b/.test(q),
+    // "What is he doing right now?", "Where does he work currently?", "What's his current job title?"
+    // Not "Is he open to work right now?": there "right now" only qualifies an availability question.
+    id: 'current-role',
+    concepts: { current: 4 },
+    not: ['start', 'notice', 'available', 'open', 'relocate', 'workmode'],
     answer: () =>
       img(experience[0].media, profile.company) +
       `\n\n${FIRST} is currently **${profile.role}** at **${profile.company}**, ${experience[0].location} (since ${experience[0].period.split('–')[0].trim()}). ` +
@@ -445,18 +585,53 @@ const RICH = [
       more('#experience'),
   },
   {
-    test: (q) => /\b(programming|coding|code|computer|software|development) languages?\b|\blanguages?\b.*\b(code|coding|program\w*|develop\w*|build)\b/.test(q),
-    answer: () =>
-      `From his skills, ${FIRST} programs in **${list(PROGRAMMING)}**, and works with MySQL and SQLite databases.` + more('#skills'),
+    // "How many devices has he managed through MDM?": the 10,000+ device rollout, then his other MDM work.
+    id: 'devices',
+    concepts: { devices: 2, mdm: 3, count: 1 },
+    require: ['devices', 'mdm'],
+    boost: ({ q }) => (named(q) ? -10 : 0),
+    answer: () => {
+      const { e, p } = pointsWhere(/MDM\/EMM/)[0]
+      const other = graphProjects.filter((g) => g.domains.includes('MDM / EMM') && !p.includes(g.text.match(/[\d,]+\+/)?.[0] || '\u0000'))
+      return (
+        `${lineOf(e, p).replace(/([\d,]+\+ enterprise devices)/, '**$1**')}` +
+        (other.length ? `\n\nHis other MDM/EMM work:\n\n${bullets(other.map((g) => `**${g.short}**: ${g.text}`))}` : '') +
+        more('#projects')
+      )
+    },
   },
   {
-    test: (q) => /\blanguages?\b|\b(speak|speaks|spoken|fluent)\b.*\b(english|hindi|marathi)\b/.test(q),
-    answer: (q) =>
-      `${FIRST} speaks ${list(languages)}.` +
-      (/speak|spoken|fluent/.test(q) ? '' : ` For code, he lists ${list(PROGRAMMING)}.`),
+    // "Has he worked with LLMs?", "Which LLM vendor's agents did he use?": his Claude agent work.
+    id: 'ai',
+    concepts: { llm: 3, agents: 2, ai: 1 },
+    boost: ({ q }) => (named(q) && !/\b(darwin|syngenta)\b/.test(q) ? -10 : 0),
+    answer: () => {
+      const lead = experience[0].points.find((p) => /Darwin Portal program/.test(p))
+      const build = experience[0].points.find((p) => /Claude Code agents/.test(p))
+      const area = skills.find((s) => /\bAI\b/.test(s.area))
+      return (
+        `At ${experience[0].company}, ${FIRST} ${lowerFirst(lead)}` +
+        (build ? ` He also ${lowerFirst(build)}` : '') +
+        (area ? `\n\nHis ${area.area} skills: ${area.items.join(', ')}.` : '') +
+        more('#projects')
+      )
+    },
   },
   {
-    test: (q) => /\b(industr(y|ies)|verticals?|sectors?|domains?)\b/.test(q),
+    id: 'programming-languages',
+    concepts: { programming: 5 },
+    answer: () => `From his skills, ${FIRST} programs in **${list(PROGRAMMING)}**, and works with MySQL and SQLite databases.` + more('#skills'),
+  },
+  {
+    id: 'spoken-languages',
+    concepts: { language: 3, speak: 3 },
+    not: ['programming'],
+    answer: ({ q }) => `${FIRST} speaks ${list(languages)}.` + (/speak|spoken|fluent/.test(q) ? '' : ` For code, he lists ${list(PROGRAMMING)}.`),
+  },
+  {
+    id: 'industries',
+    concepts: { industry: 4 },
+    not: ['inIndustry'],
     answer: () => {
       const rows = VERTICALS.map((v) => `**${v}**: ${list(graphProjects.filter((p) => p.vertical === v).map((p) => p.short))}`)
       return `His resume names ${CARD.verticals.split(', ').length} verticals: ${list(CARD.verticals.split(', '))}. By project:\n\n${bullets(rows)}` + more('#projects')
@@ -464,40 +639,51 @@ const RICH = [
   },
   {
     // "Any experience in healthcare?", "Tell me about his transit payments work"
-    test: (q) => Boolean(verticalIn(q)) && !PROJECT_NAMES.test(q),
-    answer: (q) => {
+    id: 'vertical',
+    boost: ({ q }) => (verticalIn(q) && !named(q) ? 4 : 0),
+    answer: ({ q }) => {
       const v = verticalIn(q)
       const work = graphProjects.filter((p) => p.vertical === v)
       return `In ${v}, his profile lists ${work.length === 1 ? 'one project' : `${work.length} projects`}:\n\n${bullets(work.map((p) => `**${p.name}**: ${p.text}`))}` + more('#projects')
     },
   },
   {
-    test: (q) => /\b(blogs?|blogging|articles?|writes?|writing|comics?|batman|android ?super ?nerds)\b/.test(q),
+    id: 'blogs',
+    concepts: { blog: 4 },
+    // The tech blog leads, as in the Writing section; the comic fan blog is mentioned as outside work (DES-001).
     answer: () =>
-      `${FIRST} writes two blogs:\n\n` +
-      table(['Blog', 'About'], [
-        [`**${blogs.tech.name}**`, blogs.tech.description],
-        [`**${blogs.comic.name}**`, blogs.comic.description],
-      ]) +
-      `\n\n[Read ${blogs.tech.name} ↗](${blogs.tech.url})\n\n[Read ${blogs.comic.name} ↗](${blogs.comic.url})`,
+      `${FIRST} writes **${blogs.tech.name}**, ${lowerFirst(blogs.tech.tagline)}: ${blogs.tech.description}\n\n` +
+      `[Read ${blogs.tech.name} ↗](${blogs.tech.url})\n\n` +
+      `Outside work, he also keeps **${blogs.comic.name}**, a personal comic fan blog.\n\n[Read ${blogs.comic.name} ↗](${blogs.comic.url})`,
   },
   {
-    // Not bare "hire": "How does he hire engineers?" is about his hiring (above).
-    test: (q) => /\b(linked\s?in|git\s?hub|facebook|twitter|social|contact|reach|connect|email|e-mail|mail|get in touch|hire (him|vinod))\b|\b(i|we) hire\b/.test(q),
-    answer: (q) => {
+    id: 'contact',
+    concepts: { contact: 4, hireHim: 5 },
+    // 'Facebook' in a question about his work (the Meta (Facebook) MDM project) is the project, not his profile.
+    boost: ({ q }) =>
+      /\b(meta|mdm|qculous)\b/.test(q) || (/\bfacebook\b/.test(q) && /\b(project|buil[dt]|deliver(ed)?|work(ed)? (for|with|on))\b/.test(q)) ? -10 : 0,
+    note: false,
+    answer: ({ q }) => {
       const linkedin = `[Open LinkedIn profile ↗](${profile.linkedin})`
       const github = `[Open GitHub profile ↗](${profile.github})`
-      const social = `${github}\n\n[Facebook ↗](${profile.facebook})\n\n[X (Twitter) ↗](${profile.x})`
+      // Professional channels first (DES-002); Facebook and X get their own answer when asked for by name.
+      if (/\bfacebook\b/.test(q) && !/\b(meta|mdm|qculous|project)\b/.test(q)) {
+        return `Here is ${FIRST}'s Facebook profile; it opens in a new tab.\n\n[Open Facebook profile ↗](${profile.facebook})\n\nFor work enquiries, email or LinkedIn is best.\n\n${email()}\n\n${linkedin}`
+      }
+      if (/\b(twitter|tweets?|x\.com)\b|\bon x\b|\bx (profile|account|handle)\b/.test(q)) {
+        return `Here is ${FIRST}'s X (Twitter) profile; it opens in a new tab.\n\n[Open X profile ↗](${profile.x})\n\nFor work enquiries, email or LinkedIn is best.\n\n${email()}\n\n${linkedin}`
+      }
       if (/git\s?hub/.test(q)) {
         return `Here is ${FIRST}'s GitHub profile; it opens in a new tab.\n\n${github}\n\nThis site's source code is public too: [vinod-profile on GitHub ↗](${profile.source})`
       }
       return /linked\s?in/.test(q)
         ? `Here is ${FIRST}'s LinkedIn profile; it opens in a new tab.\n\n${linkedin}\n\nYou can also email him at ${profile.email}.`
-        : `The quickest way to reach ${FIRST} is email, at ${profile.email}. He's also on LinkedIn, GitHub, Facebook and X (Twitter).\n\n${email()}\n\n${linkedin}\n\n${social}`
+        : `The quickest way to reach ${FIRST} is email, at ${profile.email}. He's also on LinkedIn, GitHub, Facebook and X.\n\n${email()}\n\n${linkedin}\n\n${github}\n\n[Facebook ↗](${profile.facebook}) · [X ↗](${profile.x})`
     },
   },
   {
-    test: (q) => /\b(timeline|journey|work history)\b|career (path|history|graph|chart|progress\w*)|\bprogress(ed|ion)\b|\b(graph|chart|visuali[sz]e)\b.*\b(career|experience|jobs?|roles?)\b/.test(q),
+    id: 'timeline',
+    concepts: { timeline: 4 },
     answer: () =>
       `Here is ${FIRST}'s career timeline across ${experience.length} roles, from ${experience.at(-1).period.match(/\d{4}/)[0]} to today.\n\n` +
       chart({
@@ -510,7 +696,8 @@ const RICH = [
       }),
   },
   {
-    test: (q) => /\b(impact|metrics?|numbers|achievements?|stats|statistics|improvements?|kpis?|results)\b/.test(q),
+    id: 'impact',
+    concepts: { impact: 3 },
     answer: () =>
       `Here are the headline numbers: ${stats.map(statLine).join('; ')}.\n\n` +
       'Measured improvements from the resume (percent change):\n\n' +
@@ -533,20 +720,22 @@ const RICH = [
       '\n\nRelease cycle time is derived from "3 weeks to 5 days"; the other values are stated in the resume.',
   },
   {
-    test: (q) => /\b(compan(y|ies)|employers?|organi[sz]ations?|firms?)\b|worked (at|for)/.test(q),
-    // No "doesn't mention" note when the answer already says the named employer isn't on the resume.
-    note: (q, question) => !EMPLOYER.test(question),
-    // "Has he worked at Google?": a named employer that isn't on his resume (known ones are answered above).
-    answer: (q, question = '') =>
+    // "Which companies has he worked for?"; "Has he worked at Google?" names an employer not on his resume.
+    id: 'companies',
+    concepts: { companies: 3 },
+    note: ({ question }) => !EMPLOYER.test(question),
+    answer: ({ question }) =>
       (EMPLOYER.test(question) ? `His resume doesn't list **${question.match(EMPLOYER)[1]}** among his employers. ` : '') +
       `${FIRST} has worked at ${experience.length} companies: ${list(experience.map((e) => e.company))}.\n\n` +
-      gallery(experience.map((e) => [e.media, e.company])) +
+      gallery(experience.map((e) => [e.media, e.company]), 4) +
       '\n\n' +
-      cappedTable(['Company', 'Role', 'Period'], experience.map((e) => [`**${e.company}**`, e.role, e.period]), 'earlier roles in [Experience](#experience).'),
+      cappedTable(['Company', 'Role', 'Period'], experience.map((e) => [`**${e.company}**`, e.role, e.period]), 'earlier roles in [Experience](#experience).', 4),
   },
   {
-    test: (q) => /\b(school|college|educat\w*|stud(y|ied)|degrees?|universit\w*|mca|mms|b\.?sc|qualifications?)\b/.test(q),
+    id: 'education',
+    concepts: { education: 4 },
     answer: () =>
+      `${FIRST} holds a Master of Computer Applications (MCA) and a B.Sc., both from colleges in Mumbai.\n\n` +
       img('edu/thakur', 'Thakur Institute of Management Studies') + ' ' + img('edu/ismail-yusuf', 'Ismail Yusuf College') +
       '\n\n' +
       table(['Degree', 'Institution', 'Years'], [
@@ -556,34 +745,90 @@ const RICH = [
       '\n\nThe resume lists college education only; no school details are included.',
   },
   {
-    test: (q) => /\b(address|located|location|lives?|based|city|hometown)\b|where is he/.test(q),
+    id: 'location',
+    concepts: { location: 4 },
+    note: false,
     answer: () =>
       img('location/bengaluru', 'Bengaluru, Karnataka, India') +
       `\n\n${FIRST} is based in **${profile.location}**, India. A street address isn't shared publicly; reach him by [email](mailto:${profile.email}) or [LinkedIn](${profile.linkedin}).`,
   },
   {
-    test: (q) => !PROJECT_NAMES.test(q) && /\b(photos?|pics?|pictures?|images?|headshot|avatar)\b|looks? like/.test(q),
+    id: 'photo',
+    concepts: { photo: 4 },
+    boost: ({ q }) => (named(q) ? -10 : 0),
+    note: false,
     answer: () => img('profile', profile.name) + `\n\n${profile.name}, ${profile.role} at ${profile.company}, based in ${profile.location}.`,
   },
   {
-    test: (q) => /\b(summary|summari[sz]e|overview|introduce|introduction|background|who is)\b/.test(q),
-    answer: (q) => {
+    // "Who is Vinod?", "Summarise him", "Pitch him in two sentences", "tl;dr", "Describe him in a single line".
+    id: 'summary',
+    concepts: { summary: 3, summaryShort: 2 },
+    boost: ({ brief }) => (brief ? 1 : 0),
+    note: false,
+    answer: (ctx) => {
       const s = sentencesOf(profile.summary)
-      // "In one sentence" gets one; "briefly", "summarise", "2-line" get two (CHAT-003); "Who is…" the full summary.
-      if (/\b(one|1|single)[ -]?(sentence|line|liner)\b|\btl;?dr\b/.test(q)) return `${FIRST} is a ${lowerFirst(s[0])}`
-      return img('profile', profile.name) + '\n\n' + (/\b(2|two|short|quick|brief(ly)?|summar\w*|in short)\b/.test(q) ? s.slice(0, 2) : s).join(' ')
+      const opening = `${FIRST} is ${article(s[0])} ${lowerFirst(s[0])}`
+      if (ctx.brief === 1) return opening
+      // A pitch uses the two-sentence pitch from the hero (data.js profile.pitch).
+      if (has(ctx, 'pitch') && profile.pitch) {
+        const p = sentencesOf(profile.pitch)
+        return [`${FIRST} is ${article(p[0])} ${p[0]}`, ...p.slice(1, ctx.brief || 2).map((x) => x.replace(/^Led\b/, 'He led'))].join(' ')
+      }
+      if (ctx.brief) return [opening, ...s.slice(1, ctx.brief)].join(' ')
+      // "Summarise him" gets two sentences; "Who is Vinod?" the full summary.
+      return img('profile', profile.name) + '\n\n' + (/summar/.test(ctx.q) ? s.slice(0, 2) : s).join(' ')
     },
   },
   {
-    test: (q) => !PROJECT_NAMES.test(q) && /\b(projects|portfolio)\b/.test(q),
-    note: true,
-    answer: () =>
-      projects.map((p) => img(p.media, p.name.split(' – ')[0])).join(' ') +
-      '\n\n' +
-      table(['Project', 'Area', 'Highlights'], projects.map((p) => [`**${p.name}**`, p.tag, p.text.split('. ')[0].replace(/\.$/, '') + '.'])) +
-      `\n\nAlso: ${otherProjects.join(', ')}.`,
+    // "Show me his projects": a short list (CHAT-003), with the full set in the Projects section.
+    id: 'projects',
+    concepts: { projects: 3 },
+    boost: ({ q }) => (named(q) || companiesIn(q).length ? -10 : 0),
+    answer: () => {
+      const shown = projects.slice(0, 4)
+      return (
+        `${FIRST}'s featured projects include:\n\n` +
+        gallery(shown.map((p) => [p.media, p.name.split(' – ')[0]]), 4) +
+        '\n\n' +
+        bullets(shown.map((p) => `**${p.name}** (${p.tag})`)) +
+        `\n\n+${projects.length - shown.length} more featured projects and ${otherProjects.length} other notable ones, such as ${list(otherProjects.slice(0, 2))}.` +
+        more('#projects')
+      )
+    },
   },
 ]
+
+// The best-scoring intent for a question, or null.
+function pickIntent(ctx) {
+  let best = null
+  for (const intent of INTENTS) {
+    if (intent.not?.some((c) => ctx.has.has(c))) continue
+    if (intent.require && !intent.require.some((c) => ctx.has.has(c))) continue
+    let score = intent.boost ? intent.boost(ctx) : 0
+    for (const [c, w] of Object.entries(intent.concepts || {})) if (ctx.has.has(c)) score += w
+    if (score >= (intent.min ?? 3) && (!best || score > best.score)) best = { intent, score }
+  }
+  return best?.intent || null
+}
+
+// A short answer for "in one sentence", "tl;dr", "briefly" (CHAT-003): the first n sentences of prose,
+// without charts, tables, images or link buttons, keeping a "More in …" link.
+// Not after abbreviations: "Xoriant Solutions Pvt. Ltd", "e.g. Darwin".
+const BRIEF_SPLIT = /(?<!\b(?:Pvt|Ltd|Inc|Co|Mr|Ms|Dr|vs|e\.g|i\.e)\.)(?<=[.!?])\s+(?=[A-Z0-9“"(*])/
+function shorten(answer, n) {
+  const link = answer.match(/\[More in [^\]]+\]\(#[\w-]+\)/)?.[0]
+  const text = answer
+    .replace(/```[\s\S]*?```/g, '\n')
+    .replace(/^\|.*$/gm, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/^\+\d+ more.*$/gm, '')
+    .replace(/^\s*\[[^\]]*\]\([^)]*\)\s*$/gm, '')
+    .replace(/^- (.*?)\.?$/gm, '$1.')
+  const parts = text.split(/\n+/).flatMap((line) => line.trim().split(BRIEF_SPLIT)).map((s) => s.trim()).filter((s) => s && !/:$/.test(s))
+  // "Yes." on its own isn't an answer: very short pieces join the sentence after them.
+  const sentences = parts.reduce((out, s, i) => (i && out.at(-1).length < 20 ? [...out.slice(0, -1), `${out.at(-1)} ${s}`] : [...out, s]), [])
+  return sentences.length ? sentences.slice(0, n).join(' ') + (link ? `\n\n${link}` : '') : answer
+}
 
 const SKILL_QUESTION = /\b(skills?|stack|tech\w*|tools?|platforms?|frameworks?|languages?|libraries|know|knows|used?|experience|familiar|hands-on|proficient|expertise)\b/
 const fullSkills = () =>
@@ -594,14 +839,14 @@ const fullSkills = () =>
 function skillAnswer(base, terms) {
   const hits = skills
     .map((s) => {
-      const area = tokenize(s.area).filter((t) => t !== 'engineering').some((t) => terms.has(t))
+      const area = tokenize(skillWords(s)).filter((t) => t !== 'engineering').some((t) => terms.has(t))
       return { s, area, items: area ? s.items : s.items.filter((item) => tokenize(item).some((t) => terms.has(t) && !GENERIC_SKILL_WORDS.has(t))) }
     })
     .filter((h) => h.items.length)
   if (!hits.length) return null
   if (hits.length >= skills.length - 2) return fullSkills()
   const lines = hits.map((h) =>
-    h.area || h.items.length > 2 ? `His ${h.s.area} skills: ${h.items.join(', ')}.` : `**${list(h.items)}** ${h.items.length > 1 ? 'are' : 'is'} in his ${h.s.area} skills.`,
+    h.area || h.items.length > 2 ? `His ${areaName(h.s)} skills: ${h.items.join(', ')}.` : `**${list(h.items)}** ${h.items.length > 1 ? 'are' : 'is'} in his ${areaName(h.s)} skills.`,
   )
   // Evidence: the first resume bullet or project that names the skill.
   const words = [...base, ...terms].filter((t) => t.length > 1 && !STOP.has(t) && !['ai', 'skills', 'technologies'].includes(t))
@@ -672,13 +917,18 @@ function retrieve(terms, { detail = false } = {}) {
 // project the previous question or answer was about.
 const COMPANY_NAMES = experience.map((e, i) => ({ type: 'company', i, name: e.company, re: COMPANY_RES[i] }))
 const PROJECT_REFS = projects.map((p, i) => ({ type: 'project', i, name: p.name.split(' – ')[0], re: new RegExp(`\\b(${p.name.toLowerCase().split(/[\s(–]/)[0]}${/syngenta/i.test(p.name) ? '|syngenta' : ''})\\b`) }))
+// The project, else the company, mentioned first: "Before Accenture, he was … at HTC" is about HTC
+// when it opens with HTC's logo, so a second "And before that?" moves on from HTC.
+const firstIn = (refs, t) =>
+  refs.map((e) => ({ e, at: t.search(e.re) })).filter((x) => x.at >= 0).sort((a, b) => a.at - b.at)[0]?.e
 const entityIn = (text = '') => {
   const t = text.toLowerCase()
-  return PROJECT_REFS.find((e) => e.re.test(t)) || COMPANY_NAMES.find((e) => e.re.test(t))
+  return firstIn(PROJECT_REFS, t) || firstIn(COMPANY_NAMES, t)
 }
 const MORE = /^(and\s+)?(tell me more|more( please| details)?|go on|continue|elaborate|expand( on (that|this|it))?|keep going|what else|anything else)\b/
 const BEFORE = /\b(before (that|this|then|there)|previous(ly)?|prior to (that|this)|earlier)\b/
-const AFTER = /\b(after (that|this|there)|next|then what)\b/
+// Not a bare "next": "Can he start next month?" is a question of its own.
+const AFTER = /\b(after (that|this|there|then)|next (role|job|company|employer|position)|what came next|then what|what next)\b/
 const PRONOUN = /\b(there|it|that (role|job|company|project|one)|this (role|job|company|project)|them|those)\b|^(and|what about|how about)\b/
 
 function describeCompany(i, intro) {
@@ -718,9 +968,15 @@ function followUp(question, q, history) {
     const work = projects.filter((p) => p.caseStudy?.company === experience[ci].company)
     if (work.length) return `At ${experience[ci].company}, his projects include:\n\n${bullets(work.map((p) => `**${p.name}**: ${sentencesOf(p.text)[0]}`))}` + more('#projects')
   }
+  // A question with a clear topic of its own ("Is it possible he starts next month?") isn't about
+  // the previous subject, even with a pronoun in it.
+  if (pickIntent({ q, question, has: conceptsOf(question), brief: 0 })) return null
   if (ent) return answerLocally(`${question} ${ent.name}`)
   return answerLocally(`${question} ${prevQ}`)
 }
+
+// Words that only ask for a short answer, for "Vinod in one line" or "tl;dr please".
+const BRIEF_WORDS = new Set('one single two three 1 2 3 sentence sentences line lines liner oneliner tldr brief briefly short quick quickly pitch sum up nutshell word words few give say put'.split(' '))
 
 // history: earlier turns as [{ role: 'user' | 'assistant', content }], used for follow-ups.
 export function answerLocally(question, history = [], { detail = false } = {}) {
@@ -729,40 +985,43 @@ export function answerLocally(question, history = [], { detail = false } = {}) {
     const reply = followUp(question, q, history)
     if (reply) return reply
   }
+  // "In one sentence", "tl;dr", "briefly" shorten any answer, not only the summary (CHAT-003).
+  const n = brevity(question)
+  const answer = answerQuestion(question, q, n, detail)
+  return n ? shorten(answer, n) : answer
+}
 
-  // Technology or skill terms the profile never uses ("Has he used Kubernetes?", "Spring Boot") get an
-  // honest note. Only terms from the topic vocabulary count, so "next" or "individual" never do.
-  const phrases = PHRASES.filter((p) => hasPhrase(q, p))
-  const phraseWords = new Set(phrases.flatMap((p) => tokenize(p)))
-  const base = tokenize(question).filter((t) => !phraseWords.has(t))
+function answerQuestion(question, q, brief, detail) {
+  // Technology or skill terms the profile never uses ("Has he used Kubernetes?", "Go or Rust") get an
+  // honest note. Only named technology, domain or qualification terms count (missingIn above).
+  const names = missingIn(question)
+  const missingWords = new Set(names.flatMap((t) => tokenize(t)))
+  const base = tokenize(question).filter((t) => !missingWords.has(t))
   const terms = new Set(base.flatMap((t) => [t, ...tokenize(SYNONYMS[t] || '')]))
-  const missingWords = [...new Set(base.filter((t) => t.length > 2 && TOPICS.has(t) && !known(t)))]
-  const missing = [...missingWords, ...phrases]
-  const note = missing.length
-    ? `His profile doesn't mention **${list([...missingWords.map((t) => asAsked(question, t)), ...phrases.map((p) => asAsked(question, p))], 'or')}**`
-    : ''
+  const note = names.length ? `His profile doesn't mention **${list(names, 'or')}**` : ''
   const withNote = (answer) => (note ? `${note}. Here's what it does say:\n\n${answer}` : answer)
 
-  const rich = RICH.find((r) => r.test(q))
-  if (rich) {
-    const noted = typeof rich.note === 'function' ? rich.note(q, question) : rich.note
-    return noted ? withNote(rich.answer(q, question)) : rich.answer(q, question)
+  const ctx = { q, question, has: conceptsOf(question), brief }
+  const intent = pickIntent(ctx)
+  if (intent) {
+    const noted = typeof intent.note === 'function' ? intent.note(ctx) : intent.note !== false
+    return noted ? withNote(intent.answer(ctx)) : intent.answer(ctx)
   }
 
-  if (note && missingWords.length === new Set(base).size) {
+  if (note && base.every((t) => GENERIC.has(t))) {
     return `${note}, so I can't confirm it. You can see what his profile does list under [Skills](#skills) and [Experience](#experience).`
   }
-  // Questions made only of stop words ("Who is Vinod?") get the photo and summary.
-  if (!terms.size) return img('profile', profile.name) + '\n\n' + profile.summary
-  const found = new Set([...terms].filter((t) => !missing.includes(t)))
+  // Questions made only of stop words ("Who is Vinod?") or of short-answer words ("Vinod in one line")
+  // get the summary.
+  if (!terms.size || (brief && base.every((t) => BRIEF_WORDS.has(t)))) return INTENTS.find((i) => i.id === 'summary').answer(ctx)
 
   if (YES_NO.test(q) || SKILL_QUESTION.test(q)) {
-    const skill = skillAnswer(base.filter((t) => found.has(t)), found)
+    const skill = skillAnswer(base, terms)
     if (skill) return withNote(skill)
   }
   if (/\b(skills?|stack|tech\w*|tools)\b/.test(q)) return withNote(fullSkills())
 
-  const answer = retrieve(found, { detail })
+  const answer = retrieve(terms, { detail })
   if (answer) return withNote(answer)
   const tryThese = suggestedPrompts.slice(1, 5).map((p) => `“${p.replace(/\?$/, '')}”`).join(', ')
   return (

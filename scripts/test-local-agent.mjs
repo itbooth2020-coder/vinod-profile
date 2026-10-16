@@ -4,6 +4,7 @@
 //   B. a held-out set: the 35 differently worded questions from the 15 Oct UAT re-test, target 32.
 //      Keep B as a measure of generalisation: fix the agent's intent handling, never the wording or
 //      checks here, and rotate in new wording at each UAT round.
+// Plus owner-decision checks (contact channels, certifications, skills, phone, blogs), which must all pass.
 // Run with `npm run test:agent` (--verbose prints every answer); exits non-zero below either target.
 import { answerLocally } from '../src/agent/localAgent.js'
 
@@ -20,6 +21,11 @@ const found = lacks(/couldn't find that/i)
 // Prose length without charts, tables and images, which render compactly.
 const prose = (a) => a.replace(/```[\s\S]*?```/g, '').replace(/^\|.*$/gm, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '')
 const short = (a) => prose(a).length <= MAX_CHARS
+// Owner decisions (Oct 2026): the resume PDF isn't published (available on request), availability is
+// hidden (data.js availability.public = false), and his age and date of birth are never shared.
+const hiddenAvail = all(has(/please contact Vinod directly/, /mailto:/, /linkedin\.com/), lacks(/3 months|notice period is|relocation|Head of Engineering|\bCTO\b|Senior Engineering Manager|\bremote\b|hybrid|onsite/i))
+const resumeOnRequest = all(has(/available on request/, /mailto:/, /linkedin\.com/), lacks(/resume\.pdf|download/i))
+const ageHidden = all(has(/His age and date of birth aren't shared/), lacks(/\d+ years old|1986|born in/i))
 
 const CASES = [
   ['How many years of experience does he have?', has(/14\+/)],
@@ -32,11 +38,11 @@ const CASES = [
   ['Give me a 2-line summary of his background', has(/14\+ years/)],
   ['What is he doing right now?', has(/Accenture/, /Custom Software Engineering Manager/)],
   ['Where does he work currently?', has(/Accenture/)],
-  ['Is Vinod actively looking for a job?', has(/open to new opportunities/i)],
-  ['How soon could he join us?', has(/3 months/)],
-  ['Would he move to Dubai or Europe?', has(/open to relocation/i)],
-  ['Is he OK with working fully remote?', has(/remote/i)],
-  ['What kind of roles is he targeting?', has(/Head of Engineering/)],
+  ['Is Vinod actively looking for a job?', hiddenAvail],
+  ['How soon could he join us?', hiddenAvail],
+  ['Would he move to Dubai or Europe?', hiddenAvail],
+  ['Is he OK with working fully remote?', hiddenAvail],
+  ['What kind of roles is he targeting?', hiddenAvail],
   ['Biggest team he has managed?', has(/20–50/, /35\+/)],
   ['Does he manage other managers?', all(has(/35\+/), lacks(/Other notable projects/))],
   ['How does he handle underperformers?', has(/couldn't find|performance reviews/i)],
@@ -61,10 +67,10 @@ const CASES = [
   ['Where did he go to university?', has(/Thakur/)],
   ['Does he hold any certifications?', has(/Coursiv/)],
   ['What is his salary expectation?', all(notFound, has(/mailto:/))],
-  ['Can I get his resume?', has(/resume\.pdf/)],
+  ['Can I get his resume?', resumeOnRequest],
   ['What is his LinkedIn?', has(/linkedin\.com/)],
   ['What languages does he speak?', has(/Hindi/, /Marathi/)],
-  ['How old is Vinod?', notFound],
+  ['How old is Vinod?', ageHidden],
   ['Is he married?', notFound],
   ['What are his strengths?', all(has(/35\+|20–50|30%/), found)],
   ['Has he led a team through a crisis?', notFound],
@@ -75,17 +81,17 @@ const CASES = [
 ]
 
 // B. Held-out set (UAT re-test, 15 Oct 2026, docs/uat/04-ai-handling.md table B), graded against
-// src/data.js and public/resume.pdf.
+// src/data.js and server/resume.pdf.
 const lead = (n, re) => (a) => re.test(prose(a).trim().slice(0, n))
 const sentences = (a) => prose(a).replace(/\[[^\]]*\]\([^)]*\)/g, '').trim().split(/(?<=[.!?])\s+(?=[A-Z])/).filter((x) => x.trim()).length
 const logos = (a) => (a.match(/!\[[^\]]*\]\(media:company\//g) || []).length
 const HOLDOUT = [
   ['How long has Vinod been in the industry?', has(/14\+/, /2011/)],
   ['Is he a people manager or an individual contributor?', all(has(/35\+/), lead(160, /manag/i), lacks(/doesn't mention/i))],
-  ['What is his notice period?', has(/3 months/)],
-  ['Can he start next month?', all(lead(120, /3 months/), lacks(/doesn't mention/i))],
-  ['Is he willing to relocate to Canada?', has(/open to relocation/i)],
-  ['What title is he looking for?', all(lead(200, /Senior Engineering Manager/), has(/Head of Engineering/, /CTO/), found)],
+  ['What is his notice period?', hiddenAvail],
+  ['Can he start next month?', all(hiddenAvail, lacks(/doesn't mention/i))],
+  ['Is he willing to relocate to Canada?', hiddenAvail],
+  ['What title is he looking for?', all(hiddenAvail, found)],
   ['How big is his current team?', has(/35\+/)],
   ['Has he managed engineering managers?', all(lead(160, /doesn't say whether he manages other managers/), has(/35\+/))],
   ['What is his biggest achievement?', has(/35\+|100%|3 weeks|30%/)],
@@ -98,7 +104,7 @@ const HOLDOUT = [
   ['Where is he based?', has(/Bengaluru/)],
   ['What is his email address?', has(/yadav\.vinod579@gmail\.com/)],
   ['What is his phone number?', all(has(/mailto:/), lacks(/couldn't find/i))],
-  ['Download CV', has(/resume\.pdf/)],
+  ['Download CV', resumeOnRequest],
   ['Does he have an MBA?', has(/doesn't mention \*\*MBA\*\*/)],
   ['What was his role at HTC?', all(has(/Senior Consultant – Lead/, /Oct 2016 – May 2024/), lacks(/Custom Software Engineering Manager/, /media:company\/accenture/))],
   ['Which companies has he worked for?', all(has(/Accenture/, /HTC Global Services/, /Hurix/), (a) => logos(a) <= 6)],
@@ -108,9 +114,9 @@ const HOLDOUT = [
   ['Has he worked in fintech or banking?', has(/doesn't mention/i)],
   ['What is his GitHub?', has(/github\.com\/vinodyadav5799/)],
   ['Does he write a blog?', has(/AndroidSuperNerds/)],
-  ['What is his date of birth?', notFound],
+  ['What is his date of birth?', ageHidden],
   ['Tell me a joke', all(notFound, lacks(/media:company/))],
-  ['Why is he leaving Accenture?', all(has(/doesn't (say|state)/i, /3 months|open to/i), lacks(/media:company/))],
+  ['Why is he leaving Accenture?', all(has(/doesn't (say|state)/i, /mailto:/), lacks(/media:company/, /3 months|Head of Engineering|\bCTO\b/))],
   ['Is he good at stakeholder management?', all(lead(200, /stakeholder/i), found)],
   ['What did he do at Xoriant?', has(/Xoriant/, /Node\.js|PHP/)],
   ['Has he worked with React Native?', all(has(/React Native/), found)],
@@ -124,6 +130,22 @@ const FOLLOW_UPS = [
   [['Where does he work currently?'], 'And before that?', has(/HTC Global Services/)],
   [['What did he do at HTC Global Services?'], 'What did he do there?', has(/HTC/)],
   [['What is his current role?'], 'What about his projects there?', has(/Darwin/, /PRESTO/)],
+]
+
+// Owner decisions (16 Oct UAT items DES-002, UX-007, UX-008, AI-004, DES-001). Not scored; all must pass.
+const DECISIONS = [
+  ['How can I contact him?', all(has(/mailto:/, /linkedin\.com/, /github\.com/, /facebook\.com/, /\bx\.com/), short)],
+  ['When was he born?', ageHidden],
+  ['Where can I see his CV?', resumeOnRequest],
+  ['Is he open to remote work?', hiddenAvail],
+  ['Is he on Facebook?', has(/facebook\.com\/vinodpyarelalyadav/)],
+  ['What is his Twitter handle?', has(/x\.com\/yadavvinod579/)],
+  ['What did he build for Facebook?', all(has(/Qculous/), lacks(/facebook\.com/))],
+  ['Can I get his mobile number?', all(has(/mailto:/, /linkedin\.com/), lacks(/\+91|\d{5}\s?\d{5}/))],
+  ['Which certifications does he hold?', all(has(/Claude Code AI Tools Certified/, /currently learning/i, /Udemy/), lacks(/In Progress/))],
+  ['Does he know jQuery?', all(has(/jQuery/), found, lacks(/doesn't mention/i))],
+  ['What leadership experience does he have?', all(lead(200, /How he leads|hiring|led/i), found)],
+  ['Does he write a blog?', all(lead(120, /AndroidSuperNerds/), has(/Outside work/))],
 ]
 
 const asHistory = (questions) => questions.flatMap((q) => [{ role: 'user', content: q }, { role: 'assistant', content: answerLocally(q) }])
@@ -146,6 +168,7 @@ function run(title, cases) {
 
 const graded = run('A. Graded set (50)', CASES)
 const holdout = run('B. Held-out set (35)', HOLDOUT)
+const decisions = run('Owner decisions (' + DECISIONS.length + ')', DECISIONS)
 console.log('')
 
 let followFails = 0
@@ -161,4 +184,5 @@ const line = (name, r, n, target) => `${name}: ${r.pass}/${n} (target ${target})
 console.log(`\n${line('Score', graded, CASES.length, TARGET)}`)
 console.log(line('Held-out', holdout, HOLDOUT.length, HOLDOUT_TARGET))
 console.log(`Follow-ups: ${FOLLOW_UPS.length - followFails}/${FOLLOW_UPS.length}`)
-process.exit(graded.pass >= TARGET && holdout.pass >= HOLDOUT_TARGET && !followFails ? 0 : 1)
+console.log(line('Owner decisions', decisions, DECISIONS.length, DECISIONS.length))
+process.exit(graded.pass >= TARGET && holdout.pass >= HOLDOUT_TARGET && !followFails && decisions.pass === DECISIONS.length ? 0 : 1)

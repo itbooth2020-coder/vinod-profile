@@ -2,14 +2,6 @@ import { useEffect, useState } from 'react'
 import { profile, personal, quotes, experience, education } from '../data.js'
 import useMotionPaused from '../hooks/useMotion.js'
 
-// Whole years since birthYear, one less before birthMonth (1–12) in the current year; null while
-// the year isn't set.
-function ageFrom(year, month = 1) {
-  if (!year) return null
-  const now = new Date()
-  return now.getFullYear() - year - (now.getMonth() + 1 < month ? 1 : 0)
-}
-
 const pickQuote = (not) => {
   const pool = quotes.filter((q) => q !== not)
   return pool[Math.floor(Math.random() * pool.length)]
@@ -37,24 +29,19 @@ export default function ProfileDialog({ titleId }) {
   const [stopped, setStopped] = useState(false) // the Pause quotes button
   const motionPaused = useMotionPaused()
   const [quote, nextQuote] = useRotatingQuote(paused || stopped || motionPaused)
-  const age = ageFrom(personal.birthYear, personal.birthMonth)
   const current = experience[0]
 
-  const facts = [
-    age !== null && `${age} years`,
-    personal.location.split(',')[0],
-    personal.nationality,
-  ].filter(Boolean)
+  // No age or date of birth: Vinod asked for them never to be shown.
+  const facts = [personal.location.split(',')[0], personal.nationality]
 
   const details = [
-    age !== null && ['Age', `${age}`],
     ['Nationality', personal.nationality],
     ['Location', personal.location],
     ['Current role', `${current.role}, ${current.company} (since ${current.period.split('–')[0].trim()})`],
     ['Experience', '14+ years in software engineering and engineering leadership'],
     ['Education', education[0].split(' — ')[0] + ', ' + education[1].split(' — ')[0]],
     ['Languages', personal.languages],
-  ].filter(Boolean)
+  ]
 
   return (
     <div className="pdialog">
@@ -106,15 +93,7 @@ export default function ProfileDialog({ titleId }) {
           </a>
           <a className="btn" href={profile.github} target="_blank" rel="noopener noreferrer">
             GitHub ↗<span className="sr-only"> (opens in a new tab)</span>
-          </a>
-          <a className="btn" href={profile.facebook} target="_blank" rel="noopener noreferrer">
-            Facebook ↗<span className="sr-only"> (opens in a new tab)</span>
-          </a>
-          <a className="btn" href={profile.x} target="_blank" rel="noopener noreferrer">
-            X ↗<span className="sr-only"> (Twitter, opens in a new tab)</span>
-          </a>
-          <a className="btn" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
-        </div>
+          </a>        </div>
       </div>
     </div>
   )

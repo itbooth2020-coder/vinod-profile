@@ -11,7 +11,7 @@
 //    'Azure DevOps' isn't also 'Azure'. The same scan finds terms in the JD and evidence in the data.
 // 4. A JD term with evidence is a strong match; without evidence but with an evidenced `related`
 //    term it's related experience; otherwise it's "not evident in the profile". No score, no verdict.
-import { profile, stats, availability, highlights, experience, projects, graphProjects, graphDomains, otherProjects, skills, certifications } from '../data.js'
+import { profile, stats, availability, showAvailability, highlights, experience, projects, graphProjects, graphDomains, otherProjects, skills, certifications, learning } from '../data.js'
 import { LEXICON } from './fitLexicon.js'
 
 export const MIN_WORDS = 20
@@ -200,6 +200,7 @@ function buildCorpus() {
     ...profile.summary.split(/(?<=\.)\s+/).map((text) => ({ text, where: 'Profile summary', priority: 1 })),
     ...skills.map((s) => ({ text: `${s.area}: ${s.items.join(', ')}`, where: 'Technical skills', priority: 1 })),
     ...certifications.map((text) => ({ text, where: 'Certifications', priority: 1 })),
+    ...learning.map((text) => ({ text, where: 'Currently learning', priority: 1 })),
   ]
 }
 
@@ -317,14 +318,14 @@ export function matchRole(jd) {
   return { tooShort: false, words, truncated, strong, related, gaps, scale, leadership, summary }
 }
 
-/** One-line availability note (data.js `availability`), or '' when he isn't looking. */
+/** One-line availability note (data.js `availability`), or '' when it's hidden or he isn't looking. */
 export const availabilityNote = () =>
-  availability.open
+  showAvailability
     ? [`notice ${availability.notice}`, availability.relocation && 'open to relocation', availability.workModes.join(' / ').toLowerCase()].filter(Boolean).join(' · ')
     : ''
 
 /** Plain-text summary for the clipboard. */
-export function fitSummaryText(result, resumeUrl = '') {
+export function fitSummaryText(result) {
   const lines = [`Role fit notes for ${profile.name} (${profile.role}, ${profile.company})`, result.summary, '']
   if (availabilityNote()) lines.splice(2, 0, `Availability: ${availabilityNote()}`)
   if (result.strong.length) {
@@ -352,7 +353,6 @@ export function fitSummaryText(result, resumeUrl = '') {
     lines.push('')
   }
   lines.push(`Contact: ${profile.email} · ${profile.linkedin}`)
-  if (resumeUrl) lines.push(`Resume: ${resumeUrl}`)
   return lines.join('\n')
 }
 

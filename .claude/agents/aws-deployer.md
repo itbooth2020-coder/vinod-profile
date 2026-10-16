@@ -12,7 +12,8 @@ The user's step-by-step guide is at `d:\Project-Doc\Vinod-Profile\deploy-vinodya
 
 - Vite build: `npm ci && npm run build` writes to `dist/`. The app is a single page with **no client-side routes**: deep links use `#case-…` hashes and `?brief=1`, which both resolve to `/`. So unknown paths get a real 404 page (`dist/404.html`, from `public/404.html`), not an SPA fallback to `index.html`.
 - The production build is static: leave `VITE_LIVE_AGENT` unset (or `false`), so the app makes **no `/api` calls** (see `src/agent/askAgent.js`). Set it to `true` only once Phase 2 serves `/api/*`.
-- `public/resume.pdf` and other `public/` files ship as static assets.
+- `public/` files ship as static assets.
+- **The resume is intentionally not published.** The PDF lives at `server/resume.pdf` (outside `public/`), so it is not in `dist/` and must not be uploaded to S3 or served at `/resume.pdf`; only the optional Phase 2 backend (`server/profileAgent.js`) reads it. Never copy it into `dist/` or the bucket. The site offers email and LinkedIn instead ("available on request").
 - Server endpoints exist only in the Vite dev/preview server (`vite.config.js` mounts them):
   - `/api/ask` → `server/profileAgent.js` (Claude; needs `ANTHROPIC_API_KEY`, streams NDJSON)
   - `/api/speak` → `server/voiceAgent.js` (Kokoro TTS; downloads a ~160 MB model on first start and needs about 1 GB RAM)
@@ -72,15 +73,15 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
 6. **Bucket policy:** allow `s3:GetObject` to principal `cloudfront.amazonaws.com`, with the condition `AWS:SourceArn` = the distribution ARN.
 7. **Apex → www redirect:** create, publish and associate the CloudFront Function from the guide (viewer-request) on the default behavior.
 8. **DNS:** add A and AAAA alias records for both names. Use the distribution domain and the CloudFront hosted zone ID `Z2FDTNDATAQYW2`.
-9. **Upload** (cache-friendly). Only Vite's hashed `/assets/*` files are immutable for a year; everything else in `dist/` keeps a fixed name (`index.html`, `404.html`, `privacy.html`, `resume.pdf`, `sitemap.xml`, `robots.txt`, `og-image.jpg`, `profile*.{png,webp}`, `fonts/*`, `logos/*`, the favicons and `apple-touch-icon.png`), so it gets a short TTL:
+9. **Upload** (cache-friendly). Only Vite's hashed `/assets/*` files are immutable for a year; everything else in `dist/` keeps a fixed name (`index.html`, `404.html`, `privacy.html`, `sitemap.xml`, `robots.txt`, `og-image.jpg`, `profile*.{png,webp}`, `fonts/*`, `logos/*`, the favicons and `apple-touch-icon.png`), so it gets a short TTL:
    ```bash
    aws s3 sync dist/assets s3://vinodyadav-com-site/assets --delete --cache-control "public,max-age=31536000,immutable"
    aws s3 sync dist/ s3://vinodyadav-com-site --delete --exclude "assets/*" --cache-control "public,max-age=300"
    aws s3 cp dist/index.html s3://vinodyadav-com-site/index.html --cache-control "no-cache"
    aws s3 cp dist/404.html s3://vinodyadav-com-site/404.html --cache-control "no-cache"
-   aws cloudfront create-invalidation --distribution-id <ID> --paths "/index.html" "/404.html" "/resume.pdf"
+   aws cloudfront create-invalidation --distribution-id <ID> --paths "/index.html" "/404.html"
    ```
-   Invalidate `/index.html`, `/404.html` and `/resume.pdf` on **every** deploy. (`aws s3 sync` only uploads changed files, so a re-run doesn't refresh `Cache-Control` on unchanged objects; when changing cache headers, add `--exact-timestamps` or copy the objects again.)
+   Invalidate `/index.html` and `/404.html` on **every** deploy. On the first deploy after the resume was unpublished, the `--delete` sync removes any old `resume.pdf` object from the bucket; also invalidate `"/resume.pdf"` that one time so CloudFront stops serving a cached copy. (`aws s3 sync` only uploads changed files, so a re-run doesn't refresh `Cache-Control` on unchanged objects; when changing cache headers, add `--exact-timestamps` or copy the objects again.)
 10. **Wait** with `aws cloudfront wait distribution-deployed --id <ID>`, then run the verification below.
 
 ## Phase 2 (optional, ask first): live Claude agent and Kokoro voice
@@ -88,6 +89,7 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
 Offer this only after Phase 1 is live, and explain the extra cost first (about $10–20/month for an always-on instance, plus Claude API usage).
 
 - Add a small production entry point, for example `server/index.js`, that serves `/api/ask` and `/api/speak` with Node's `http` module and the existing `handleAsk` and `handleSpeak`. Don't change the handlers' behavior. Delegate code changes to the `developer` agent if the change is more than a thin wrapper.
+- `kokoro-js` (the voice server's TTS) is a **devDependency** (PERF-BE-006: its 7 `npm audit` findings stay out of `npm audit --omit=dev`, and the static build doesn't need it). On the Phase 2 instance install with `npm ci --include=dev` (or `npm install --include=dev`), or move `kokoro-js` back to `dependencies`, or `/api/speak` can't load Kokoro and VINCE falls back to the browser voice.
 - Recommended host: one Lightsail instance or a small EC2 instance (2 GB RAM, Node 22, run under systemd or pm2) in `ap-south-1`. Avoid Lambda: Kokoro's model size and cold starts make it a poor fit, and the handlers expect Node's `req`/`res`.
 - Store `ANTHROPIC_API_KEY` in SSM Parameter Store as a SecureString, and have the instance load it at startup through an instance role.
 - Add a second CloudFront origin (the instance, HTTPS or HTTP-only from CloudFront) and an ordered cache behavior for `/api/*`: all methods, managed `CachingDisabled` policy, and the `AllViewerExceptHostHeader` origin request policy. Restrict the instance's security group to the CloudFront managed prefix list.
@@ -118,7 +120,7 @@ curl -s https://www.vinodyadav.com | grep -o '<meta http-equiv="Content-Security
 curl -sI https://www.vinodyadav.com/privacy.html | head -1   # 200
 curl -sI https://www.vinodyadav.com/index.html | grep -i cache-control   # no-cache
 curl -sI https://vinodyadav-com-site.s3.ap-south-1.amazonaws.com/index.html  # 403: bucket not public
-curl -sI https://www.vinodyadav.com/resume.pdf           # 200
+curl -sI https://www.vinodyadav.com/resume.pdf | head -1  # 404: the resume is intentionally not published
 ```
 The built JS should make no `/api` requests: open the live site with DevTools > Network filtered to `/api` and ask the console a question; nothing should appear.
 

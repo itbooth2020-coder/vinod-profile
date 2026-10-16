@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 
 const getInitial = () => {
   try {
@@ -15,9 +15,16 @@ const ICONS = {
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState(getInitial)
+  // null until mounted: the prerendered HTML and hydration can't know the saved theme, so they show
+  // 'dark' (index.html's default) and the real one is read before the hydrated page paints. The icon
+  // follows <html data-theme> in CSS (styles.css .theme-toggle__icon), so it is right from the first paint.
+  const [theme, setTheme] = useState(null)
+  const current = theme || 'dark'
+
+  useLayoutEffect(() => setTheme(getInitial()), [])
 
   useEffect(() => {
+    if (!theme) return
     document.documentElement.dataset.theme = theme
     try { localStorage.setItem('theme', theme) } catch {}
   }, [theme])
@@ -30,12 +37,14 @@ export default function ThemeToggle() {
     <button
       type="button"
       className="toggle theme-toggle"
-      aria-label={`Theme: ${theme}`}
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      title={`Switch to the ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      aria-label={`Theme: ${current}`}
+      onClick={() => setTheme(current === 'dark' ? 'light' : 'dark')}
+      title={`Switch to the ${current === 'dark' ? 'light' : 'dark'} theme`}
     >
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-        <path d={ICONS[theme] || ICONS.dark} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {Object.entries(ICONS).map(([id, d]) => (
+          <path key={id} className={`theme-toggle__icon theme-toggle__icon--${id}`} d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        ))}
       </svg>
       Theme
     </button>

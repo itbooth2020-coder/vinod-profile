@@ -1,6 +1,6 @@
 // VINCE: the voice assistant's persona, its follow-up questions and the guided-tour script.
 // Everything here is built from src/data.js, so it stays in step with the resume.
-import { profile, profileCard, stats, availability, leadership, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
+import { profile, profileCard, stats, availability, showAvailability, leadership, highlights, experience, projects, skills, education, blogs, graphProjects } from '../data.js'
 
 export const NAME = 'V.I.N.C.E.'
 export const EXPANSION = 'Virtual Intelligence for Navigating Career Experience'
@@ -32,7 +32,7 @@ function greeting() {
 // (live wording). offline: answers come from the in-browser resume search (askAgent.js offline()).
 export function introduction(greet = greeting(), { offline = false } = {}) {
   return (
-    `${greet}. I'm VINCE: ${EXPANSION}. Think of me as ${FIRST}'s own JARVIS. ` +
+    `${greet}. I'm VINCE: ${EXPANSION}. ` +
     (offline ? `I answer from his resume, which covers ${YEARS} years of work. ` : `I know his ${YEARS} years of work inside out. `) +
     `What would you like to know about ${FIRST}? His experience, his projects, his skills? Or shall I take you on a guided tour?`
   )
@@ -52,10 +52,11 @@ const QUESTIONS = {
   timeline: ['Show his career timeline', 'How has his career progressed?'],
   project: projects.map((p) => `Tell me about the ${project(p)} project`),
   ai: ['How does he use AI agents in his work?', 'Which AI tools and frameworks does he know?'],
-  skills: skills.filter((s) => !/librar|method|architect/i.test(s.area)).map((s) => `What ${s.area} skills does he have?`),
+  skills: skills.filter((s) => !s.earlier && !/librar|method|architect/i.test(s.area)).map((s) => `What ${s.area} skills does he have?`),
   impact: ['What impact has he had?', 'What measurable results has he delivered?'],
   leadership: ['How large are the teams he has led?', 'How does he hire and mentor engineers?'],
-  availability: ['Is he open to new roles?', 'What is his notice period?'],
+  // Only suggested while data.js shows availability; otherwise those questions get a "contact him" reply.
+  ...(showAvailability && { availability: ['Is he open to new roles?', 'What is his notice period?'] }),
   education: ['Where did he study?'],
   certs: ['Which certifications does he hold?'],
   blogs: ['Does he write any blogs?'],
@@ -109,7 +110,7 @@ const norm = (q) => q.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()
 // Shuffled within each topic, so the suggestions differ from visit to visit.
 export function nextQuestions(question = '', answer = '', asked = new Set()) {
   const topic = detect(question) || detect(answer) || 'intro'
-  const order = [...RELATED[topic], ...shuffle(Object.keys(QUESTIONS))]
+  const order = [...RELATED[topic].filter((t) => QUESTIONS[t]), ...shuffle(Object.keys(QUESTIONS))]
   const out = []
   const used = new Set()
   for (const t of order) {
@@ -251,7 +252,8 @@ export function tourSteps() {
     },
     {
       target: 'skills',
-      text: `On the technical side, his skills cover ${skills.map((s) => s.area.replace(' / ', ' and ')).join(', ').replace(/, ([^,]*)$/, ', and $1')}, from Kotlin and Swift to Claude AI agents.`,
+      // Leadership first, as in Skills.jsx; the collapsed Earlier experience group isn't narrated.
+      text: `His skills start with ${skills[0].area.toLowerCase()}, such as ${list(skills[0].items.slice(0, 3))}, and cover ${skills.slice(1).filter((s) => !s.earlier).map((s) => s.area.replace(' / ', ' and ')).join(', ').replace(/, ([^,]*)$/, ', and $1')}, from Kotlin and Swift to Claude AI agents.`,
     },
     {
       target: 'credentials',
@@ -259,7 +261,8 @@ export function tourSteps() {
     },
     {
       target: 'blogs',
-      text: `Away from work, he writes two blogs: ${blogs.tech.name}, ${lowerFirst(blogs.tech.tagline)}, and ${blogs.comic.name}, ${lowerFirst(blogs.comic.tagline)}.`,
+      // The Writing section: the tech blog leads; the comic fan blog is only an 'Outside work' line (DES-001).
+      text: `Under Writing, he publishes ${blogs.tech.name}, ${lowerFirst(blogs.tech.tagline)}. Outside work, he also keeps a personal comic fan blog.`,
     },
     {
       target: 'contact',
@@ -335,7 +338,7 @@ export function briefNarration() {
   const notice = `${NUMBER_WORDS[n] || n} ${unit}'` // "three months'"
   const segments = [
     { target: 'name', text: `${profile.name}, ${profile.role} at ${profile.company}.` },
-    availability.open && {
+    showAvailability && {
       target: 'availability',
       text: `Open to ${list(availability.roles)} roles; ${notice} notice${availability.relocation ? '; will relocate' : ''}.`,
     },
@@ -343,7 +346,7 @@ export function briefNarration() {
     ...proof.map((p, i) => ({ target: `stat-${i}`, ...p })),
     { target: 'projects', text: `Projects: ${list(projects.slice(0, 3).map(project))}.` },
     { target: 'domains', text: `Domains: ${list(profile.domains)}.` },
-    { target: 'actions', text: 'His resume is right here.' },
+    { target: 'actions', text: 'You can email him or connect on LinkedIn.' },
   ].filter(Boolean)
   return segments.map((s) => ({ ...s, speech: s.speech ? spoken(s.speech) : spoken(s.text) }))
 }

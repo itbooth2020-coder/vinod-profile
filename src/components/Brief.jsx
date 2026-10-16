@@ -165,10 +165,9 @@ export default function Brief({ headingRef, onClose }) {
       </div>
 
       <div className="actions" data-brief="actions">
-        <a className="btn btn--primary" href={`${import.meta.env.BASE_URL}${profile.resume}`} download>Download resume</a>
+        <a className="btn btn--primary" href={`mailto:${profile.email}`}>Email</a>
         {/* Leaves brief mode via App's in-page link handling; RoleFit then focuses its heading. */}
         <a className="btn" href="#fit">Check role fit</a>
-        <a className="btn" href={`mailto:${profile.email}`}>Email</a>
         <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">
           LinkedIn<span className="sr-only"> (opens in a new tab)</span>
         </a>

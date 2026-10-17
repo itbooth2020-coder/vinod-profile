@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { profile } from '../data.js'
 import Avatar from './Avatar.jsx'
 import Availability from './Availability.jsx'
+import ProfileCard from './ProfileCard.jsx'
 
 // Simple-icons style glyphs (24x24), drawn with currentColor. `sr` is the accessible name; the
 // footer lists the same four profiles.
@@ -59,7 +60,7 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
           {more ? 'Show less' : 'Read more'}
         </button>
         <Availability />
-        {/* VINCE stays one click away in the floating launcher; the console is in the header nav ("ask", or "ask AI" with the live agent). */}
+        {/* VINCE stays one click away in the floating launcher and the header nav ("ask VINCE"). */}
         <div className="actions">
           <a className="btn btn--primary" href={`mailto:${profile.email}`}>Email</a>
         </div>
@@ -79,6 +80,8 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
       <div className="hero__photo">
         <Avatar priority sizes="(min-width: 900px) 200px, (max-width: 600px) 60px, 76px" />
       </div>
+      {/* At a glance + "More" (the profile dialog): under the photo on desktop, after the social links on phones. */}
+      <ProfileCard />
     </section>
   )
 }

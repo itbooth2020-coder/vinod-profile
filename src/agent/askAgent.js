@@ -8,7 +8,7 @@ let loadFailures = 0
 
 // VITE_LIVE_AGENT (build-time flag): whether the site has a server with /api/ask and /api/speak.
 // Production builds call them only when it is 'true'. The static site (S3 + CloudFront) leaves it
-// unset, so the console uses the local agent and VINCE the browser voice, with no /api requests.
+// unset, so VINCE uses the local agent and the browser voice, with no /api requests.
 // `npm run dev` mounts the endpoints (vite.config.js), so dev tries them unless it is 'false'.
 const flag = import.meta.env.VITE_LIVE_AGENT
 export const liveAgent = import.meta.env.DEV ? flag !== 'false' : flag === 'true'
@@ -22,7 +22,7 @@ export const markApiDown = () => {
 }
 
 // Whether answers come from the offline resume search: always on the static site, and in dev
-// after the live endpoint has failed once. The console and VINCE label their answers with it.
+// after the live endpoint has failed once. VINCE labels his answers with it.
 export const offline = () => !apiAvailable()
 
 // Streams an answer from the runtime agent at /api/ask (NDJSON), falling back to the

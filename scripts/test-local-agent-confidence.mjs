@@ -150,7 +150,7 @@ const d = run(`D. Table D regression (${TABLE_D.length})`, TABLE_D)
 const pat = run(`P. Confident-wrong patterns (${PATTERNS.length})`, PATTERNS)
 const low = run(`L. Low confidence (${LOW.length})`, LOW.map(([q, topic]) => [q, unsureFormat(topic)]))
 
-// S. Every question the assistants suggest (console chips, VINCE's follow-ups, the domain graph's
+// S. Every question the assistants suggest (suggested prompts, VINCE's follow-ups, the domain graph's
 // questions) gets a confident answer: an unsure reply to our own suggestion would be a dead end.
 const nodes = [
   ...graphProjects.flatMap((p) => [{ type: 'project', project: p }, ...p.tech.map((t) => ({ type: 'tech', label: t }))]),

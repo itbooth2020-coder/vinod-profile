@@ -1,7 +1,6 @@
 import ThemeToggle from './ThemeToggle.jsx'
 import ThemePicker from './ThemePicker.jsx'
 import MotionToggle from './MotionToggle.jsx'
-import { liveAgent } from '../agent/askAgent.js'
 
 // Same order as the sections in App.jsx.
 const links = [
@@ -9,11 +8,14 @@ const links = [
   { href: '#projects', label: 'projects' },
   { href: '#experience', label: 'experience' },
   { href: '#fit', label: 'role fit' },
-  { href: '#console', label: liveAgent ? 'ask AI' : 'ask' }, // "AI" only with the live agent (askAgent.js)
   { href: '#skills', label: 'skills' },
   { href: '#blogs', label: 'writing' },
   { href: '#contact', label: 'contact' },
 ]
+
+// Opens VINCE's panel (Vince.jsx queues the event until the panel has loaded). data-vince-trigger:
+// VINCE's outside-click close ignores it, so the press doesn't close him as it opens him.
+const openVince = () => window.dispatchEvent(new Event('vince:open'))
 
 export default function Header() {
   return (
@@ -27,6 +29,10 @@ export default function Header() {
         {links.map((l) => (
           <a key={l.href} href={l.href}>{l.label}</a>
         ))}
+        {/* After the sections: an action, not a place on the page. Hidden without JavaScript (index.html). */}
+        <button type="button" className="nav__vince" onClick={openVince} aria-haspopup="dialog" data-vince-trigger>
+          ask VINCE
+        </button>
       </nav>
       <div className="header__tools">
         <ThemePicker />

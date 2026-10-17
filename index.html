@@ -144,7 +144,7 @@
       /* The app failed to mount (data-app="failed", script above): the same static page as <noscript>. */
       :root[data-app='failed'] .counter__final { visibility: visible !important; } :root[data-app='failed'] .counter__live { visibility: hidden !important; }
       :root[data-app='failed'] .hero .lede { display: block !important; }
-      :root[data-app='failed'] :is(.header__tools, .hero__top, .lede__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress) { display: none !important; }
+      :root[data-app='failed'] :is(.header__tools, .nav__vince, .hero__top, .lede__more, .glance__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress) { display: none !important; }
     </style>
     <noscript>
       <!-- Without JavaScript the prerendered page (vite.config.js) is static: show the counters' final
@@ -152,7 +152,7 @@
       <style>
         .counter__final { visibility: visible !important; } .counter__live { visibility: hidden !important; }
         .hero .lede { display: block !important; }
-        .header__tools, .hero__top, .lede__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress { display: none !important; }
+        .header__tools, .nav__vince, .hero__top, .lede__more, .glance__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress { display: none !important; }
       </style>
     </noscript>
   </head>

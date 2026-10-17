@@ -1,13 +1,9 @@
-// One conversation for VINCE's two interfaces (CHAT-001): the text console in the page ("Ask VINCE
-// (text)", PromptConsole.jsx) and the VINCE panel (VoiceAssistant.jsx). Both add their turns here and
-// render the shared log in their own way, so a question asked in either shows in both, and a
-// follow-up in one can refer to an answer given in the other.
+// VINCE's conversation (CHAT-001), kept outside the panel (VoiceAssistant.jsx), so it survives the
+// panel being remounted after an error, and follow-ups can refer to earlier answers.
 //
-// Turns: { id, role, content, via, pending, sig, sources, citations }
-//   role     'user' | 'assistant': questions and answers, shared and sent to the agent as history;
-//            'note': VINCE's own lines (introduction, tour stops, suggestions), shown only in his panel,
-//            with speaker 'you' | 'vince'
-//   via      'console' | 'vince': where the turn was asked, so only VINCE's own answers are spoken
+// Turns: { id, role, content, pending, sig, sources, citations }
+//   role     'user' | 'assistant': questions and answers, sent to the agent as history;
+//            'note': VINCE's own lines (introduction, tour stops, suggestions), with speaker 'you' | 'vince'
 //   pending  the answer is still on its way
 // React components read it with useSyncExternalStore(subscribe, getTurns).
 
@@ -43,7 +39,3 @@ export const history = (limit = 10) =>
     .filter((t) => (t.role === 'user' || t.role === 'assistant') && !t.pending && t.content)
     .slice(-limit)
     .map(({ role, content, sig }) => ({ role, content, sig }))
-
-// Whether an answer asked through the other interface is on its way: that interface's log doesn't
-// announce it to screen readers, so it isn't read out twice.
-export const pendingElsewhere = (list, via) => list.some((t) => t.pending && t.via !== via)

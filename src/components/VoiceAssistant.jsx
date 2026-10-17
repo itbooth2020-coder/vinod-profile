@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { profile } from '../data.js'
 import { askAgent, offline } from '../agent/askAgent.js'
-import { append, getTurns, history, pendingElsewhere, subscribe, update } from '../agent/conversation.js'
+import { append, getTurns, history, subscribe, update } from '../agent/conversation.js'
 import { voiceApi } from '../agent/voiceSafe.js'
 import { NAME, EXPANSION, acknowledge, isUnsure, introduction, welcomeBack, nextQuestions, markAsked, followUpLine, toSpeech, tourSteps, explainNode, nodeQuestions, briefNarration } from '../agent/vince.js'
 import ArcOrb from './ArcOrb.jsx'
@@ -13,9 +13,7 @@ import { Sources } from './LazyParts.jsx'
 // aloud, then suggests what to ask next. He can also narrate a guided tour of the page.
 // The panel can be minimized to a small bar (the conversation carries on) or maximized to
 // a large, centered conversation view.
-// The conversation is shared with VINCE's text console (PromptConsole.jsx) through
-// agent/conversation.js: questions asked there show here, and follow-ups work across both. He only
-// speaks answers to questions asked in this panel.
+// The conversation lives in agent/conversation.js, so it survives the panel being remounted.
 // Other components open him with: window.dispatchEvent(new Event('vince:open')).
 // The 30-second brief asks him to narrate it with 'vince:brief'.
 // Loaded on demand by Vince.jsx, which shows the launcher until then.
@@ -108,7 +106,7 @@ export default function VoiceAssistant({ onReady }) {
   const keepFocus = useRef(false) // set by an outside-click close, so focus stays where the visitor clicked
 
   // VINCE's own lines (introduction, tour stops, suggestions) are notes: shown in his panel only.
-  const note = (speaker, content) => append({ role: 'note', speaker, content, via: 'vince' })
+  const note = (speaker, content) => append({ role: 'note', speaker, content })
   const addVince = (text) => note('vince', text)
 
   // Stops whatever VINCE is doing: speaking, waiting, listening, fetching an answer or
@@ -289,8 +287,8 @@ export default function VoiceAssistant({ onReady }) {
     setInput('')
     setSuggestions([])
     const earlier = history()
-    append({ role: 'user', content: question, via: 'vince' })
-    const id = append({ role: 'assistant', content: '', via: 'vince', pending: true })
+    append({ role: 'user', content: question })
+    const id = append({ role: 'assistant', content: '', pending: true })
     setMode('thinking')
 
     let answer = ''
@@ -404,8 +402,7 @@ export default function VoiceAssistant({ onReady }) {
       greeted.current = true
       offeredTour.current = true
       const text = introduction(undefined, { offline: offline() })
-      // Anything already in the conversation stays: explanations from the graph dialog, and questions
-      // asked in the text console.
+      // Anything already in the conversation stays, such as explanations from the graph dialog.
       addVince(text)
       setSuggestions(nextQuestions('', '', asked.current))
       voice(toSpeech(text, 2000))
@@ -701,8 +698,7 @@ export default function VoiceAssistant({ onReady }) {
           {size !== 'mini' && (
             <div className="vince__body">
               <div className="vince__main">
-                <div className="vince__stage">
-                  <ArcOrb state={mode} energyRef={energy} />
+                <div className="vince__bar">
                   <p className="vince__status" role="status">{interim ? `“${interim}”` : STATUS[mode]}</p>
                   {(mode !== 'idle' || touring || briefing) && (
                     <button type="button" className="vince__stop" onClick={stopAll} aria-label="Stop VINCE">
@@ -711,23 +707,27 @@ export default function VoiceAssistant({ onReady }) {
                   )}
                 </div>
 
-                {/* The shared conversation (agent/conversation.js), including questions asked in the text
-                    console; those answers aren't announced here as well as there. */}
-                <div className="vince__log" ref={logRef} onClick={onLogClick} role="log" aria-live={pendingElsewhere(turns, 'vince') ? 'off' : 'polite'} aria-label="Conversation with VINCE">
-                  {turns.map((t) => {
-                    const who = t.role === 'note' ? t.speaker : t.role === 'user' ? 'you' : 'vince'
-                    return (
-                      <div key={t.id} className={`vmsg vmsg--${who}`}>
-                        <small>{who}</small>
-                        {t.role === 'assistant' ? (
-                          t.content ? <RichText text={t.content} /> : <p className="vmsg__wait">{t.pending ? 'Accessing records…' : 'Stopped.'}</p>
-                        ) : (
-                          <p>{t.content}</p>
-                        )}
-                        <Sources items={t.citations} />
-                      </div>
-                    )
-                  })}
+                {/* The orb sits behind the conversation as a decorative layer; it's outside the scrolling
+                    log, so it stays put while the messages scroll over it. */}
+                <div className="vince__chat">
+                  <ArcOrb state={mode} energyRef={energy} className="vince__orbbg" />
+                  {/* The conversation (agent/conversation.js). */}
+                  <div className="vince__log" ref={logRef} onClick={onLogClick} role="log" aria-live="polite" aria-label="Conversation with VINCE">
+                    {turns.map((t) => {
+                      const who = t.role === 'note' ? t.speaker : t.role === 'user' ? 'you' : 'vince'
+                      return (
+                        <div key={t.id} className={`vmsg vmsg--${who}`}>
+                          <small>{who}</small>
+                          {t.role === 'assistant' ? (
+                            t.content ? <RichText text={t.content} /> : <p className="vmsg__wait">{t.pending ? 'Accessing records…' : 'Stopped.'}</p>
+                          ) : (
+                            <p>{t.content}</p>
+                          )}
+                          <Sources items={t.citations} />
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {touring ? (
@@ -737,7 +737,7 @@ export default function VoiceAssistant({ onReady }) {
                   </div>
                 ) : (
                   <div className="vince__chips" role="group" aria-label="Suggested questions">
-                    {/* First, so it's visible without scrolling the one-row chip strip on phones (CHAT-009);
+                    {/* First, so it's always visible in the one-line chip strip (CHAT-009);
                         DOM order, not CSS order, so focus order matches what's seen. */}
                     <button type="button" className="vince__tourbtn" onClick={startTour} disabled={mode === 'thinking'}>
                       <svg className="vince__play" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false">
@@ -745,8 +745,9 @@ export default function VoiceAssistant({ onReady }) {
                       </svg>
                       Guided tour
                     </button>
-                    {suggestions.map((q) => (
-                      <button key={q} type="button" onClick={() => (unlockSpeech(), ask(q))} disabled={mode === 'thinking'}>
+                    {/* Only the first two fit the compact strip (one below 360px, styles.css); the full list still drives the follow-ups. */}
+                    {suggestions.slice(0, 2).map((q) => (
+                      <button key={q} type="button" className="vince__q" title={q} onClick={() => (unlockSpeech(), ask(q))} disabled={mode === 'thinking'}>
                         {q}
                       </button>
                     ))}

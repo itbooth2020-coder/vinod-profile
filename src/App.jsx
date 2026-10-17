@@ -3,7 +3,6 @@ import ScrollProgress from './components/ScrollProgress.jsx'
 import Header from './components/Header.jsx'
 import Hero from './components/Hero.jsx'
 import Brief from './components/Brief.jsx'
-import ProfileCard from './components/ProfileCard.jsx'
 import Impact from './components/Impact.jsx'
 import Leadership from './components/Leadership.jsx'
 import Experience from './components/Experience.jsx'
@@ -15,7 +14,6 @@ import Blogs from './components/Blogs.jsx'
 import Footer from './components/Footer.jsx'
 import Vince from './components/Vince.jsx'
 import SectionBoundary, { lazyRetry } from './components/SectionBoundary.jsx'
-import { liveAgent } from './agent/askAgent.js'
 
 // Below-the-fold, interactive sections load as separate chunks after first paint (PERF-FE-002).
 // Each placeholder reserves the section's height (styles.css .lazy-ph), so nothing shifts when it
@@ -24,7 +22,6 @@ import { liveAgent } from './agent/askAgent.js'
 // If a section's chunk can't load, its SectionBoundary shows "This section couldn't load." with a
 // Retry in its place, at the same height, and the rest of the page stays (FUNC-014).
 const RoleFit = lazyRetry(() => import('./components/RoleFit.jsx'))
-const PromptConsole = lazyRetry(() => import('./components/PromptConsole.jsx'))
 const DomainGraph = lazyRetry(() => import('./components/DomainGraph.jsx'))
 
 // 30-second brief: <html data-mode="brief"> hides everything but the header and the brief (styles.css).
@@ -32,7 +29,6 @@ const DomainGraph = lazyRetry(() => import('./components/DomainGraph.jsx'))
 const briefInUrl = () => new URLSearchParams(window.location.search).get('brief') === '1'
 
 const fitPlaceholder = <div id="fit" className="lazy-ph lazy-ph--fit" aria-busy="true" />
-const consolePlaceholder = <div id="console" className="card chat lazy-ph" aria-busy="true" />
 const graphPlaceholder = <div className="card lazy-ph lazy-ph--graph" aria-busy="true" />
 
 export default function App() {
@@ -144,25 +140,16 @@ export default function App() {
             ) : fitPlaceholder}
           </SectionBoundary>
           <div className="layout">
-            {/* VINCE's text console: the same assistant and conversation as the VINCE panel (CHAT-001). */}
-            <h2 className="sr-only">{liveAgent ? 'Ask VINCE, the AI assistant, about the profile' : 'Ask VINCE about the profile'}</h2>
-            <SectionBoundary id="console" className="card chat lazy-ph" tag="div" level={3} title="Ask VINCE (text)" onRetry={PromptConsole.reset}>
+            {/* Full width; the profile card is in the hero (Hero.jsx). Questions go to VINCE (the
+                floating panel; the header's "ask VINCE" opens it). */}
+            <h2 className="sr-only">Domain graph</h2>
+            <SectionBoundary className="card lazy-ph lazy-ph--graph" tag="div" level={3} title="Domain graph" onRetry={DomainGraph.reset}>
               {mounted ? (
-                <Suspense fallback={consolePlaceholder}>
-                  <PromptConsole />
+                <Suspense fallback={graphPlaceholder}>
+                  <DomainGraph />
                 </Suspense>
-              ) : consolePlaceholder}
+              ) : graphPlaceholder}
             </SectionBoundary>
-            <div className="side">
-              <ProfileCard />
-              <SectionBoundary className="card lazy-ph lazy-ph--graph" tag="div" level={3} title="Domain graph" onRetry={DomainGraph.reset}>
-                {mounted ? (
-                  <Suspense fallback={graphPlaceholder}>
-                    <DomainGraph />
-                  </Suspense>
-                ) : graphPlaceholder}
-              </SectionBoundary>
-            </div>
           </div>
           <Skills />
           <Credentials />

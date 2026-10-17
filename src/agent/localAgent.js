@@ -1138,7 +1138,7 @@ function confident(ctx, pick) {
 }
 
 // Questions to try after an unsure answer: ones about the concepts the question carries, then the
-// console's suggested prompts. Each has a confident answer.
+// suggested prompts (data.js). Each has a confident answer.
 const SUGGEST = [
   [['ai', 'llm', 'agents', 'ml'], 'How does he use AI agents in his work?'],
   [['impact', 'measure', 'count'], 'What impact has he had?'],

@@ -3,6 +3,8 @@ import { importAgain } from '../importAgain.js'
 // The offline agent (and the resume data it searches) loads on the first question, not with the page;
 // a failed load is tried again on the next question (FUNC-014).
 const loadLocal = () => importAgain(() => import('./localAgent.js'))
+// FUNC-015: after two failed loads in a row, say how to recover instead of "Please try again".
+let loadFailures = 0
 
 // VITE_LIVE_AGENT (build-time flag): whether the site has a server with /api/ask and /api/speak.
 // Production builds call them only when it is 'true'. The static site (S3 + CloudFront) leaves it
@@ -33,7 +35,18 @@ export const offline = () => !apiAvailable()
 // (earlier turns) also lets the offline agent follow up on "tell me more" or "what did he do there?".
 export async function askAgent(question, history, { onStatus, onText, onSource, onReset, onDone, signal, voice = false }) {
   const local = async () => {
-    const { answerLocally } = await loadLocal()
+    let mod
+    try {
+      mod = await loadLocal()
+      loadFailures = 0
+    } catch (err) {
+      if (++loadFailures < 2) throw err
+      onSource('local')
+      return onText("The assistant couldn't load. Please reload the page to try again.")
+    }
+    const { answerLocally, ensureLexicon } = mod
+    // The lexicon only adds "doesn't mention X" notes; without it the answer still comes (FUNC-015).
+    await ensureLexicon()
     onSource('local')
     onText(answerLocally(question, history))
   }

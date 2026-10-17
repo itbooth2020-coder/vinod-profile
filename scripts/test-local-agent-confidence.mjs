@@ -13,9 +13,11 @@
 //      an availability question.
 //   S. Every question the assistants suggest is answered with confidence.
 // Run with `npm run test:agent` (--verbose prints every answer); exits non-zero on any failure.
-import { answerLocally } from '../src/agent/localAgent.js'
+import { answerLocally, ensureLexicon } from '../src/agent/localAgent.js'
 import { followUpPieces, nodeQuestions } from '../src/agent/vince.js'
 import { graphDomains, graphProjects, suggestedPrompts } from '../src/data.js'
+
+await ensureLexicon() // FUNC-015: the role-fit lexicon loads on demand
 
 const has = (...patterns) => (a) => patterns.every((p) => p.test(a))
 const lacks = (...patterns) => (a) => patterns.every((p) => !p.test(a))

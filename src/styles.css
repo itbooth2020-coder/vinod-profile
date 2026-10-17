@@ -130,6 +130,8 @@ a { color: var(--accent2); }
 @media (max-width: 680px) {
   .nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; gap: 20px; margin: -8px -20px 0; padding: 6px 36px 6px 20px; overflow-x: auto; scrollbar-width: thin; scroll-padding-inline: 20px 36px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
   .nav :is(a, .nav__vince) { flex: none; white-space: nowrap; padding: 8px 0; }
+  /* UX-012: "ask VINCE" leads the row, so it shows without scrolling the nav (it's last on wider screens). */
+  .nav__vince { order: -1; }
 }
 
 /* Theme picker */
@@ -556,7 +558,9 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .gallery--single { grid-template-columns: minmax(0, 220px); }
 .media { margin: 0; display: grid; gap: 6px; justify-items: center; text-align: center; padding: 10px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
 .media img, .media__mono { width: 64px; height: 64px; border-radius: 12px; object-fit: contain; background: #fff; }
-.media__mono { display: grid; place-items: center; font: 700 15px var(--mono); color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); border: 1px solid var(--border); }
+/* Monogram text: the accent nudged toward --text, as --hud-ink (which is only set inside VINCE), so it
+   stays >= 4.5:1 in every palette, dark and light (UI-010: plain --accent was 2.6:1 in Ocean Blue dark). */
+.media__mono { display: grid; place-items: center; font: 700 15px var(--mono); color: color-mix(in srgb, var(--accent) 60%, var(--text)); background: color-mix(in srgb, var(--accent) 14%, var(--panel2)); border: 1px solid var(--border); }
 .media--photo img { width: 100%; height: auto; aspect-ratio: 1; max-width: 200px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent2); background: none; }
 .media--location .media__mono { font-size: 28px; border-radius: 50%; }
 .media figcaption { font-size: 12px; line-height: 1.35; color: var(--muted); overflow-wrap: anywhere; }
@@ -670,6 +674,10 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .vince__sub { margin: 2px 0 0; font: 11px var(--mono); color: var(--muted); }
 /* "Offline · answers from the resume" on the static site (askAgent.js offline()) */
 .vince__source { margin: 2px 0 0; font: 10.5px var(--mono); letter-spacing: 0.04em; color: var(--muted); }
+/* CHAT-013: below 360px the label would wrap to three lines beside the icons; one line, the full text in the tooltip. */
+@media (max-width: 359.98px) {
+  .vince__source { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 .vince__tools { display: flex; gap: 6px; }
 .vince__icon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--hud-line); border-radius: 10px; background: transparent; color: var(--text); font-size: 15px; cursor: pointer; }
 .vince__icon:hover { border-color: var(--accent); }
@@ -888,12 +896,28 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .case__logos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .case__logos .media { width: 120px; }
 /* Placeholders for lazily loaded sections (App.jsx): about the height each section renders at, so
-   nothing below moves when it arrives. Measured: role fit 526-597px, domain graph 523-615px. */
+   nothing below moves when it arrives. Measured: role fit 526-597px, domain graph 523-810px (full width). */
 .lazy-ph--fit { min-height: 530px; }
 .lazy-ph--graph { min-height: 540px; }
 @media (max-width: 600px) {
   .lazy-ph--fit { min-height: 590px; }
   .lazy-ph--graph { min-height: 560px; }
+}
+/* PERF-FE-011: the graph card is its 2px border + the graph (inner width x 3/4, or x 2/5 from 861px, as
+   .gsvg above) + its head, toolbar and details, which wrap onto more lines as the card narrows. The
+   placeholder follows the same rule from the card's own width (container units, so scrollbars don't
+   skew it); the px heights above remain for browsers without container queries. Re-measure if the
+   graph's toolbar or details change. */
+@supports (container-type: inline-size) {
+  .layout { container-type: inline-size; }
+  .lazy-ph--graph { --ph-ratio: 0.75; --ph-rest: 196.6px; min-height: calc((100cqw - 2px) * var(--ph-ratio) + var(--ph-rest)); }
+  @media (min-width: 861px) { .lazy-ph--graph { --ph-ratio: 0.4; } }
+  @container (min-width: 943px) { .lazy-ph--graph { --ph-rest: 183px; } }
+  @container (max-width: 501.98px) { .lazy-ph--graph { --ph-rest: 219.7px; } }
+  @container (max-width: 468.98px) { .lazy-ph--graph { --ph-rest: 261.7px; } }
+  @container (max-width: 342.98px) { .lazy-ph--graph { --ph-rest: 284.8px; } }
+  @container (max-width: 318.98px) { .lazy-ph--graph { --ph-rest: 326.8px; } }
+  @container (max-width: 272.98px) { .lazy-ph--graph { --ph-rest: 349.9px; } }
 }
 /* A lazy section, case study or VINCE's panel that couldn't load (FUNC-014, SectionBoundary.jsx):
    its heading, a short note and Retry, at the placeholder's height. */

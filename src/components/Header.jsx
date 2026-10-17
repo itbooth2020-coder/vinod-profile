@@ -29,7 +29,8 @@ export default function Header() {
         {links.map((l) => (
           <a key={l.href} href={l.href}>{l.label}</a>
         ))}
-        {/* After the sections: an action, not a place on the page. Hidden without JavaScript (index.html). */}
+        {/* After the sections: an action, not a place on the page. On phones CSS shows it first in the
+            scrolling row, so it's visible without swiping (UX-012). Hidden without JavaScript (index.html). */}
         <button type="button" className="nav__vince" onClick={openVince} aria-haspopup="dialog" data-vince-trigger>
           ask VINCE
         </button>

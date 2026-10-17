@@ -6,7 +6,12 @@
 //      checks here, and rotate in new wording at each UAT round.
 // Plus owner-decision checks (contact channels, certifications, skills, phone, blogs), which must all pass.
 // Run with `npm run test:agent` (--verbose prints every answer); exits non-zero below either target.
-import { answerLocally } from '../src/agent/localAgent.js'
+import { answerLocally, ensureLexicon } from '../src/agent/localAgent.js'
+
+// FUNC-015: the agent answers before (or without) the role-fit lexicon; then load it for the suites.
+const noLexicon = /Master of Computer Applications|MCA/.test(answerLocally('Where did he study?'))
+console.log(`${noLexicon ? 'PASS' : 'FAIL'} without the lexicon: Where did he study?`)
+await ensureLexicon()
 
 const TARGET = 45 // of 50
 const HOLDOUT_TARGET = 32 // of 35
@@ -185,4 +190,5 @@ console.log(`\n${line('Score', graded, CASES.length, TARGET)}`)
 console.log(line('Held-out', holdout, HOLDOUT.length, HOLDOUT_TARGET))
 console.log(`Follow-ups: ${FOLLOW_UPS.length - followFails}/${FOLLOW_UPS.length}`)
 console.log(line('Owner decisions', decisions, DECISIONS.length, DECISIONS.length))
-process.exit(graded.pass >= TARGET && holdout.pass >= HOLDOUT_TARGET && !followFails && decisions.pass === DECISIONS.length ? 0 : 1)
+console.log(`Without the lexicon: ${noLexicon ? 1 : 0}/1`)
+process.exit(noLexicon && graded.pass >= TARGET && holdout.pass >= HOLDOUT_TARGET && !followFails && decisions.pass === DECISIONS.length ? 0 : 1)

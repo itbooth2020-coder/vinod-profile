@@ -6,7 +6,9 @@
 // aimed at one of these strings, and don't edit a question or check to make it pass. Replace the set
 // with new wording at the next UAT round; then it can join the regression suites.
 // Run with `npm run test:agent` (--verbose prints every answer); exits non-zero below the target.
-import { answerLocally } from '../src/agent/localAgent.js'
+import { answerLocally, ensureLexicon } from '../src/agent/localAgent.js'
+
+await ensureLexicon() // FUNC-015: the role-fit lexicon loads on demand
 
 const TARGET = 34
 const MAX_CHARS = 1200 // prose, without charts, tables and images (CHAT-003)

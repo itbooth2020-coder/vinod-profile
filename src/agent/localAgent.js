@@ -6,7 +6,7 @@
 // Answers use the same Markdown subset as the live agent (see components/RichText.jsx).
 // Regression tests: scripts/test-local-agent.mjs and scripts/test-local-agent-fresh.mjs (npm run test:agent).
 import { profile, profileCard, stats, availability, showAvailability, leadership, highlights, experience, projects, graphProjects, otherProjects, skills, certifications, learning, education, languages, blogs, suggestedPrompts } from '../data.js'
-import { LEXICON } from './fitLexicon.js'
+import { importAgain } from '../importAgain.js'
 import { conceptsOf, brevity, analyse, stem as conceptStem } from './concepts.js'
 
 const FIRST = profile.firstName.split(' ')[0]
@@ -173,8 +173,8 @@ const termRe = (term, cs) => {
 const inProfile = (re) => ((re.lastIndex = 0), re.test(PROFILE_RAW))
 // Never noted: Claude is an LLM, and the machine-learning intent explains his model-training work.
 const COVERED = new Set(['LLMs', 'Machine learning'])
-const MISSING_TERMS = [
-  ...LEXICON.filter((e) => NOTE_CATS.has(e.cat) && !COVERED.has(e.label)).map((e) => {
+const buildMissingTerms = (lexicon) => [
+  ...lexicon.filter((e) => NOTE_CATS.has(e.cat) && !COVERED.has(e.label)).map((e) => {
     const res = [e.re ? new RegExp(e.re, e.cs ? 'g' : 'gi') : termRe(e.label, e.cs), ...(e.aliases || []).map((a) => termRe(a, false)), ...(e.exact || []).map((a) => termRe(a, true))]
     // An English-word name ('Rust', 'Dart') also counts in a lower-case question; 'Go', 'C' and 'R' don't.
     if (e.cs && !e.re && e.label.length > 2) res.push(termRe(e.label, false))
@@ -182,6 +182,20 @@ const MISSING_TERMS = [
   }),
   ...EXTRA_TOPICS.map((t) => ({ res: [termRe(t, false)], evidenced: inProfile(termRe(t, false)) || VOCAB.has(stem(t)) })),
 ].filter((t) => !t.evidenced)
+// Works without the lexicon: only the "doesn't mention X" notes are fewer.
+let MISSING_TERMS = buildMissingTerms([])
+
+// FUNC-015: the lexicon is a separate chunk shared with RoleFit. Load it here with a retry under a
+// fresh URL; if it fails, answer without it and try again on the next question.
+let lexiconLoad
+export const ensureLexicon = () =>
+  (lexiconLoad ??= importAgain(() => import('./fitLexicon.js'))
+    .then(({ LEXICON }) => {
+      MISSING_TERMS = buildMissingTerms(LEXICON)
+    })
+    .catch(() => {
+      lexiconLoad = undefined
+    }))
 
 // The missing terms a question names, as it spells them, longest first and without overlaps.
 function missingIn(question) {

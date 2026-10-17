@@ -918,6 +918,11 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .section-error { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .section-error :is(h2, h3, p) { margin: 0; }
 .section-error p, .case-fail p { color: var(--muted); }
+/* UI-009: inner padding for the card fallbacks (console, domain graph) */
+.card.section-error { padding-block: 16px; }
+.card.section-error > * { margin-inline: 16px; }
+.card.chat.section-error { padding-top: 0; }                                 /* keep the console header strip flush */
+.card.chat.section-error > h3 { margin-inline: 0; align-self: stretch; }    /* full-width strip */
 .case-fail { display: grid; gap: 12px; padding: 24px; }
 .case-fail :is(h2, p) { margin: 0; }
 .case-fail h2 { font-size: 20px; overflow-wrap: anywhere; }

@@ -101,6 +101,7 @@ export default function VoiceAssistant({ onReady }) {
   const showRef = useRef(null)
   const panelRef = useRef(null)
   const launcherRef = useRef(null)
+  const opener = useRef(null) // UX-013: the control that opened VINCE (e.g. the nav "ask VINCE"); focus returns there on close
   const logRef = useRef(null)
   const wasOpen = useRef(false)
   const keepFocus = useRef(false) // set by an outside-click close, so focus stays where the visitor clicked
@@ -559,12 +560,21 @@ export default function VoiceAssistant({ onReady }) {
     }
   }, [])
 
-  // Focus moves into the panel when it opens or changes size, and back to the launcher when it
-  // closes, unless it closed because the visitor clicked elsewhere, or it opened minimized to
-  // narrate the brief: then focus stays where it is.
+  // Focus moves into the panel when it opens or changes size, and back to the control that opened
+  // it when it closes (UX-013; the launcher if that control is gone or hidden), unless it closed
+  // because the visitor clicked elsewhere, or it opened minimized to narrate the brief: then focus
+  // stays where it is. The opener still has focus here (the panel takes it just below); opening
+  // from the launcher unmounts it, so that case falls back to the new launcher.
   useEffect(() => {
+    if (open && !wasOpen.current) opener.current = document.activeElement
     if (open && !keepFocus.current) panelRef.current?.focus()
-    else if (wasOpen.current && !keepFocus.current) launcherRef.current?.focus()
+    else if (wasOpen.current && !keepFocus.current) {
+      const el = opener.current
+      const usable = el && el !== document.body && el.isConnected && el.getClientRects().length > 0 && !el.closest('[inert]')
+      const back = usable ? el : launcherRef.current
+      back?.focus()
+    }
+    if (!open) opener.current = null
     keepFocus.current = false
     wasOpen.current = open
   }, [open, size])
@@ -645,7 +655,7 @@ export default function VoiceAssistant({ onReady }) {
               ) : (
                 <>
                   <p id="vince-sub" className="vince__sub">{EXPANSION}</p>
-                  {source === 'local' && <p id="vince-source" className="vince__source">Offline · answers from the resume</p>}
+                  {source === 'local' && <p id="vince-source" className="vince__source" title="Offline · answers from the resume">Offline · answers from the resume</p>}
                 </>
               )}
             </div>

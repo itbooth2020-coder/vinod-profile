@@ -231,8 +231,10 @@ export default function VoiceAssistant({ onReady }) {
     brief.current.i = i
     const el = document.querySelector(`[data-brief="${steps[i].target}"]`)
     if (el) {
+      // Under the sticky header counts as out of view (scroll-padding-top then keeps it clear).
       const r = el.getBoundingClientRect()
-      if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' })
+      const top = document.querySelector('.header')?.getBoundingClientRect().bottom || 0
+      if (r.top < top || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' })
       el.classList.add('tour-focus')
     }
     voice(steps[i].speech, () => brief.current && runBrief(i + 1))

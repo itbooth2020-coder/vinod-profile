@@ -122,8 +122,9 @@ export default function App() {
     <>
       <ScrollProgress />
       <a className="skip" href="#main">Skip to content</a>
+      {/* Outside .wrap: the sticky header's background spans the full width (it has its own .wrap). */}
+      <Header />
       <div className="wrap">
-        <Header />
         <main id="main">
           <Hero brief={brief} onToggleBrief={() => showBrief(!brief)} toggleRef={toggleRef} />
           {brief && <Brief headingRef={headingRef} onClose={(opts) => showBrief(false, opts)} />}

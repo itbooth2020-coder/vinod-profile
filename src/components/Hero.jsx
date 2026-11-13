@@ -40,19 +40,6 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
   return (
     <section id="top" className="hero">
       <div className="hero__text">
-        <div className="hero__top">
-          {/* Switches between the full profile and the brief. The label text is the accessible name. */}
-          <button ref={toggleRef} type="button" role="switch" className="brief-switch" aria-checked={brief} onClick={onToggleBrief}>
-            <span className="brief-switch__label">30-second brief</span>
-            <span className="brief-switch__track" aria-hidden="true">
-              <span className="brief-switch__thumb">
-                <svg viewBox="0 0 12 12" width="10" height="10" focusable="false">
-                  <path d="M2.5 6.2 5 8.5l4.5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            </span>
-          </button>
-        </div>
         <h1>{profile.firstName} <em>{profile.lastName}</em></h1>
         <p className="headline">{profile.headline}</p>
         <p id="hero-pitch" className={`lede${more ? ' lede--open' : ''}`}>{profile.pitch}</p>
@@ -80,8 +67,9 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
       <div className="hero__photo">
         <Avatar priority sizes="(min-width: 900px) 200px, (max-width: 600px) 60px, 76px" />
       </div>
-      {/* At a glance + "More" (the profile dialog): under the photo on desktop, after the social links on phones. */}
-      <ProfileCard />
+      {/* At a glance, the brief switch and "More" (the profile dialog): under the photo on desktop, after the
+          social links on phones. In brief mode only the switch stays (styles.css). */}
+      <ProfileCard brief={brief} onToggleBrief={onToggleBrief} toggleRef={toggleRef} />
     </section>
   )
 }

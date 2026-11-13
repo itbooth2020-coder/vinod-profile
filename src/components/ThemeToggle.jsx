@@ -46,7 +46,7 @@ export default function ThemeToggle() {
           <path key={id} className={`theme-toggle__icon theme-toggle__icon--${id}`} d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         ))}
       </svg>
-      Theme
+      <span className="toggle__label">Theme</span>
     </button>
   )
 }

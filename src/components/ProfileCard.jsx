@@ -3,11 +3,12 @@ import { profile, profileCard } from '../data.js'
 import ProfileDialog from './ProfileDialog.jsx'
 
 // The hero's "at a glance" details (Hero.jsx): a few rows of the profile card, and "More" to open the
-// full profile dialog. Availability, age and nationality aren't shown here.
+// full profile dialog, on one row with the 30-second brief switch (App.jsx owns its state, ref and focus
+// return). Availability, age and nationality aren't shown here.
 const GLANCE = ['role', 'company', 'experience', 'team scale', 'location']
 const rows = profileCard.filter(([k]) => GLANCE.includes(k))
 
-export default function ProfileCard() {
+export default function ProfileCard({ brief, onToggleBrief, toggleRef }) {
   const dialogRef = useRef(null)
   const [open, setOpen] = useState(false)
 
@@ -31,10 +32,23 @@ export default function ProfileCard() {
           </div>
         ))}
       </dl>
-      {/* The native modal dialog returns focus to this button when it closes. */}
-      <button type="button" className="icon-btn glance__more" onClick={show} aria-haspopup="dialog">
-        More<span className="sr-only"> about {profile.firstName}</span> <span aria-hidden="true">⤢</span>
-      </button>
+      <div className="glance__actions">
+        {/* Switches between the full profile and the brief (App.jsx). The label text is the accessible name. */}
+        <button ref={toggleRef} type="button" role="switch" className="brief-switch" aria-checked={brief} onClick={onToggleBrief}>
+          <span className="brief-switch__label">30-second brief</span>
+          <span className="brief-switch__track" aria-hidden="true">
+            <span className="brief-switch__thumb">
+              <svg viewBox="0 0 12 12" width="10" height="10" focusable="false">
+                <path d="M2.5 6.2 5 8.5l4.5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </span>
+        </button>
+        {/* The native modal dialog returns focus to this button when it closes. */}
+        <button type="button" className="icon-btn glance__more" onClick={show} aria-haspopup="dialog">
+          More<span className="sr-only"> about {profile.firstName}</span> <span aria-hidden="true">⤢</span>
+        </button>
+      </div>
 
       <dialog
         ref={dialogRef}

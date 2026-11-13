@@ -43,12 +43,13 @@ const load = () => {
   }
 }
 
-// Black or white text on a custom accent, whichever contrasts more.
+// Black or white text on a custom accent, whichever contrasts more: at least 4.58:1 for any accent
+// (an off-black ink could fall to 4.39:1), e.g. on the current-section pill in the header nav.
 const inkFor = (hex) => {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
   const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
   const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
-  return L > 0.179 ? '#0b0e14' : '#ffffff'
+  return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? '#000000' : '#ffffff'
 }
 
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -169,7 +170,7 @@ export default function ThemePicker() {
         aria-controls="theme-panel"
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="picker__dot" aria-hidden="true" /> Customize
+        <span className="picker__dot" aria-hidden="true" /><span className="toggle__label"> Customize</span>
       </button>
 
       {open && (

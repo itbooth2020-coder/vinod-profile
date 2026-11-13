@@ -64,7 +64,10 @@
 :root[data-font='system'] { --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+/* Anchor jumps, scrollIntoView and focused elements stop 12px below the sticky header (2.4.11). Header.jsx
+   measures --header-h; this is its height (the same at every width) for the static page without JavaScript. */
+:root { --header-h: 56px; }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 12px); }
 body {
   margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 var(--sans);
   background-image:
@@ -75,25 +78,47 @@ body {
 a { color: var(--accent2); }
 :focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; border-radius: 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.skip { position: absolute; left: -999px; top: 8px; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; z-index: 9; }
+/* Fixed, so focusing it shows it over the sticky header without scrolling the page. */
+.skip { position: fixed; left: -999px; top: 8px; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; z-index: 40; }
 .skip:focus { left: 8px; }
 
-.progress { position: fixed; inset: 0 0 auto; height: 3px; z-index: 10; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+/* Above the sticky header (z-index 15), along its top edge. */
+.progress { position: fixed; inset: 0 0 auto; height: 3px; z-index: 16; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--accent2)); }
 
 .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
 
-/* Header */
-.header { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; padding: 16px 0; flex-wrap: wrap; }
-.brand { font: 600 14px var(--mono); color: var(--muted); text-decoration: none; }
-.brand b { color: var(--accent2); }
-.nav { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-left: auto; }
-.nav a { font: 13px var(--mono); color: var(--muted); text-decoration: none; padding: 6px 0; }
-/* "ask VINCE" (Header.jsx) opens the VINCE panel: a button that looks like the section links. */
-.nav__vince { font: 13px var(--mono); color: var(--muted); background: none; border: 0; padding: 6px 0; cursor: pointer; }
-.nav a:hover, .nav__vince:hover { color: var(--text); }
+/* Header: sticky, above the page (z-index 15) and below the progress bar, Customize (inside it), VINCE
+   (30) and the skip link (40). Opaque without backdrop-filter; translucent and blurred with it, close
+   enough to --bg that its text keeps its contrast over anything scrolling beneath. The bottom edge
+   shows once the page has scrolled (Header.jsx is-scrolled); the border is always there, so no shift. */
+.header { position: sticky; top: 0; z-index: 15; background: var(--bg); border-bottom: 1px solid transparent; }
+@supports (backdrop-filter: blur(8px)) {
+  .header { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); }
+}
+.header.is-scrolled { border-bottom-color: var(--border); box-shadow: 0 8px 20px -14px rgb(0 0 0 / 0.5); }
+/* The header's own controls sit inside html's scroll-padding-top, so focusing one would scroll the page
+   up to "reveal" it although it never moves. A matching negative scroll-margin counts them as in view. */
+.header :is(.nav > *, .toggle) { scroll-margin-top: calc(-1 * var(--header-h) - 12px); }
+/* One row at every width: the section nav as a row of pills, the tools on the right. The pills scroll
+   sideways when they don't all fit, fading out on the right (the nav's right padding holds the fade and
+   also spaces the pills from the tools). Nothing wraps, so the header keeps its height in every theme
+   and font (UI-008). Focused pills scroll into view; scroll-padding keeps them clear of the fade, and
+   the nav's padding leaves room for their focus ring. */
+.header__inner { display: flex; align-items: center; gap: 4px; padding-top: 7px; padding-bottom: 6px; }
+.nav { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 6px; padding: 3px 36px 3px 3px; overflow-x: auto; scrollbar-width: thin; scroll-padding-inline: 3px 36px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+/* Section links and "ask VINCE" (Header.jsx, which opens the VINCE panel) as pills tinted with the
+   theme's accent; text is --text on every tint (>= 4.5:1 in every palette, light and dark). Stronger
+   on hover and focus; the section in view (aria-current) is solid accent. "ask VINCE" uses accent2,
+   so it reads as an action rather than a place on the page. No transitions, so nothing animates. */
+.nav :is(a, .nav__vince) { flex: none; display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text); font: 13px var(--mono); white-space: nowrap; text-decoration: none; cursor: pointer; }
+.nav :is(a, .nav__vince):is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.nav :is(a, .nav__vince):focus-visible { outline-offset: 1px; border-radius: 999px; }
+.nav .nav__vince { background: color-mix(in srgb, var(--accent2) 12%, var(--panel)); border-color: color-mix(in srgb, var(--accent2) 40%, transparent); }
+.nav .nav__vince:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent2) 22%, var(--panel)); border-color: color-mix(in srgb, var(--accent2) 70%, transparent); }
+.nav a[aria-current='true'], .nav a[aria-current='true']:is(:hover, :focus-visible) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .toggle { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; min-height: 40px; font: 13px var(--mono); cursor: pointer; }
 .toggle:hover { border-color: var(--accent); }
-.header__tools { display: flex; gap: 8px; }
+.header__tools { flex: none; display: flex; gap: 8px; }
 /* Pause animations (MotionToggle.jsx): an icon toggle; pressed = paused. */
 .motion-toggle { display: inline-grid; place-items: center; width: 40px; padding: 0; }
 .motion-toggle svg { display: block; }
@@ -105,33 +130,18 @@ a { color: var(--accent2); }
 .theme-toggle svg { flex: none; display: block; }
 .theme-toggle__icon--light, :root[data-theme='light'] .theme-toggle__icon--dark { display: none; }
 :root[data-theme='light'] .theme-toggle__icon--light { display: inline; }
-.brand__init { display: none; }
-/* Desktop: brand, nav and tools on one row in every theme and font (UI-008). Nothing wraps, so the
-   header keeps its height when the theme or a Customize font changes. */
-@media (min-width: 1101px) {
-  .header { flex-wrap: nowrap; }
-  .brand, .header__tools { flex: none; }
-  .brand { white-space: nowrap; }
-  .nav { flex-wrap: nowrap; gap: 4px 14px; }
-  .nav :is(a, .nav__vince) { white-space: nowrap; }
+/* Below a full-width column (1060px) the pills and labelled tools don't fit together: Customize and
+   Theme show only their icons (their names stay for screen readers). Every pill still fits beside the
+   icons down to ~960px; narrower, the pills scroll. */
+@media (max-width: 1099px) {
+  .header__tools .toggle__label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .header__tools .toggle { width: 40px; padding: 0; justify-content: center; }
 }
-/* Tablets and small laptops: brand and tools share the first row; the nav gets its own row below. */
-@media (max-width: 1100px) {
-  .header__tools { order: 2; margin-left: auto; }
-  .nav { order: 3; flex: 1 0 100%; margin-left: 0; }
-}
-/* Narrow screens: "Vinod P. Yadav" on screen; the full middle name stays for screen readers. */
-@media (max-width: 420px) {
-  .brand__mid { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .brand__init { display: inline; }
-}
-/* Phones: the nav becomes one horizontally scrollable row under the brand and tools, edge to edge,
-   fading out on the right. Focused links scroll into view on their own; scroll-padding keeps them clear of the fade. */
+/* Phones: the pill row starts at the screen's left edge; "ask VINCE" leads it, so it shows without
+   swiping (UX-012). */
 @media (max-width: 680px) {
-  .nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; gap: 20px; margin: -8px -20px 0; padding: 6px 36px 6px 20px; overflow-x: auto; scrollbar-width: thin; scroll-padding-inline: 20px 36px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
-  .nav :is(a, .nav__vince) { flex: none; white-space: nowrap; padding: 8px 0; }
-  /* UX-012: "ask VINCE" leads the row, so it shows without scrolling the nav (it's last on wider screens). */
-  .nav__vince { order: -1; }
+  .nav { margin-left: -20px; padding: 3px 36px 3px 20px; scroll-padding-inline: 20px 36px; }
+  .nav .nav__vince { order: -1; }
 }
 
 /* Theme picker */
@@ -192,9 +202,13 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .glance .kv { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 6px 24px; font-size: 13px; }
 .glance .kv > div { grid-template-columns: 76px 1fr; }
 .glance .kv dt { font-size: 11px; }
-.glance__more { margin-top: 10px; }
-@media print { .glance .glance__more { display: none; } }
-.hero__top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+/* The brief switch and "More" on one row, both 44px pills in the same type, sized to fit the 280px desktop column
+   (and 320px phones) side by side; they wrap if the row is ever too narrow. */
+.glance__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.glance__actions .brief-switch { gap: 8px; font-size: 12px; }
+.glance__actions .glance__more { min-height: 44px; padding: 4px 12px; border-radius: 999px; font: 600 12px var(--mono); }
+.glance__actions .glance__more:focus-visible { outline-offset: 2px; }
+@media print { .glance .glance__actions { display: none; } }
 /* "Read more" for the pitch: phones only (below). */
 .lede__more { display: none; }
 /* Phones: a small photo beside the name, then the Email button, then the pitch clamped to
@@ -204,10 +218,9 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 @media (max-width: 600px) {
   .hero {
     grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; align-items: center;
-    grid-template-areas: 'top top' 'photo name' 'photo headline' 'actions actions' 'lede lede' 'more more' 'avail avail' 'social social' 'glance glance';
+    grid-template-areas: 'photo name''photo headline' 'actions actions' 'lede lede' 'more more' 'avail avail' 'social social' 'glance glance';
   }
   .hero__text { display: contents; }
-  .hero__top { grid-area: top; }
   .hero__photo { grid-area: photo; order: 0; margin: 0; align-self: center; }
   .hero__photo .avatar img, .hero__photo .avatar__fallback { width: 60px; height: 60px; }
   .hero h1 { grid-area: name; margin: 12px 0 2px; font-size: clamp(1.6rem, 7.4vw, 1.9rem); }
@@ -219,9 +232,12 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
   .hero .avail { grid-area: avail; padding-right: 56px; } /* clear of the VINCE orb at the bottom right */
   .hero .social { grid-area: social; margin-top: 4px; }
   .hero .glance { grid-area: glance; margin-top: 16px; }
+  /* On the first screen of a 640px-tall phone this row sits by the VINCE orb (bottom right, 52px wide, 16px in):
+     keep it left of the orb. One row from 360px; narrower (or with a wider Customize font) More wraps below. */
+  .hero .glance__actions { padding-right: 48px; }
 }
 @media print { .lede__more { display: none !important; } .hero .lede { display: block; overflow: visible; } }
-/* Brief switch (Hero.jsx): label + pill track with a sliding thumb; the whole pill is the button (44px tall). */
+/* Brief switch (ProfileCard.jsx): label + pill track with a sliding thumb; the whole pill is the button (44px tall). */
 .brief-switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 8px 4px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text); font: 600 13px var(--mono); cursor: pointer; }
 .brief-switch:hover { border-color: var(--accent); }
 .brief-switch:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
@@ -242,13 +258,18 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .social a:hover { border-color: var(--accent); color: var(--accent); }
 .social svg { display: block; }
 
-/* 30-second brief (Brief.jsx): <html data-mode="brief"> hides the rest of the page, keeping the header and the brief switch. */
+/* 30-second brief (Brief.jsx): <html data-mode="brief"> hides the rest of the page, keeping the header and the brief
+   switch. The switch lives in the hero's profile block (ProfileCard.jsx); with the rest of the hero hidden it sits at
+   the top, above the brief, at every width (where it was before it moved), so turning the brief off is right there. */
 :root[data-mode='brief'] main > :not(.hero, .brief),
 :root[data-mode='brief'] .footer,
-:root[data-mode='brief'] .hero__text > :not(.hero__top),
+:root[data-mode='brief'] .hero__text,
 :root[data-mode='brief'] .hero__photo,
-:root[data-mode='brief'] .hero .glance { display: none; }
+:root[data-mode='brief'] .hero .glance > :not(.glance__actions, dialog),
+:root[data-mode='brief'] .hero .glance__more { display: none; }
 :root[data-mode='brief'] .hero { display: block; padding-bottom: 12px; }
+:root[data-mode='brief'] .hero .glance { margin: 8px 0 0; }
+:root[data-mode='brief'] .hero .glance__actions { margin: 0; }
 /* Until the app has mounted (index.html sets data-app, App.jsx removes it), only the prerendered header
    and hero are laid out, so the hero paints quickly (PERF-FE-007); the rest appears with the app. */
 :root[data-app='pending'] #main > :not(.hero), :root[data-app='pending'] .footer { display: none; }
@@ -421,7 +442,7 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 }
 
 /* Sections */
-section { padding: 20px 0; scroll-margin-top: 16px; }
+section { padding: 20px 0; }
 h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 /* Balanced rows, no orphaned last card: four-card groups (highlights, How I lead) as 2×2; three cards
@@ -513,6 +534,7 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
    role before printing. Brief and case-study printing have their own rules. */
 @media print {
   .header, .layout, .gview, .actions, #fit, #blogs, .skip, .progress { display: none; }
+  .header { position: static; }
   .contact .actions { display: flex; }
   .contact a[href^='http']::after { content: ' (' attr(href) ')'; font-weight: 400; overflow-wrap: anywhere; }
   .footer { padding-bottom: 28px; }

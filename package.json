@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:agent": "node scripts/test-local-agent.mjs && node scripts/test-local-agent-fresh.mjs && node scripts/test-local-agent-confidence.mjs",
-    "test:server": "node scripts/check-server.mjs"
+    "test:server": "node scripts/check-server.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -18,8 +19,14 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.10",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^29.1.1",
     "kokoro-js": "^1.2.1",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^5.1.0"
   }
 }

@@ -3,7 +3,6 @@ import ScrollProgress from './components/ScrollProgress.jsx'
 import Header from './components/Header.jsx'
 import Hero from './components/Hero.jsx'
 import Brief from './components/Brief.jsx'
-import Impact from './components/Impact.jsx'
 import Leadership from './components/Leadership.jsx'
 import Experience from './components/Experience.jsx'
 import Projects from './components/Projects.jsx'
@@ -128,18 +127,9 @@ export default function App() {
         <main id="main">
           <Hero brief={brief} onToggleBrief={() => showBrief(!brief)} toggleRef={toggleRef} />
           {brief && <Brief headingRef={headingRef} onClose={(opts) => showBrief(false, opts)} />}
-          {/* Keep Header.jsx nav and VINCE's tour (agent/vince.js tourSteps) in this order. */}
-          <Impact />
+          {/* Keep Header.jsx nav and VINCE's tour (agent/vince.js tourSteps) in this order. "At a glance" is
+              a dialog opened from the hero (Impact.jsx), not a section. */}
           <Leadership />
-          <Projects />
-          <Experience />
-          <SectionBoundary id="fit" className="lazy-ph lazy-ph--fit" title="Check role fit" onRetry={RoleFit.reset}>
-            {mounted ? (
-              <Suspense fallback={fitPlaceholder}>
-                <RoleFit />
-              </Suspense>
-            ) : fitPlaceholder}
-          </SectionBoundary>
           <div className="layout">
             {/* Full width; the profile card is in the hero (Hero.jsx). Questions go to VINCE (the
                 floating panel; the header's "ask VINCE" opens it). */}
@@ -152,6 +142,15 @@ export default function App() {
               ) : graphPlaceholder}
             </SectionBoundary>
           </div>
+          <Projects />
+          <Experience />
+          <SectionBoundary id="fit" className="lazy-ph lazy-ph--fit" title="Check role fit" onRetry={RoleFit.reset}>
+            {mounted ? (
+              <Suspense fallback={fitPlaceholder}>
+                <RoleFit />
+              </Suspense>
+            ) : fitPlaceholder}
+          </SectionBoundary>
           <Skills />
           <Credentials />
           <Blogs />

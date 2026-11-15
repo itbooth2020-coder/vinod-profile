@@ -4,6 +4,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { resetHelpOff } from '../components/mailtoCheck.js'
 
 // The static site's setting: VINCE answers from the offline resume search, never /api (askAgent.js).
 // Tests that need the live path stub it to 'true' and reload the module.
@@ -83,6 +84,34 @@ if (browser) {
     this.dispatchEvent(new Event('close'))
   }
 
+  // Popover API (EmailButton.jsx shows its menu in the top layer): showPopover()/hidePopover() record the
+  // state in data-popover-open, since jsdom has no top layer and no :popover-open (so its UA stylesheet
+  // hides every [popover]; the style below shows the open ones, as :popover-open would; !important because
+  // jsdom ranks its UA rule by specificity, not by origin). A test can delete showPopover from the
+  // prototype (and restore it) to exercise the fallback.
+  const popoverStyle = document.createElement('style')
+  popoverStyle.dataset.test = 'popover'
+  popoverStyle.textContent = '[popover][data-popover-open] { display: block !important; }'
+  document.head.append(popoverStyle)
+  Object.defineProperty(HTMLElement.prototype, 'popover', {
+    configurable: true,
+    get() {
+      return this.getAttribute('popover')
+    },
+    set(v) {
+      if (v == null) this.removeAttribute('popover')
+      else this.setAttribute('popover', v)
+    },
+  })
+  HTMLElement.prototype.showPopover = function showPopover() {
+    if (!this.hasAttribute('popover')) throw new DOMException('Not a popover', 'NotSupportedError')
+    if (this.hasAttribute('data-popover-open')) throw new DOMException('Already showing', 'InvalidStateError')
+    this.setAttribute('data-popover-open', '')
+  }
+  HTMLElement.prototype.hidePopover = function hidePopover() {
+    this.removeAttribute('data-popover-open')
+  }
+
   // Canvas: a 2D context that accepts every call and remembers assigned properties (ArcOrb, Chart).
   HTMLCanvasElement.prototype.getContext = function getContext() {
     const canvas = this
@@ -127,6 +156,7 @@ afterEach(() => {
   FakeObserver.instances = []
   localStorage.clear()
   sessionStorage.clear()
+  resetHelpOff()
   document.documentElement.removeAttribute('data-mode')
   if (window.location.hash || window.location.search) history.replaceState(null, '', '/')
 })

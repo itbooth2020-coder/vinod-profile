@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 const SERVER_ENV = [
   'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL',
   'PROFILE_AGENT_MODEL', 'PROFILE_AGENT_VOICE_MODEL', 'PROFILE_AGENT_DAILY_LIMIT', 'PROFILE_AGENT_ORIGINS',
-  'PROFILE_AGENT_SECRET', 'TRUST_PROXY',
+  'PROFILE_AGENT_SECRET', 'PROFILE_AGENT_REDACT', 'PROFILE_AGENT_RESUME', 'TRUST_PROXY',
   'VINCE_VOICE', 'KOKORO_VOICE', 'KOKORO_DTYPE', 'KOKORO_SPEED',
 ]
 
@@ -32,8 +32,11 @@ function profileAgent(env) {
 // Content-Security-Policy for the static site (PERF-BE-005), added to dist/index.html as a <meta>
 // at build time only: the dev server injects inline scripts of its own. The hashes of index.html's
 // inline script and style are computed here, so editing them can't silently break the page.
-// frame-ancestors can't be set from a <meta>: CloudFront sends it as a header, together with this
-// same policy (keep .claude/agents/aws-deployer.md in sync).
+// frame-ancestors can't be set from a <meta>, so CloudFront sends it as a header. That header holds only
+// the directives that apply to every page (frame-ancestors 'none'; base-uri 'self'; object-src 'none';
+// form-action 'self' mailto:), never this policy's hashes, which would go stale and block the other
+// pages' inline styles. The browser enforces the header and this meta together (keep
+// .claude/agents/aws-deployer.md in sync).
 //   script-src: this site only (blog posts are built in by scripts/fetch-blogs.mjs; no JSONP)
 //   style-src / font-src: Google Fonts, only for a font picked in Customize (ThemePicker.jsx)
 //   img-src: this site only; blog thumbnails are downloaded at build time into public/blog-thumbs/

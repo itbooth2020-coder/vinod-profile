@@ -199,6 +199,10 @@ export const CONCEPTS = {
   llm: ['llm', 'large language model', 'gpt', 'chatgpt', 'openai', 'genai', 'generative ai', 'language model', 'model provider', 'ai vendor', 'llm vendor', 'vendor * agent', 'which model', 'foundation model', 'anthropic', 'claude'],
   agents: ['ai agent', 'agent', 'agentic', 'multi agent', 'orchestrat*', 'coding assistant', 'code assistant', 'ai assistant', 'ai coding', 'ai tool', 'copilot*', 'claude code'],
   ai: ['ai', 'artificial intelligence'],
+  // Application security and the vulnerability remediation program for a global bank (current work at Accenture).
+  security: ['security', 'appsec', 'secure coding', 'vulnerab*', 'remediat*', 'owasp', 'owasp top 10', 'owasp top ten', 'masvs', 'sast', 'dast', '=sca', 'software composition analysis', 'static analysis', 'penetration test*', 'pen test*', 'pentest*', 'devsecop*', 'pci', 'pci dss', '=tls', 'cve', 'security patch*', 'security sla*', 'security finding*', 'rescan*'],
+  // Technical program management: his title line and the program governance he runs.
+  tpm: ['technical program manag*', '=tpm', 'program manag*', 'programme manag*', 'program governance', 'governance', 'leadership dashboard*', 'sla complian*', 'sla tracking', 'kpi tracking', 'run * program', 'manage * program'],
   // A number asked about: "by how much did X drop", "what percent", "how many devices".
   measure: ['how much', 'by how much', 'what percent*', 'percentage', 'percent', 'by what', 'how many', 'faster', 'quicker', 'slower', 'speed up', 'reduce', 'reduction', 'cut', 'improve', 'improvement', 'increase', 'decrease', 'save', 'saving', 'drop', 'shorten'],
   // The client of a project ("the client for PRESTO", "which customer was it for").

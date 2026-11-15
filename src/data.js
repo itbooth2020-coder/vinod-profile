@@ -7,17 +7,19 @@ export const profile = {
   name: 'Vinod Pyarelal Yadav',
   firstName: 'Vinod Pyarelal',
   lastName: 'Yadav',
-  headline: 'Engineering Manager | Mobile & Enterprise Architecture | Scalable Systems',
+  headline: 'Engineering Manager | Technical Program Manager | Application Security | Mobile & Enterprise Architecture',
   tagline:
-    'Engineering Manager with 14+ years leading teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered and web platforms at scale.',
+    'Engineering Manager and Technical Program Manager with 14+ years leading teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered and web platforms at scale.',
   // Hero lede: a one-sentence pitch from the Accenture bullets in the resume ("managing a team of 35+
   // engineers", "budget … for a 35-engineer org", "100% on-time milestone delivery", "release cycle time
-  // from 3 weeks to 5 days", "reducing team attrition by 20%"). The second sentence is from the Darwin
-  // bullets: "Led the Darwin Portal program for Syngenta, … AI assistant routes requests to specialist
-  // Claude AI agents" and "Used Claude Code agents to build the project … under engineer oversight".
-  // The tagline above is still VINCE's intro. Keep index.html's static fallback in sync.
+  // from 3 weeks to 5 days", "reducing team attrition by 20%"). The second sentence is from the global-bank
+  // bullets ("Technical Program Manager for a global bank's Application Security & Vulnerability Remediation
+  // Program … across approximately 3,000 Android, iOS, and web applications") and the Darwin bullet
+  // ("Led the Darwin Portal program for Syngenta, … routes requests to specialist Claude AI agents").
+  // localAgent.js turns its "Now …" opening into "He is now …" for spoken pitches.
+  // The tagline above is still VINCE's intro. Keep index.html's meta descriptions in sync.
   pitch:
-    "Engineering Manager leading a 35+ engineer, budget-owning org at Accenture: 100% on-time milestones, release cycles cut from 3 weeks to 5 days, and attrition down 20%. Led Syngenta's Darwin Portal, whose AI assistant routes requests to specialist Claude AI agents, built with Claude Code agents under engineer oversight.",
+    "Engineering Manager and Technical Program Manager leading a 35+ engineer, budget-owning org at Accenture: 100% on-time milestones, release cycles cut from 3 weeks to 5 days, and attrition down 20%. Now driving security vulnerability remediation across ~3,000 Android, iOS and web applications for a global bank; also led Syngenta's Darwin Portal, built on specialist Claude AI agents.",
   role: 'Custom Software Engineering Manager',
   company: 'Accenture',
   location: 'Bengaluru, Karnataka',
@@ -27,9 +29,9 @@ export const profile = {
   x: 'https://x.com/yadavvinod579',
   github: 'https://github.com/vinodyadav5799',
   source: 'https://github.com/itbooth2020-coder/vinod-profile', // this site's source code
-  domains: ['Mobile', 'IoT', 'MDM / EMM', 'AI Agents', 'Enterprise', 'Web'],
+  domains: ['Application Security', 'Mobile', 'IoT', 'MDM / EMM', 'AI Agents', 'Enterprise', 'Web'],
   summary:
-    'Results-driven Engineering Manager with 14+ years of experience leading cross-functional teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered, and web platforms at scale. Proven track record of improving system performance by 30%+, shipping solutions supporting 30K+ users and devices, and reducing time-to-market through CI/CD automation. Deep expertise in Android/iOS, MDM/EMM, prompt engineering, Claude AI agent integration, agentic development, system architecture, and Agile delivery across Retail, Transit, Healthcare, Agri-Tech, and Enterprise Mobility verticals. Adept at hiring, mentoring, setting OKRs, managing stakeholder relationships, budget ownership, and aligning engineering roadmaps with business strategy.',
+    'Results-driven Engineering Manager and Technical Program Manager with 14+ years of experience leading cross-functional teams of 20–50 engineers to deliver enterprise-grade mobile, IoT, AI-powered, and web platforms at scale. Currently driving application security vulnerability remediation across approximately 3,000 mobile and web applications for a global bank. Proven track record of improving system performance by 30%+, shipping solutions supporting 30K+ users and devices, and reducing time-to-market through CI/CD automation. Deep expertise in Android/iOS, application security (OWASP, SAST/DAST/SCA), MDM/EMM, prompt engineering, Claude AI agent integration, agentic development, system architecture, and Agile delivery across Banking, Retail, Transit, Healthcare, Agri-Tech, and Enterprise Mobility verticals. Adept at program governance, hiring, mentoring, setting OKRs, managing stakeholder relationships, budget ownership, and aligning engineering roadmaps with business strategy.',
 }
 
 // Profile dialog. Vinod's age and date of birth are deliberately not stored or shown anywhere.
@@ -57,7 +59,7 @@ export const profileCard = [
   ['team scale', '35+ engineers'],
   ['scale', '30K+ users and devices'],
   ['location', 'Bengaluru, India'],
-  ['verticals', 'Retail, Transit, Healthcare, Agri-Tech, Enterprise Mobility'],
+  ['verticals', 'Banking, Retail, Transit, Healthcare, Agri-Tech, Enterprise Mobility'],
 ]
 
 // Availability, confirmed by Vinod (not in the resume). When shown: the hero and 30-second brief strip
@@ -139,6 +141,8 @@ export const leadershipPhilosophy =
 export const highlights = [
   // The resume's career-wide summary line; "over his career" scopes it against the Accenture stat (UX-005).
   { title: 'Team Scale', text: 'Led cross-functional teams of 20–50 engineers across 5+ concurrent enterprise programs over his career' },
+  // Resume: "Program-managing vulnerability remediation across ~3,000 Android, iOS, and web applications for a global bank"
+  { title: 'Application Security', text: 'Program-managing vulnerability remediation across ~3,000 Android, iOS, and web applications for a global bank' },
   { title: 'Performance', text: 'Improved system performance by 30%+ across Android, iOS, and web platforms' },
   { title: 'User Scale', text: 'Delivered production-grade solutions serving 30K+ users/devices globally' },
   { title: 'Architecture', text: 'Architected scalable MDM, IoT, AI-agent, transit payment, and retail mobility platforms from 0 to production' },
@@ -152,7 +156,12 @@ export const experience = [
     location: 'Bengaluru',
     period: 'Jun 2024 – Present',
     current: true,
+    // The three global-bank bullets lead, as in the resume, in the present tense ("Serving as" -> "Serves as")
+    // so they read after "he" in the assistant's answers.
     points: [
+      "Serves as Technical Program Manager for a global bank's Application Security & Vulnerability Remediation Program, owning end-to-end remediation delivery across approximately 3,000 Android, iOS, and web applications and coordinating multiple Tech Leads and developer workstreams with the bank's security teams, application owners, and architects.",
+      'Establishes the remediation operating model: consolidating SAST, DAST, and SCA findings, classifying vulnerabilities by severity (Critical to Low), and prioritizing by exploitability, business impact, exposure, and regulatory requirements; assigning application ownership and defining remediation SLAs, milestones, and sprint-level plans.',
+      'Runs daily/weekly governance and technical reviews; tracks SLA compliance, aging findings, reopen rates, risks, and dependencies through centralized leadership dashboards; drives closure with QA, penetration testing, rescans, and validation evidence.',
       'Spearheaded end-to-end delivery of 3 enterprise mobility programs simultaneously, managing a team of 35+ engineers across Android, iOS, and web stacks, achieving 100% on-time milestone delivery.',
       'Managed engineering budget and resource allocation for a 35-engineer org, overseeing headcount planning, vendor costs, and tooling investments — optimizing team structure to reduce operational costs by 15%.',
       'Designed and deployed MDM/EMM solutions for provisioning and managing 10,000+ enterprise devices, reducing device onboarding time by 40% through automation.',
@@ -160,9 +169,8 @@ export const experience = [
       'Established CI/CD pipelines using Jenkins, Git, and DevOps tooling, reducing release cycle time from 3 weeks to 5 days and cutting production defects by 35%.',
       'Delivered GroceryTech mobile solutions with Bluetooth proximity, real-time location tracking, and barcode scanning, improving warehouse operational efficiency by 25%.',
       'Led the Darwin Portal program for Syngenta, architecting a React Native for Web agri-intelligence portal whose orchestrator-core AI assistant routes requests to specialist Claude AI agents, with CopilotKit, AG-UI, and A2UI rendering agent responses as interactive UI.',
-      'Applied prompt engineering across the assistant: role-based system prompts, few-shot examples, structured JSON outputs, tool-calling instructions, and grounding guardrails, refined through test-set evaluation.',
-      'Used Claude Code agents to build the project (scaffolding, code generation, refactoring, unit tests, code review) under engineer oversight, and the Claude Agent SDK with Python on Databricks for backend APIs and crop-yield, crop-stabilization, and seed-loss prediction models.',
-      'Defined quarterly OKRs, conducted bi-weekly performance reviews, and drove hiring of 8 senior engineers, reducing team attrition by 20%.',
+      'Applied prompt engineering (system prompts, few-shot examples, structured JSON outputs, grounding guardrails) and used Claude Code and the Claude Agent SDK with Python on Databricks to build backend APIs and crop-yield, crop-stabilization, and seed-loss prediction models.',
+      'Defined quarterly OKRs for the engineering team, conducted bi-weekly performance reviews, and drove hiring of 8 senior engineers, reducing team attrition by 20%.',
       'Managed stakeholder communications across client leadership, product, and operations teams, ensuring roadmap alignment and proactive risk mitigation.',
     ],
   },
@@ -252,9 +260,34 @@ export const experience = [
 //               "X to Y" figures, or { label, change, unit, better } for a single relative change.
 export const projects = [
   {
+    name: 'Global Bank – Application Security & Vulnerability Remediation',
+    media: 'project/bank-appsec',
+    tag: 'Banking · Application Security',
+    // VINCE's tour line (vince.js tourSteps), short and spoken after the name (CHAT-014).
+    tourLine: 'an enterprise-wide program remediating security vulnerabilities across about 3,000 Android, iOS and web applications',
+    text: "Enterprise-wide program remediating security vulnerabilities across a global bank's portfolio of approximately 3,000 Android, iOS, and web applications within agreed security SLAs, through code fixes, dependency upgrades, configuration changes, and security patches aligned to OWASP Top 10 and OWASP MASVS.",
+    caseStudy: {
+      // Context: the resume's global-bank project description (also the card text). Role: the first global-bank
+      // bullet in the Accenture experience entry. Approach: the labelled points under the resume's
+      // global-bank project. All verbatim except the client, named only as "a global bank" on this site.
+      company: 'Accenture',
+      client: 'A global bank',
+      context: "Enterprise-wide program remediating security vulnerabilities across a global bank's portfolio of approximately 3,000 Android, iOS, and web applications within agreed security SLAs, through code fixes, dependency upgrades, configuration changes, and security patches aligned to OWASP Top 10 and OWASP MASVS.",
+      role: "Serves as Technical Program Manager for a global bank's Application Security & Vulnerability Remediation Program, owning end-to-end remediation delivery across approximately 3,000 Android, iOS, and web applications and coordinating multiple Tech Leads and developer workstreams with the bank's security teams, application owners, and architects.",
+      approach: [
+        'Execution approach: Six-phase model — discovery and application inventory, severity classification and risk-based prioritization, resource allocation, engineering remediation, validation and closure, and continuous monitoring.',
+        'Governance & KPIs: Leadership dashboards tracking application coverage, vulnerability backlog, Critical/High exposure, SLA compliance, aging findings, reopen rate, and team throughput.',
+        'Validation: Functional, regression, and security testing with QA, AppSec, and penetration testing teams; closure confirmed through rescans and validation evidence.',
+      ],
+      outcomes: [],
+      metrics: [],
+    },
+  },
+  {
     name: 'Darwin Portal – Syngenta',
     media: 'project/darwin',
     tag: 'Agri-Tech AI Platform',
+    tourLine: 'an AI-powered agri-intelligence portal for Syngenta, built on specialist Claude AI agents',
     text: 'AI-powered agricultural intelligence portal giving Syngenta teams a conversational assistant for crop-yield, crop-stabilization, and seed-loss insights, backed by Databricks data pipelines and predictive models.',
     caseStudy: {
       company: 'Accenture',
@@ -345,9 +378,17 @@ export const projects = [
 ]
 
 // Domain graph: Vinod -> vertical (or domain) -> project -> technologies. All from the resume.
-export const graphDomains = ['Mobile', 'IoT', 'MDM / EMM', 'AI Agents', 'Web']
+export const graphDomains = ['Application Security', 'Mobile', 'IoT', 'MDM / EMM', 'AI Agents', 'Web']
 
 export const graphProjects = [
+  {
+    short: 'Bank AppSec',
+    name: 'Global Bank – Application Security & Vulnerability Remediation Program',
+    vertical: 'Banking',
+    domains: ['Application Security', 'Mobile', 'Web'],
+    tech: ['SAST', 'DAST', 'SCA', 'OWASP Top 10', 'OWASP MASVS', 'Penetration Testing', 'Leadership Dashboards'],
+    text: 'Technical program management of vulnerability remediation across ~3,000 Android, iOS and web applications within agreed security SLAs, aligned to OWASP Top 10 and OWASP MASVS.',
+  },
   {
     short: 'Darwin Portal',
     name: 'Darwin Portal – Syngenta',
@@ -448,19 +489,20 @@ export const otherProjects = [
   'Ciber Connect Enterprise App',
 ]
 
-// Every skill in the resume's Technical skills section, ordered leadership first (UX-008). Older
+// Every skill in the resume's Technical skills section, ordered leadership (Program Management) first (UX-008). Older
 // items sit in the last group (earlier: true), which Skills.jsx shows as a collapsed "Earlier
 // experience" group; the assistant and role fit still use every item. Resume group of each moved item:
 // Xamarin (Mobile), jQuery and PHP (Frontend / Web), Singleton and Observer (Architecture), Google Ads (Cloud & IoT).
 export const skills = [
-  { area: 'Leadership & Methodologies', items: ['Agile/Scrum', 'OKR Frameworks', 'Budget Management', 'Sprint Planning', 'SDLC', 'Waterfall'] },
+  { area: 'Program Management', items: ['Technical Program Management', 'Program Governance', 'SLA & KPI Tracking', 'Risk & Dependency Management', 'Leadership Dashboards', 'Stakeholder Management', 'Agile/Scrum', 'Waterfall', 'OKRs', 'SDLC', 'Sprint Planning', 'Budget Management'] },
+  { area: 'Application Security', items: ['Vulnerability Management & Remediation', 'OWASP Top 10', 'OWASP MASVS', 'SAST', 'DAST', 'SCA', 'Secure Coding', 'Security SLAs', 'Penetration Test Coordination', 'PCI DSS awareness', 'TLS & Certificates', 'DevSecOps'] },
   { area: 'AI & Agents', items: ['Claude AI Agent Integration', 'Claude Agent SDK', 'Claude Code (Agentic Development)', 'Multi-Agent Orchestration', 'Tool/Function Calling', 'CopilotKit', 'AG-UI', 'A2UI', 'Generative AI', 'NLP', 'Data Analysis & Model Training'] },
   { area: 'Prompt Engineering', items: ['System Prompt Design', 'Few-Shot Prompting', 'Structured JSON Outputs', 'Context Management', 'Guardrails & Grounding', 'Prompt Evaluation & Iteration'] },
   { area: 'Architecture', items: ['MVVM', 'MVC', 'Microservices', 'MDM/EMM'] },
   { area: 'Mobile', items: ['Android (Kotlin, Java, Jetpack Compose)', 'iOS (Swift, SwiftUI)', 'Flutter', 'React Native'] },
   { area: 'Frontend / Web', items: ['React JS', 'Next.js', 'TypeScript', 'JavaScript', 'HTML5'] },
   { area: 'Backend & APIs', items: ['Node.js', 'RESTful APIs', 'Python', 'Databricks', 'XML', 'JSON', 'MySQL', 'SQLite'] },
-  { area: 'DevOps & CI/CD', items: ['Jenkins', 'GitHub', 'GitLab', 'Azure DevOps', 'Git'] },
+  { area: 'DevOps & CI/CD', items: ['Jenkins', 'GitHub', 'GitHub Actions', 'GitLab', 'Azure DevOps', 'Git'] },
   { area: 'Cloud & IoT', items: ['Firebase', 'Google Maps', 'Azure', 'NFC', 'Bluetooth', 'Wi-Fi modules'] },
   { area: 'Libraries', items: ['Dagger 2', 'Hilt', 'RxJava', 'Rx Android', 'OpenTok', 'PayPal SDK'] },
   { area: 'Earlier experience', earlier: true, items: ['Xamarin', 'jQuery', 'PHP', 'Singleton', 'Observer', 'Google Ads'] },
@@ -506,6 +548,7 @@ export const suggestedPrompts = [
   'Which companies has he worked for?',
   'What impact has he had?',
   'Show me his projects',
+  'Tell me about his bank application security program',
   'Tell me about the Darwin Portal AI project',
   'Which tech stack does he know?',
 ]

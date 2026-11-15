@@ -191,6 +191,23 @@ describe('answerLocally', () => {
       expect(converse('Tell me about the PRESTO project', 'Who was the client?')).toMatch(/client for \*\*PRESTO\*\* is \*\*Metrolinx\*\*/)
     })
 
+    it('answers the current bank program, and its team size, without inventing a head count', () => {
+      expect(answerLocally('What is his current role?')).toMatch(/Technical Program Manager for a global bank's Application Security & Vulnerability Remediation Program/)
+      expect(answerLocally('What application security work has he done?')).toMatch(/3,000 Android, iOS, and web applications[\s\S]*OWASP Top 10/)
+      expect(converse('Tell me about the bank program', 'How big was the team?')).toMatch(/doesn't state the team size for Global Bank/)
+      expect(converse('Tell me about the bank program', 'Who was the client?')).toMatch(/client for \*\*Application Security & Vulnerability Remediation\*\* is \*\*a global bank\*\*/)
+    })
+
+    // Owner decision (Nov 2026): the client is named only as "a global bank"; a question naming a bank
+    // gets neither a yes nor a no.
+    it('answers questions naming a specific bank neutrally', () => {
+      for (const q of ['Has he worked with HSBC?', 'Has he worked for Barclays?']) {
+        const a = answerLocally(q)
+        expect(a).toMatch(/described only as a global bank/)
+        expect(a).not.toMatch(/\byes\b|\bconfirm/i)
+      }
+    })
+
     it('a question with its own subject ignores the history', () => {
       expect(converse('Tell me about the Darwin project', 'How old is Vinod?')).toBe("His age and date of birth aren't shared.")
     })

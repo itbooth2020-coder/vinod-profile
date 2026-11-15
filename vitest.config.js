@@ -13,5 +13,9 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     include: ['src/**/*.test.{js,jsx}', 'server/**/*.test.js'],
     restoreMocks: true,
+    // TEST-007: on Windows, a workspace opened as c:\… (lowercase drive) made the default pool load
+    // Vitest twice, once per drive spelling, so every file failed with "Vitest failed to find the
+    // runner". vmThreads runs each file in a VM context and passes with either spelling.
+    pool: 'vmThreads',
   },
 })

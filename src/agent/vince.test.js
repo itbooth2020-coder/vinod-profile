@@ -35,7 +35,7 @@ describe('briefNarration (the 30-second brief)', () => {
 
 describe('tourSteps', () => {
   it('visits each section once, in page order', () => {
-    expect(tourSteps().map((s) => s.target)).toEqual(['top', 'impact', 'lead', 'projects', 'experience', 'skills', 'credentials', 'blogs', 'contact'])
+    expect(tourSteps().map((s) => s.target)).toEqual(['top', 'glance', 'lead', 'projects', 'experience', 'skills', 'credentials', 'blogs', 'contact'])
   })
 
   it('narrates from the data without placeholders', () => {
@@ -43,6 +43,24 @@ describe('tourSteps', () => {
       expect(s.text).not.toMatch(/undefined|NaN|\[object/)
       expect(s.text.length).toBeGreaterThan(20)
     }
+  })
+
+  it('leads the projects with the current bank program, with the right articles', () => {
+    const text = tourSteps().find((s) => s.target === 'projects').text
+    expect(text).toMatch(/Global Bank, an enterprise-wide program/)
+    expect(text).toMatch(/Darwin Portal, an AI-powered/)
+    expect(tourSteps().find((s) => s.target === 'glance').text).toMatch(/He is currently program-managing vulnerability remediation across ~3,000/)
+  })
+
+  it('CHAT-014: stays within 300 words; the At a glance stop points to the button and reads only its stats', () => {
+    const steps = tourSteps()
+    expect(steps.reduce((n, s) => n + s.text.trim().split(/\s+/).length, 0)).toBeLessThanOrEqual(300)
+    const glance = steps.find((s) => s.target === 'glance').text
+    expect(glance).toMatch(/^Press At a glance for his headline numbers: 35\+ engineers led, 100% on-time milestones, 3 weeks to 5 days release cycle and 8 senior engineers hired\./)
+    expect(glance).not.toMatch(/30%\+|30K\+|5\+ concurrent/) // highlights inside the closed dialog aren't read
+    const projects = steps.find((s) => s.target === 'projects').text
+    expect(projects).not.toMatch(/a global bank's portfolio/) // "Global Bank, … a global bank's …" said twice
+    expect(projects.split(/\s+/).length).toBeLessThanOrEqual(45)
   })
 
   it('does not narrate the collapsed Earlier experience skills', () => {

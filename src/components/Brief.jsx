@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { profile, profileCard, stats, projects } from '../data.js'
 import Avatar from './Avatar.jsx'
 import Availability from './Availability.jsx'
+import EmailButton from './EmailButton.jsx'
 
 // "30-second brief": a one-screen summary for recruiters. Shown while <html data-mode="brief">
 // (see App.jsx); styles.css hides the rest of the page so nothing else unmounts.
@@ -55,16 +56,19 @@ export default function Brief({ headingRef, onClose }) {
     const ignored = (el) => !(el instanceof Element) || el.closest(
       '#brief, a, button, input, select, textarea, label, summary, [role="button"], [contenteditable], ' +
       '[tabindex]:not([tabindex="-1"]), dialog, [role="dialog"], .vince, .vince-launch, .vince-dock, ' +
-      '.vince-backdrop, [data-vince-trigger], #theme-panel, [aria-controls="theme-panel"]',
+      '.vince-backdrop, [data-vince-trigger], #theme-panel, [aria-controls="theme-panel"], .email__menu',
     )
+    // An open dialog, theme panel, VINCE panel or Email chooser closes on its own outside press; leave the
+    // brief be. The Email menu closes on the click after this pointerup and returns focus to its button
+    // (FUNC-022), so a press is ignored if a chooser is open at either end of it.
+    const ownsPress = () => document.querySelector('dialog[open], #theme-panel, .vince--normal, .email__menu:not([hidden])')
     const onPointerDown = (e) => {
       start = null
       if (e.button !== 0 || !e.isPrimary) return
       const root = document.documentElement
       if (e.clientX >= root.clientWidth || e.clientY >= root.clientHeight) return // page scrollbar
       if (ignored(e.target)) return
-      // An open dialog, theme panel or VINCE panel closes on its own outside press; leave the brief be.
-      if (document.querySelector('dialog[open], #theme-panel, .vince--normal')) return
+      if (ownsPress()) return
       start = { x: e.clientX, y: e.clientY }
     }
     const onCancel = () => { start = null }
@@ -74,7 +78,7 @@ export default function Brief({ headingRef, onClose }) {
     const onPointerUp = (e) => {
       const from = start
       start = null
-      if (!from || e.button !== 0 || !e.isPrimary || ignored(e.target)) return
+      if (!from || e.button !== 0 || !e.isPrimary || ignored(e.target) || ownsPress()) return
       if (Math.hypot(e.clientX - from.x, e.clientY - from.y) > 10) return
       const swallow = (ev) => { ev.preventDefault(); ev.stopPropagation() }
       window.addEventListener('click', swallow, { capture: true, once: true })
@@ -165,7 +169,7 @@ export default function Brief({ headingRef, onClose }) {
       </div>
 
       <div className="actions" data-brief="actions">
-        <a className="btn btn--primary" href={`mailto:${profile.email}`}>Email</a>
+        <EmailButton />
         {/* Leaves brief mode via App's in-page link handling; RoleFit then focuses its heading. */}
         <a className="btn" href="#fit">Check role fit</a>
         <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">

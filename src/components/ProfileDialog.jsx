@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { profile, personal, quotes, experience, education } from '../data.js'
 import useMotionPaused from '../hooks/useMotion.js'
+import EmailButton from './EmailButton.jsx'
 
 const pickQuote = (not) => {
   const pool = quotes.filter((q) => q !== not)
@@ -87,7 +88,7 @@ export default function ProfileDialog({ titleId }) {
           ))}
         </dl>
         <div className="actions">
-          <a className="btn btn--primary" href={`mailto:${profile.email}`}>Email</a>
+          <EmailButton />
           <a className="btn" href={profile.linkedin} target="_blank" rel="noopener noreferrer">
             LinkedIn ↗<span className="sr-only"> (opens in a new tab)</span>
           </a>

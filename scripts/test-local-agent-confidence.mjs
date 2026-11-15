@@ -57,7 +57,7 @@ const TABLE_D = [
   ['How much faster are releases thanks to him?', all(sure, lead(250, /3 weeks to 5 days/), lacks(/Meijer/))],
   ['By what percentage did he speed up device onboarding?', all(sure, lead(250, /40%/), lacks(/notice period|please contact Vinod directly/))],
   ['What role did AI play in the Syngenta work?', all(sure, has(/Darwin/, /Claude AI agents/), lacks(/looking for|please contact Vinod directly/))],
-  ['Did he use AI coding assistants to write software?', all(sure, has(/Claude Code agents/), lacks(/AndroidSuperNerds|Batman/))],
+  ['Did he use AI coding assistants to write software?', all(sure, has(/Claude Code\b/), lacks(/AndroidSuperNerds|Batman/))],
   ['Can you share a number I can ring him on?', all(has(/don't share a phone number/, /mailto:/), lacks(/\+91|\d{5}\s?\d{5}/))],
   ["I'd like his CV as a file, please", resumeOnRequest],
   ['What is the short version of his background?', all(sure, has(/14\+ years/), (a) => sentences(a) <= 2)],

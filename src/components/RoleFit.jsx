@@ -154,7 +154,7 @@ export default function RoleFit() {
                 <ul className="fit__list">
                   {result.related.map((r) => (
                     <li key={r.label} className="card fit__rel">
-                      <p><span className="fit__term">{r.label}</span> <span className="fit__via">not named in the profile; related: {r.via.join(', ')}</span></p>
+                      <p><span className="fit__term">{r.label}</span> <span className="fit__via">{r.note ? `in the profile as ${r.note}` : `not named in the profile; related: ${r.via.join(', ')}`}</span></p>
                       <Evidence items={r.evidence} />
                     </li>
                   ))}

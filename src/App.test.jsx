@@ -23,6 +23,22 @@ describe('App', () => {
   it("has every section VINCE's guided tour visits", () => {
     renderApp()
     for (const s of tourSteps()) expect(document.getElementById(s.target), s.target).not.toBeNull()
+    // "At a glance" is the hero's dialog button now, not a section.
+    expect(document.getElementById('glance')).toHaveAccessibleName('At a glance')
+    expect(document.getElementById('impact')).toBeNull()
+  })
+
+  it('puts the domain graph right after "How I lead", and "At a glance" in the hero beside Email', () => {
+    renderApp()
+    const blocks = [...document.getElementById('main').children]
+    const lead = blocks.findIndex((el) => el.id === 'lead')
+    expect(lead).toBeGreaterThan(-1)
+    expect(blocks[lead + 1]).toHaveClass('layout')
+    expect(within(blocks[lead + 1]).getByRole('heading', { name: 'Domain graph', level: 2 })).toBeInTheDocument()
+    expect(blocks[lead + 2]).toHaveAttribute('id', 'projects')
+    expect(blocks.map((el) => el.id).filter(Boolean)).toEqual(['top', 'lead', 'projects', 'experience', 'fit', 'skills', 'credentials', 'blogs', 'contact'])
+    const hero = document.getElementById('top')
+    expect(within(hero).getByRole('button', { name: 'Email' }).closest('.email').nextElementSibling).toBe(within(hero).getByRole('button', { name: 'At a glance' }))
   })
 
   it('the 30-second brief switch shows the brief, moves focus to it, and Back returns', async () => {

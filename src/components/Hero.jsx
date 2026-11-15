@@ -3,6 +3,8 @@ import { profile } from '../data.js'
 import Avatar from './Avatar.jsx'
 import Availability from './Availability.jsx'
 import ProfileCard from './ProfileCard.jsx'
+import Impact from './Impact.jsx'
+import EmailButton from './EmailButton.jsx'
 
 // Simple-icons style glyphs (24x24), drawn with currentColor. `sr` is the accessible name; the
 // footer lists the same four profiles.
@@ -47,9 +49,11 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
           {more ? 'Show less' : 'Read more'}
         </button>
         <Availability />
-        {/* VINCE stays one click away in the floating launcher and the header nav ("ask VINCE"). */}
+        {/* VINCE stays one click away in the floating launcher and the header nav ("ask VINCE").
+            "At a glance" opens the metrics and highlights in a dialog (Impact.jsx). */}
         <div className="actions">
-          <a className="btn btn--primary" href={`mailto:${profile.email}`}>Email</a>
+          <EmailButton />
+          <Impact brief={brief} />
         </div>
         <ul className="social" aria-label="Social profiles">
           {SOCIAL.map((s) => (
@@ -67,7 +71,7 @@ export default function Hero({ brief, onToggleBrief, toggleRef }) {
       <div className="hero__photo">
         <Avatar priority sizes="(min-width: 900px) 200px, (max-width: 600px) 60px, 76px" />
       </div>
-      {/* At a glance, the brief switch and "More" (the profile dialog): under the photo on desktop, after the
+      {/* Profile details, the brief switch and "More" (the profile dialog): under the photo on desktop, after the
           social links on phones. In brief mode only the switch stays (styles.css). */}
       <ProfileCard brief={brief} onToggleBrief={onToggleBrief} toggleRef={toggleRef} />
     </section>

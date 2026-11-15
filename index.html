@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Vinod Pyarelal Yadav, Engineering Manager at Accenture: 14+ years in mobile, IoT and web. Led Syngenta's Darwin Portal, built on specialist Claude AI agents." />
+    <meta name="description" content="Vinod Pyarelal Yadav, Engineering Manager and Technical Program Manager at Accenture: 14+ years in mobile, IoT, AI and web. Driving security vulnerability remediation across ~3,000 apps for a global bank." />
     <meta name="theme-color" content="#0b0e14" />
     <meta name="color-scheme" content="dark light" />
     <link rel="canonical" href="https://www.vinodyadav.com/" />
@@ -11,7 +11,7 @@
     <meta property="og:url" content="https://www.vinodyadav.com/" />
     <meta property="og:site_name" content="Vinod Pyarelal Yadav" />
     <meta property="og:title" content="Vinod Pyarelal Yadav | Engineering Manager" />
-    <meta property="og:description" content="Vinod Pyarelal Yadav, Engineering Manager at Accenture: 14+ years in mobile, IoT and web. Led Syngenta's Darwin Portal, built on specialist Claude AI agents." />
+    <meta property="og:description" content="Vinod Pyarelal Yadav, Engineering Manager and Technical Program Manager at Accenture: 14+ years in mobile, IoT, AI and web. Driving security vulnerability remediation across ~3,000 apps for a global bank." />
     <meta property="og:image" content="https://www.vinodyadav.com/og-image.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
@@ -21,7 +21,7 @@
     <meta name="twitter:site" content="@yadavvinod579" />
     <meta name="twitter:creator" content="@yadavvinod579" />
     <meta name="twitter:title" content="Vinod Pyarelal Yadav | Engineering Manager" />
-    <meta name="twitter:description" content="Vinod Pyarelal Yadav, Engineering Manager at Accenture: 14+ years in mobile, IoT and web. Led Syngenta's Darwin Portal, built on specialist Claude AI agents." />
+    <meta name="twitter:description" content="Vinod Pyarelal Yadav, Engineering Manager and Technical Program Manager at Accenture: 14+ years in mobile, IoT, AI and web. Driving security vulnerability remediation across ~3,000 apps for a global bank." />
     <meta name="twitter:image" content="https://www.vinodyadav.com/og-image.jpg" />
     <meta name="twitter:image:alt" content="Portrait of Vinod Pyarelal Yadav, Engineering Manager" />
     <script type="application/ld+json">
@@ -29,7 +29,7 @@
         "@context": "https://schema.org",
         "@type": "Person",
         "name": "Vinod Pyarelal Yadav",
-        "jobTitle": "Engineering Manager",
+        "jobTitle": "Engineering Manager and Technical Program Manager",
         "url": "https://www.vinodyadav.com/",
         "image": "https://www.vinodyadav.com/profile.webp",
         "email": "mailto:yadav.vinod579@gmail.com",
@@ -46,6 +46,9 @@
         ],
         "knowsAbout": [
           "Engineering management",
+          "Technical program management",
+          "Application security",
+          "Vulnerability management",
           "Mobile (Android/iOS)",
           "MDM/EMM",
           "IoT",
@@ -145,14 +148,22 @@
       :root[data-app='failed'] .counter__final { visibility: visible !important; } :root[data-app='failed'] .counter__live { visibility: hidden !important; }
       :root[data-app='failed'] .hero .lede { display: block !important; }
       :root[data-app='failed'] :is(.header__tools, .nav__vince, .glance__actions, .lede__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress) { display: none !important; }
+      /* "At a glance" (FUNC-018): no dead button; its metrics and highlights show after the hero, as in print. */
+      :root[data-app='failed'] :is(#glance, .gdialog--glance .pdialog__close) { display: none !important; }
+      :root[data-app='failed'] .gdialog--glance { display: block !important; position: static; flex-basis: 100%; width: auto; max-width: none; max-height: none; margin: 16px 0 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; }
+      :root[data-app='failed'] .glance-dialog { padding: 0; } :root[data-app='failed'] .glance-dialog > h2 { padding-right: 0; }
     </style>
     <noscript>
       <!-- Without JavaScript the prerendered page (vite.config.js) is static: show the counters' final
-           values and the full pitch, and hide the controls and sections that need the app. -->
+           values, the full pitch and At a glance's content (FUNC-018), and hide the controls and sections
+           that need the app. -->
       <style>
         .counter__final { visibility: visible !important; } .counter__live { visibility: hidden !important; }
         .hero .lede { display: block !important; }
         .header__tools, .nav__vince, .glance__actions, .lede__more, .case-open, .card__head .icon-btn, .lazy-ph, .vince-dock, .progress { display: none !important; }
+        #glance, .gdialog--glance .pdialog__close { display: none !important; }
+        .gdialog--glance { display: block !important; position: static; flex-basis: 100%; width: auto; max-width: none; max-height: none; margin: 16px 0 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; }
+        .glance-dialog { padding: 0; } .glance-dialog > h2 { padding-right: 0; }
       </style>
     </noscript>
   </head>

@@ -9,7 +9,8 @@
 //    and 'C' doesn't match 'CI/CD' or 'R&D'.
 // 3. Texts are scanned longest-match-first, so 'React Native' isn't also counted as 'React' and
 //    'Azure DevOps' isn't also 'Azure'. The same scan finds terms in the JD and evidence in the data.
-// 4. A JD term with evidence is a strong match; without evidence but with an evidenced `related`
+// 4. A JD term with evidence is a strong match (unless every evidence line shows only awareness or
+//    coordination of it: the lexicon's `weak` pattern, FUNC-017, makes it related experience); without evidence but with an evidenced `related`
 //    term it's related experience; otherwise it's "not evident in the profile". No score, no verdict.
 import { profile, stats, availability, showAvailability, highlights, experience, projects, graphProjects, graphDomains, otherProjects, skills, certifications, learning } from '../data.js'
 import { LEXICON } from './fitLexicon.js'
@@ -35,7 +36,7 @@ function compile(entry) {
     ...(entry.aliases || []).map((a) => termRegex(a, false)),
     ...(entry.exact || []).map((a) => termRegex(a, true)),
   ]
-  return { ...entry, jd, data: [...jd, ...(entry.also || []).map((a) => termRegex(a, false))] }
+  return { ...entry, jd, data: [...jd, ...(entry.also || []).map((a) => termRegex(a, false))], weakRe: entry.weak ? new RegExp(entry.weak, 'i') : null }
 }
 
 // Skills and technologies named in data.js, split into single terms:
@@ -242,7 +243,9 @@ function index() {
       if (seen.has(f.term.label)) continue
       seen.add(f.term.label)
       if (!evidence.has(f.term.label)) evidence.set(f.term.label, [])
-      evidence.get(f.term.label).push({ text: item.text, where: item.where, priority: item.priority, order })
+      // Weak evidence (FUNC-017): the words around this mention say awareness or coordination only.
+      const weak = Boolean(f.term.weakRe?.test(item.text.slice(Math.max(0, f.start - 40), f.end + 25)))
+      evidence.get(f.term.label).push({ text: item.text, where: item.where, priority: item.priority, order, weak })
     }
   })
   for (const list of evidence.values()) list.sort((a, b) => b.priority - a.priority || a.order - b.order)
@@ -319,6 +322,10 @@ export function matchRole(jd) {
     if (seen.has(t.label)) continue
     seen.add(t.label)
     const ev = evidence.get(t.label)
+    if (ev?.length && t.weakRe && ev.every((e) => e.weak)) {
+      related.push({ label: t.label, cat: t.cat, via: [], note: t.weakNote, evidence: ev.slice(0, 2).map(clean) })
+      continue
+    }
     if (ev?.length) {
       strong.push({ label: t.label, cat: t.cat, evidence: ev.slice(0, 3).map(clean), total: ev.length })
       continue
@@ -367,7 +374,7 @@ export function fitSummaryText(result) {
   }
   if (result.related.length) {
     lines.push('Related experience:')
-    for (const r of result.related) lines.push(`- ${r.label}: related evidence in ${r.via.join(', ')}`)
+    for (const r of result.related) lines.push(`- ${r.label}: ${r.note ? `in the profile as ${r.note}` : `related evidence in ${r.via.join(', ')}`}`)
     lines.push('')
   }
   if (result.leadership) {

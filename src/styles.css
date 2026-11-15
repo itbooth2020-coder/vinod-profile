@@ -102,20 +102,22 @@ a { color: var(--accent2); }
 /* One row at every width: the section nav as a row of pills, the tools on the right. The pills scroll
    sideways when they don't all fit, fading out on the right (the nav's right padding holds the fade and
    also spaces the pills from the tools). Nothing wraps, so the header keeps its height in every theme
-   and font (UI-008). Focused pills scroll into view; scroll-padding keeps them clear of the fade, and
-   the nav's padding leaves room for their focus ring. */
+   and font (UI-008). A focused pill is scrolled into view by Header.jsx (the nav's onFocus, UX-015;
+   browsers don't do it for a sideways row); scroll-padding keeps it clear of the fade, and the nav's
+   padding leaves room for its focus ring. */
 .header__inner { display: flex; align-items: center; gap: 4px; padding-top: 7px; padding-bottom: 6px; }
 .nav { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; gap: 6px; padding: 3px 36px 3px 3px; overflow-x: auto; scrollbar-width: thin; scroll-padding-inline: 3px 36px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
 /* Section links and "ask VINCE" (Header.jsx, which opens the VINCE panel) as pills tinted with the
    theme's accent; text is --text on every tint (>= 4.5:1 in every palette, light and dark). Stronger
-   on hover and focus; the section in view (aria-current) is solid accent. "ask VINCE" uses accent2,
+   on hover and focus; the section in view (aria-current) is solid accent and underlined, so it doesn't
+   rely on colour alone (UI-011; the underline doesn't change the pill's width). "ask VINCE" uses accent2,
    so it reads as an action rather than a place on the page. No transitions, so nothing animates. */
 .nav :is(a, .nav__vince) { flex: none; display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text); font: 13px var(--mono); white-space: nowrap; text-decoration: none; cursor: pointer; }
 .nav :is(a, .nav__vince):is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .nav :is(a, .nav__vince):focus-visible { outline-offset: 1px; border-radius: 999px; }
 .nav .nav__vince { background: color-mix(in srgb, var(--accent2) 12%, var(--panel)); border-color: color-mix(in srgb, var(--accent2) 40%, transparent); }
 .nav .nav__vince:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent2) 22%, var(--panel)); border-color: color-mix(in srgb, var(--accent2) 70%, transparent); }
-.nav a[aria-current='true'], .nav a[aria-current='true']:is(:hover, :focus-visible) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.nav a[aria-current='true'], .nav a[aria-current='true']:is(:hover, :focus-visible) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); text-decoration: underline 2px; text-underline-offset: 4px; }
 .toggle { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; min-height: 40px; font: 13px var(--mono); cursor: pointer; }
 .toggle:hover { border-color: var(--accent); }
 .header__tools { flex: none; display: flex; gap: 8px; }

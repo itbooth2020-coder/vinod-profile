@@ -1,7 +1,7 @@
 // Fresh-wording test for the offline profile agent (src/agent/localAgent.js), AI-003 round 3.
 // 40 recruiter and hiring-manager questions, written for this round in wording not used in
 // scripts/test-local-agent.mjs or the UAT tables, across every topic, each with a check graded
-// against src/data.js. Target 34/40.
+// against src/data.js, plus 6 AI-009 regression questions (Nov 2026). Target 40/46.
 // Rule for this set: improve the agent's concepts and synonyms (src/agent/concepts.js), never code
 // aimed at one of these strings, and don't edit a question or check to make it pass. Replace the set
 // with new wording at the next UAT round; then it can join the regression suites.
@@ -10,7 +10,7 @@ import { answerLocally, ensureLexicon } from '../src/agent/localAgent.js'
 
 await ensureLexicon() // FUNC-015: the role-fit lexicon loads on demand
 
-const TARGET = 34
+const TARGET = 40
 const MAX_CHARS = 1200 // prose, without charts, tables and images (CHAT-003)
 
 const has = (...patterns) => (a) => patterns.every((p) => p.test(a))
@@ -75,6 +75,14 @@ const FRESH = [
   // Contact and resume
   ['How do I email him?', has(/yadav\.vinod579@gmail\.com/)],
   ['Where can I download his résumé?', resumeOnRequest],
+  // AI-009: a question about the resume's content gets the content; only a request for the document
+  // gets "available on request".
+  ['What programming languages appear on his CV?', all(has(/Kotlin/, /Swift/), lacks(/available on request/))],
+  ['Which cloud platforms are on his résumé?', all(has(/Azure/, /Firebase/), lacks(/available on request/))],
+  ['Is React Native on his CV?', all(has(/React Native/), lacks(/available on request/))],
+  ['Which degrees are on his CV?', all(has(/Master of Computer Applications/), lacks(/available on request/))],
+  ['Could you email me his CV?', resumeOnRequest],
+  ['Is there a PDF of his resume I can have?', resumeOnRequest],
   // Short answers on any topic (CHAT-003)
   ['Sum Vinod up in a sentence', all(has(/14\+ years/), (a) => sentences(a) <= 1)],
   ['Give me the elevator pitch on Vinod', all(has(/Engineering Manager/, /35\+/), (a) => sentences(a) <= 2, found)],
@@ -82,7 +90,7 @@ const FRESH = [
 ]
 
 const verbose = process.argv.includes('--verbose')
-console.log('\nC. Fresh wording (40)')
+console.log(`\nC. Fresh wording (${FRESH.length})`)
 let pass = 0
 const failures = []
 FRESH.forEach(([q, check], i) => {

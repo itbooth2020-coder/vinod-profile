@@ -228,7 +228,9 @@ export const LEXICON = [
   { label: 'Managing managers', cat: 'Leadership', re: '\\b(?:managers? of managers|(?:manag(?:e|es|ed|ing)|lead(?:s|ing)?|led) (?:other |multiple |several )?(?:engineering )?managers|(?:multiple|several|\\d+\\+?) (?:engineering |people )?managers|directors? of engineering|engineering directors)\\b' },
   { label: 'Board reporting', cat: 'Leadership', aliases: ['board of directors', 'board-level', 'board reporting', 'report to the board', 'reporting to the board', 'board meetings', 'board members'] },
   { label: 'M&A', cat: 'Leadership', re: '(?<![A-Za-z0-9])(?:M&A|M and A|mergers (?:and|&) acquisitions)(?![A-Za-z0-9])' },
-  { label: 'Headcount planning', cat: 'Leadership', aliases: ['resource allocation', 'capacity planning', 'resource planning'] },
+  { label: 'Headcount planning', cat: 'Leadership', aliases: ['resource allocation', 'resource planning'] },
+  // Capacity planning is usually infrastructure (SRE) work, not headcount (FUNC-016).
+  { label: 'Capacity planning', cat: 'DevOps', aliases: ['capacity management'] },
   { label: 'Vendor management', cat: 'Leadership', aliases: ['vendors', 'vendor'] },
   { label: 'Roadmaps', cat: 'Leadership', aliases: ['roadmap', 'technical roadmap', 'product roadmap', 'roadmapping'] },
   { label: 'Delivery management', cat: 'Leadership', aliases: ['on-time delivery', 'end-to-end delivery', 'delivery', 'program delivery'] },

@@ -23,7 +23,8 @@ export default function Counter({ value, sr }) {
       io.disconnect()
       const start = performance.now()
       const step = (now) => {
-        const p = Math.min(1, (now - start) / 1400)
+        // rAF can pass a timestamp from before `start`; clamp so the count never dips below zero.
+        const p = Math.min(1, Math.max(0, (now - start) / 1400))
         setN(Math.round(target * (1 - Math.pow(1 - p, 3))))
         raf = p < 1 ? requestAnimationFrame(step) : 0
       }

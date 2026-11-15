@@ -150,6 +150,8 @@ export const CONCEPTS = {
 
   // Topics
   resume: ['resume', 'cv', 'curriculum vitae'],
+  // Asking for the document itself ("Can I get a copy of his CV?", "Download CV", "his resume as a PDF").
+  resumeAsk: ['download', 'copy of', 'send', 'share', 'forward', 'email me', 'mail me', 'attach', 'pdf', 'file', 'get his', 'get vinod', 'get a', 'get the', 'see his', 'see vinod', 'see the', 'view his', 'have his', 'like his', 'want his', 'need his', 'link to'],
   resumeSays: ['resume say', 'resume mention', 'resume cover', 'resume state', 'resume list', 'cv say', 'cv mention'],
   // Age and date of birth are never shared (owner decision); "Where was he born?" stays `personal`.
   age: ['how old', '=age', '=aged', 'year old', 'birthday', 'birth date', 'birthdate', 'date of birth', 'dob', 'year of birth', 'birth year', 'when * born', 'what year * born', 'born in what year', 'born on'],

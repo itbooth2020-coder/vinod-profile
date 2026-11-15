@@ -75,14 +75,31 @@ function buildTerms() {
   return [...lexicon, ...extra]
 }
 
+// A JD phrase that isn't asked for (FUNC-016): negated ("No people management", "without line
+// management", "people management not required"), or, for hiring, recruiting boilerplate ("We are
+// hiring a…", "we're recruiting"). The window stops at punctuation, so a negation in an earlier
+// clause doesn't carry over; "not only" and "not just" aren't negations.
+const NEG_BEFORE = /\b(?:no|not|without|non)\b(?!\s+(?:only|just|limited)\b)[\w\s-]{0,20}$/i
+const NEG_AFTER = /^[\s:(–-]*(?:experience\s+)?(?:is\s+|are\s+)?(?:not\s+(?:required|needed|necessary|expected|a requirement)|unnecessary)\b/i
+const BOILERPLATE = /\b(?:we['’]re|we are|is|are|now)\s+(?:actively\s+|currently\s+)?$/i
+function notAsked(text, start, end, label) {
+  const before = text.slice(Math.max(0, start - 25), start)
+  if (NEG_BEFORE.test(before) || NEG_AFTER.test(text.slice(end, end + 40))) return true
+  return /^hiring$/i.test(label) && BOILERPLATE.test(before)
+}
+
 // Every term occurrence in `text`, longest first and non-overlapping. Lexicon terms win over
 // data-only terms, so 'Claude AI Agents' (a skills item) doesn't hide 'Claude' and 'AI agents'.
+// In the JD, phrases that aren't asked for are left out (notAsked above).
 function scan(text, terms, mode) {
   const found = []
   for (const t of terms) {
     for (const re of t[mode]) {
       re.lastIndex = 0
-      for (const m of text.matchAll(re)) found.push({ term: t, start: m.index, end: m.index + m[0].length })
+      for (const m of text.matchAll(re)) {
+        const end = m.index + m[0].length
+        found.push({ term: t, start: m.index, end, skip: mode === 'jd' && notAsked(text, m.index, end, t.label) })
+      }
     }
   }
   const rank = (f) => (f.term.source === 'lexicon' ? 1 : 0)
@@ -103,7 +120,9 @@ function scan(text, terms, mode) {
     spans.add(key)
     covered.fill(1, f.start, f.end)
   }
-  return kept.sort((a, b) => a.start - b.start)
+  // A phrase that isn't asked for still claims its words, so "No people management" isn't read as
+  // a shorter term inside it either.
+  return kept.filter((f) => !f.skip).sort((a, b) => a.start - b.start)
 }
 
 // ALL-CAPS job descriptions (FUNC-010): case-sensitive terms ('Swift', 'React', 'Go', 'Node') never
@@ -150,6 +169,9 @@ const TEAM_RES = [
   /\b(?:teams?|org(?:ani[sz]ation)?|department|headcount) of (?:about |around |over |more than |up to )?(\d{1,3}(?:,\d{3})*|\d+)\s*\+?/gi,
   /(?<![\d.,])(\d{1,4})\s*\+?[\s-]*(?:person|people|member|engineer)\s+(?:engineering\s+)?(?:team|org|organi[sz]ation|department)\b/gi,
 ]
+// "No direct reports" and "no people management" start with their own negation, so notAsked only
+// rules out a negation before them ("not an individual contributor role").
+const IC_RE = /\b(?:individual[\s-]contributor|no direct reports|no people management)\b/gi
 const TITLES = [
   [/\b(?:CTO|Chief Technology Officer)\b/, 'CTO'],
   [/\b(?:C[A-Z]O|Chief [A-Z][a-z]+ Officer)\b/, 'C-level'],
@@ -172,6 +194,10 @@ function scaleGaps(text) {
   const team = most(TEAM_RES)
   if (team > PROFILE_TEAM) {
     gaps.push({ label: `Team of ${team}+`, cat: 'Scale', note: `The JD mentions ${team.toLocaleString('en')}+ people; the profile shows ${TEAM_TEXT}.` })
+  }
+  // An individual-contributor role (FUNC-016): the profile is a people manager's, so say so.
+  if ([...text.matchAll(IC_RE)].some((m) => !notAsked(text, m.index, m.index + m[0].length, ''))) {
+    gaps.push({ label: 'Individual-contributor role', cat: 'Scale', note: `The JD describes an individual-contributor role; the profile is a people manager's (${profile.role}; ${TEAM_TEXT}).` })
   }
   // The role's own title: its first line (or opening words), and not "reports to the VP…".
   const head = text.trim().split('\n')[0].slice(0, 160)
@@ -306,7 +332,10 @@ export function matchRole(jd) {
     }
   }
 
-  const signals = SIGNALS.filter(([, re]) => re.test(text)).map(([name]) => name)
+  // A signal counts when at least one of its mentions is asked for (FUNC-016).
+  const signals = SIGNALS.filter(([name, re]) =>
+    [...text.matchAll(new RegExp(re.source, 'gi'))].some((m) => !notAsked(text, m.index, m.index + m[0].length, name)),
+  ).map(([name]) => name)
   const leadership = signals.length ? { signals, evidence: leadershipEvidence(signals) } : null
 
   const summary = [

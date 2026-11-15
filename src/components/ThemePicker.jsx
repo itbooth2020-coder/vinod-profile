@@ -168,6 +168,7 @@ export default function ThemePicker() {
         className="toggle"
         aria-expanded={open}
         aria-controls="theme-panel"
+        title="Customize colours and font"
         onClick={() => setOpen((o) => !o)}
       >
         <span className="picker__dot" aria-hidden="true" /><span className="toggle__label"> Customize</span>

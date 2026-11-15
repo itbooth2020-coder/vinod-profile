@@ -14,8 +14,10 @@ const YEARS = profile.tagline.match(/\d+\+?/)[0] // e.g. '14+'
 const CARD = Object.fromEntries(profileCard)
 
 // Words that carry no topic. "used", "worked", "know" and "experience" are here so that in
-// "Has he used Kubernetes?" only the technology counts.
+// "Has he used Kubernetes?" only the technology counts. "Resume" and "CV" say where to look, not what
+// about ("What skills are on his CV?", AI-009); asking for the document is the `resume` intent.
 const STOP = new Set((
+  'resume cv curriculum vitae ' +
   'a an the and or of to in on for with by at is are was were be been being has have had do does did doing done ' +
   'he his him vinod yadav pyarelal what which who whom whose how why when where tell me about can could would will ' +
   'shall should may might you your please give list any some there their it its this that these those from as into ' +
@@ -483,11 +485,16 @@ const INTENTS = [
     answer: () => `His profile doesn't include salary expectations; that's best discussed with ${FIRST} directly.\n\n${email()}`,
   },
   {
-    // "Can I get his resume?", "Download CV", but not "What does his resume say about…?" The PDF
+    // "Can I get his resume?", "Download CV", or just "CV": a request for the document itself
+    // (`resumeAsk`, or no other words). Not a question about its content ("What skills are on his
+    // CV?", "What does his resume say about…?"), which the content intents answer (AI-009). The PDF
     // isn't published on the site (owner decision): it's available on request.
     id: 'resume',
-    concepts: { resume: 5 },
+    concepts: { resume: 3, resumeAsk: 3 },
+    require: ['resume'],
     not: ['resumeSays'],
+    // Without `resumeAsk`, only a question of nothing but resume words counts ("CV", "His resume please").
+    boost: (ctx) => (has(ctx, 'resumeAsk') ? 0 : tokenize(ctx.question).every((t) => PLAIN.has(t)) ? 3 : -3),
     note: false,
     answer: () =>
       `${FIRST}'s resume is available on request: email him or connect on LinkedIn.\n\n${email()}\n\n[Open LinkedIn profile ↗](${profile.linkedin})`,
@@ -540,7 +547,7 @@ const INTENTS = [
     boost: (ctx) =>
       spanIn(ctx.q) && !companiesIn(ctx.q).length && !named(ctx.q) &&
       !has(ctx, 'education', 'certs', 'blog', 'age', 'personal', 'start', 'notice', 'available', 'open', 'relocate', 'workmode', 'target', 'schedule') &&
-      (has(ctx, 'career', 'companies', 'current', 'city', 'first', 'previous') || /\b(work\w*|employ\w*|jobs?|roles?|doing|did he do|where was he|positions?)\b/.test(ctx.q))
+      (has(ctx, 'career', 'companies', 'current', 'city', 'first', 'previous') || /\b(work\w*|employ\w*|jobs?|roles?|doing|(?:did|will) he do|where (?:was|will) he(?: be)?|positions?)\b/.test(ctx.q))
         ? 8
         : 0,
     explains: ({ q }) => [...yearsIn(q).map(String), 'between', 'during', 'since', 'until', 'before', 'after', 'year'],

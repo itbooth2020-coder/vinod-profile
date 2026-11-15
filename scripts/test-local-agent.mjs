@@ -116,7 +116,8 @@ const HOLDOUT = [
   ['How does he mentor engineers?', has(/Mentored 10\+/)],
   ['Does he do code reviews?', all(has(/code review/i), found, lacks(/doesn't mention/i))],
   ['What agile practices does he use?', has(/Agile/, /sprint/i)],
-  ['Has he worked in fintech or banking?', has(/doesn't mention/i)],
+  // Nov 2026 resume: Banking is now a vertical (a global bank); fintech still isn't named.
+  ['Has he worked in fintech or banking?', has(/doesn't mention \*\*fintech\*\*/i, /Global Bank/)],
   ['What is his GitHub?', has(/github\.com\/vinodyadav5799/)],
   ['Does he write a blog?', has(/AndroidSuperNerds/)],
   ['What is his date of birth?', ageHidden],
@@ -134,11 +135,36 @@ const FOLLOW_UPS = [
   [['Tell me about the Darwin Portal AI project'], 'Tell me more', has(/Prompt engineering|Claude AI agent integration/i)],
   [['Where does he work currently?'], 'And before that?', has(/HTC Global Services/)],
   [['What did he do at HTC Global Services?'], 'What did he do there?', has(/HTC/)],
-  [['What is his current role?'], 'What about his projects there?', has(/Darwin/, /PRESTO/)],
+  [['What is his current role?'], 'What about his projects there?', has(/global bank/i, /Darwin/, /PRESTO/)],
+  // Current program (Nov 2026 resume): follow-ups about the bank program by reference.
+  [['Tell me about the bank program'], 'Who was the client?', all(has(/\*\*a global bank\*\*/), lacks(/\byes\b/i))],
+  [['Tell me about the bank program'], 'How big was the team?', all(has(/doesn't state the team size/), lacks(/35\+/))],
+  [['Tell me about the bank program'], 'When did it start?', has(/Accenture/, /Jun 2024/, /doesn't give the project's own dates/)],
 ]
 
 // Owner decisions (16 Oct UAT items DES-002, UX-007, UX-008, AI-004, DES-001). Not scored; all must pass.
 const DECISIONS = [
+  // Nov 2026: the current client is named only as "a global bank"; naming a bank gets neither yes nor no.
+  ['Has he worked with HSBC?', all(has(/described only as a global bank/), lacks(/\byes\b/i, /HSBC/))],
+  ['Which bank is his client?', all(has(/a global bank/), lacks(/\byes\b/i))],
+  // TEST-003 (15 Nov): the visitor's bank name is never repeated ("doesn't mention **<name>**" read as a
+  // denial and put the name on screen). Stand-in names: the client's real name appears nowhere in this repo.
+  ...['has he worked with Examplebank?', 'Did he work at Examplebank?', 'Does he work for Northwind Bank?', 'Has he partnered with Contoso Financial Group?'].map((q) => [
+    q,
+    all(has(/described only as a global bank/), lacks(/\byes\b|\bconfirm/i, /Examplebank|Northwind|Contoso/)),
+  ]),
+  // TEST-004 / TEST-005 / AI-011: "Is the client X?", "Is the bank X?", "Which bank?"
+  ...['Is the client Examplebank?', 'Is the bank Northwind Bank?', 'Which bank?', 'Is it Examplebank?'].map((q) => [
+    q,
+    all(has(/described only as a global bank/), lacks(/\b(yes|no|isn't|is not)\b/i, /Examplebank|Northwind|HTC Global Services/)),
+  ]),
+  // AI-014 (15 Nov release round): the name-first guesses and "what did he do at X" for an organisation the
+  // profile doesn't name get the same neutral line, never "I couldn't find that" (which reads as a denial).
+  ...['Was Examplebank his client?', 'Is Northwind Bank the client?', 'What did he do at Contoso Financial Group?', 'What did he do at Examplebank?'].map((q) => [
+    q,
+    all(has(/described only as a global bank/), lacks(/(yes|no|isn't|is not)/i, /couldn't find/i, /Examplebank|Northwind|Contoso|HTC Global Services/)),
+  ]),
+  ['What did he do at Syngenta?', all(has(/Syngenta/), lacks(/described only as a global bank/))],
   ['How can I contact him?', all(has(/mailto:/, /linkedin\.com/, /github\.com/, /facebook\.com/, /\bx\.com/), short)],
   ['When was he born?', ageHidden],
   ['Where can I see his CV?', resumeOnRequest],

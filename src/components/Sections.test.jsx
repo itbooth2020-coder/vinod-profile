@@ -25,7 +25,7 @@ describe('Skills', () => {
   it('leads with leadership and keeps "Earlier experience" collapsed', () => {
     const { container } = render(<Skills />)
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings[0]).toBe('Leadership & Methodologies')
+    expect(headings[0]).toBe('Program Management')
     expect(headings.at(-1)).toBe('Earlier experience')
     const earlier = container.querySelector('details')
     expect(earlier).not.toHaveAttribute('open')
@@ -100,7 +100,7 @@ describe('Contact', () => {
   it('offers email, LinkedIn and GitHub, external links in a new tab', () => {
     render(<Contact />)
     const region = screen.getByRole('region', { name: "Let's connect" })
-    expect(within(region).getByRole('link', { name: 'yadav.vinod579@gmail.com' })).toHaveAttribute('href', 'mailto:yadav.vinod579@gmail.com')
+    expect(within(region).getByRole('button', { name: 'yadav.vinod579@gmail.com' })).toHaveAttribute('aria-expanded', 'false')
     checkNewTab(externalLinks(region))
     expect(externalLinks(region)).toHaveLength(2)
   })

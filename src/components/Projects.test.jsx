@@ -20,6 +20,22 @@ describe('Projects', () => {
     expect(buttons.length).toBeGreaterThan(0)
     for (const b of buttons) expect(b).toHaveAttribute('aria-haspopup', 'dialog')
     expect(screen.getByRole('button', { name: /Read case study:\s*Darwin Portal – Syngenta/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Read case study:\s*Global Bank – Application Security & Vulnerability Remediation/ })).toBeInTheDocument()
+  })
+
+  it('opens the current bank program from its #case-bank-appsec link, with its client and approach', async () => {
+    history.replaceState(null, '', '/#case-bank-appsec')
+    try {
+      render(<Projects />)
+      const dialog = await openDialog()
+      expect(dialog).toHaveAccessibleName('Global Bank – Application Security & Vulnerability Remediation')
+      expect(dialog).toHaveTextContent(/Client: A global bank/)
+      expect(dialog).toHaveTextContent(/approximately 3,000 Android, iOS, and web applications/)
+      expect(within(dialog).getByRole('heading', { name: 'Approach' })).toBeInTheDocument()
+      expect(dialog).toHaveTextContent(/OWASP Top 10/)
+    } finally {
+      history.replaceState(null, '', '/')
+    }
   })
 
   it('opens the case study in a dialog, sets a shareable #case- link, and returns focus on Close', async () => {

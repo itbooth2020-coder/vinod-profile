@@ -23,6 +23,7 @@ export const media = [
   { id: 'edu/thakur', label: 'Thakur Institute of Management Studies (MCA)', kind: 'education', mono: 'TIMS' },
   { id: 'edu/ismail-yusuf', label: 'Ismail Yusuf College (B.Sc.)', kind: 'education', mono: 'IYC' },
 
+  { id: 'project/bank-appsec', label: 'Global Bank Application Security Program', kind: 'project', mono: 'BANK' }, // the client is named only as "a global bank"
   { id: 'project/darwin', label: 'Darwin Portal – Syngenta', kind: 'project', src: 'logos/syngenta.png' },
   { id: 'project/presto', label: 'PRESTO Transit Payments', kind: 'project', src: 'logos/prestocard.png' },
   { id: 'project/vusion', label: 'VusionGroup Retail IoT', kind: 'project', src: 'logos/vusion.png' },

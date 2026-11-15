@@ -12,6 +12,9 @@
 //   re       custom regex source for the label (overrides the default word-boundary pattern)
 //   also     extra patterns used only when searching the data for evidence
 //   related  labels of other entries whose evidence counts as related experience
+//   weak     regex source: when every evidence line matches it near the term ("PCI DSS awareness",
+//            "Penetration Test Coordination"), the term is related experience, not a match (FUNC-017);
+//            weakNote says why
 
 export const LEXICON = [
   // Languages
@@ -191,8 +194,31 @@ export const LEXICON = [
   { label: 'Scalability', cat: 'Architecture', aliases: ['scalable', 'at scale', 'scaling'] },
   { label: 'Performance optimization', cat: 'Architecture', aliases: ['performance tuning', 'app performance', 'system performance'] },
   { label: 'Distributed systems', cat: 'Architecture', related: ['Microservices'] },
-  { label: 'Security', cat: 'Architecture', aliases: ['application security', 'mobile security', 'secure coding'], also: ['secure', 'encrypted'] },
+  { label: 'Security', cat: 'Architecture', aliases: ['application security', 'mobile security', 'AppSec'], also: ['secure', 'encrypted'] },
   { label: 'Compliance', cat: 'Architecture', aliases: ['regulatory compliance', 'GDPR'] },
+
+  // Application security (the global-bank vulnerability remediation program and the resume's AppSec skills)
+  { label: 'Vulnerability management', cat: 'Security', aliases: ['vulnerability remediation', 'vulnerability management & remediation', 'remediation of vulnerabilities', 'remediating security vulnerabilities', 'security vulnerabilities'], related: ['Security'] },
+  { label: 'OWASP', cat: 'Security', aliases: ['OWASP Top 10', 'OWASP Top Ten', 'OWASP MASVS', 'MASVS', 'OWASP ASVS'] },
+  { label: 'SAST', cat: 'Security', cs: true, aliases: ['static application security testing'] },
+  { label: 'DAST', cat: 'Security', cs: true, aliases: ['dynamic application security testing'] },
+  { label: 'SCA', cat: 'Security', cs: true, aliases: ['software composition analysis'] },
+  // The resume coordinates penetration testing ("Penetration Test Coordination", "drives closure with QA,
+  // penetration testing", "with … penetration testing teams") and lists PCI DSS as "awareness": related, not matched.
+  { label: 'Penetration testing', cat: 'Security', aliases: ['pen testing', 'pentesting', 'pentest', 'pen test', 'penetration test', 'penetration test coordination'], weak: 'coordinat|drives closure with|testing teams', weakNote: 'coordination only' },
+  { label: 'DevSecOps', cat: 'Security', related: ['DevOps', 'Security'] },
+  { label: 'Secure coding', cat: 'Security', aliases: ['secure development', 'secure SDLC'], related: ['Security'] },
+  { label: 'PCI DSS', cat: 'Security', aliases: ['PCI', 'PCI-DSS', 'PCI compliance'], weak: 'awareness', weakNote: 'awareness only' },
+  { label: 'TLS', cat: 'Security', cs: true, aliases: ['SSL', 'TLS/SSL', 'SSL/TLS'] },
+  // Named security tools: evidenced only if data.js names them; otherwise shown with the related practice.
+  { label: 'Checkmarx', cat: 'Security', related: ['SAST'] },
+  { label: 'Fortify', cat: 'Security', related: ['SAST'] },
+  { label: 'Veracode', cat: 'Security', related: ['SAST', 'DAST'] },
+  { label: 'SonarQube', cat: 'Security', related: ['SAST', 'Code review'] },
+  { label: 'Snyk', cat: 'Security', related: ['SCA'] },
+  { label: 'Black Duck', cat: 'Security', related: ['SCA'] },
+  { label: 'Burp Suite', cat: 'Security', aliases: ['Burp'], related: ['DAST', 'Penetration testing'] },
+  { label: 'SIEM', cat: 'Security', aliases: ['Splunk', 'security monitoring'], related: ['Security'] },
   // Named security standards: evidenced only if data.js names them.
   { label: 'SOC 2', cat: 'Architecture', aliases: ['SOC2', 'SOC 2 Type II'] },
   { label: 'ISO 27001', cat: 'Architecture', aliases: ['ISO/IEC 27001', 'ISO27001'] },
@@ -235,12 +261,41 @@ export const LEXICON = [
   { label: 'Roadmaps', cat: 'Leadership', aliases: ['roadmap', 'technical roadmap', 'product roadmap', 'roadmapping'] },
   { label: 'Delivery management', cat: 'Leadership', aliases: ['on-time delivery', 'end-to-end delivery', 'delivery', 'program delivery'] },
   { label: 'Program management', cat: 'Leadership', aliases: ['programs', 'multiple programs'] },
-  { label: 'Risk management', cat: 'Leadership', aliases: ['risk mitigation'] },
+  { label: 'Technical program management', cat: 'Leadership', aliases: ['technical program manager', 'technical program managers'], exact: ['TPM'], related: ['Program management', 'Delivery management'] },
+  { label: 'Program governance', cat: 'Leadership', aliases: ['governance', 'governance reviews'], related: ['Program management'] },
+  { label: 'SLAs', cat: 'Leadership', aliases: ['SLA', 'service level agreements', 'SLA compliance', 'SLA tracking', 'security SLAs'] },
+  { label: 'KPIs', cat: 'Leadership', aliases: ['KPI', 'key performance indicators', 'KPI tracking'] },
+  { label: 'Dashboards', cat: 'Leadership', aliases: ['leadership dashboards', 'executive dashboards', 'status reporting'] },
+  { label: 'Risk management', cat: 'Leadership', aliases: ['risk mitigation', 'risk & dependency management', 'dependency management', 'risk-based prioritization'] },
   { label: 'Strategy', cat: 'Leadership', aliases: ['business strategy', 'engineering strategy', 'technical strategy'] },
   { label: 'Retention', cat: 'Leadership', aliases: ['attrition', 'team retention'] },
   { label: 'Client management', cat: 'Leadership', aliases: ['client-facing', 'customer-facing', 'clients'], also: ['client leadership', 'client engagements'] },
   { label: 'Product management', cat: 'Leadership', related: ['Roadmaps', 'Stakeholder management'] },
   { label: 'Distributed teams', cat: 'Leadership', aliases: ['remote teams', 'global teams', 'offshore teams'], related: ['Cross-functional teams'] },
+
+  // Certifications (TEST-006): evidenced only if data.js names them (certifications, learning), so a JD
+  // that asks for one he doesn't hold shows it as not evident.
+  // The one he holds (data.js certifications: 'Claude Code AI Tools Certified — Coursiv, 2026') is matched.
+  { label: 'Claude Code certification', cat: 'Certifications', aliases: ['Claude Code certified', 'Claude Code AI Tools Certified', 'Claude certification', 'Claude certified'], related: ['Claude Code'] },
+  { label: 'CISSP', cat: 'Certifications', aliases: ['Certified Information Systems Security Professional'] },
+  { label: 'CISM', cat: 'Certifications', aliases: ['Certified Information Security Manager'] },
+  { label: 'CISA', cat: 'Certifications', aliases: ['Certified Information Systems Auditor'] },
+  { label: 'CSSLP', cat: 'Certifications', aliases: ['Certified Secure Software Lifecycle Professional'] },
+  { label: 'CCSP', cat: 'Certifications', aliases: ['Certified Cloud Security Professional'] },
+  { label: 'CEH', cat: 'Certifications', aliases: ['Certified Ethical Hacker'] },
+  { label: 'OSCP', cat: 'Certifications', aliases: ['Offensive Security Certified Professional'] },
+  { label: 'GIAC', cat: 'Certifications', aliases: ['GWAPT', 'GPEN', 'GSEC'] },
+  { label: 'Security+', cat: 'Certifications', aliases: ['CompTIA Security+', 'Security Plus'] },
+  { label: 'PCI QSA', cat: 'Certifications', aliases: ['QSA', 'Qualified Security Assessor'] },
+  { label: 'PMP', cat: 'Certifications', aliases: ['Project Management Professional'] },
+  { label: 'PgMP', cat: 'Certifications', aliases: ['Program Management Professional'] },
+  { label: 'CSM', cat: 'Certifications', cs: true, aliases: ['Certified ScrumMaster', 'Certified Scrum Master'] },
+  { label: 'PMI-ACP', cat: 'Certifications', aliases: ['PMI ACP'] },
+  { label: 'SAFe certification', cat: 'Certifications', aliases: ['SAFe Agilist', 'SAFe Program Consultant'], related: ['SAFe'] },
+  { label: 'ITIL', cat: 'Certifications' },
+  { label: 'PRINCE2', cat: 'Certifications' },
+  { label: 'TOGAF', cat: 'Certifications' },
+  { label: 'AWS certification', cat: 'Certifications', aliases: ['AWS Certified', 'AWS Certified Solutions Architect'], related: ['AWS'] },
 
   // Education
   { label: 'PhD', cat: 'Education', aliases: ['Ph.D', 'doctorate', 'doctoral degree'] },
@@ -251,7 +306,8 @@ export const LEXICON = [
   { label: 'Logistics', cat: 'Domain', aliases: ['supply chain', 'last-mile', 'warehouse', 'fulfillment'] },
   { label: 'Transit', cat: 'Domain', aliases: ['transportation', 'public transport'] },
   { label: 'Payments', cat: 'Domain', aliases: ['payment', 'payment systems'] },
-  { label: 'Fintech', cat: 'Domain', aliases: ['financial services', 'banking'], related: ['Payments'] },
+  { label: 'Banking', cat: 'Domain', aliases: ['bank', 'BFSI', 'banking and financial services'], related: ['Payments'] },
+  { label: 'Fintech', cat: 'Domain', aliases: ['financial services'], related: ['Payments', 'Banking'] },
   { label: 'Healthcare', cat: 'Domain', aliases: ['health tech', 'healthtech', 'digital health'] },
   { label: 'HIPAA', cat: 'Domain' },
   { label: 'Agri-Tech', cat: 'Domain', aliases: ['agriculture', 'agritech', 'agricultural'] },

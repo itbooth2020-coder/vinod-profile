@@ -28,7 +28,7 @@ export default function Header() {
   // it (html scroll-padding-top). styles.css has per-breakpoint fallbacks for the no-JS page.
   // The block in view: the one crossing a line a third of the way down the space below the header, or
   // the last one once the page is scrolled to the end. Every top-level block of <main> counts, so over
-  // one that isn't in the nav (Impact, the domain graph, Credentials) no pill is current (UX-017);
+  // one that isn't in the nav (the domain graph, Credentials) no pill is current (UX-017);
   // over a nav section, its pill gets aria-current. Blocks are looked up each time (role fit swaps its
   // placeholder) and checked at most once a frame, only while scrolling.
   useEffect(() => {

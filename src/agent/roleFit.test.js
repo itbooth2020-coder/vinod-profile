@@ -191,3 +191,29 @@ describe('fitSummaryText and availability', () => {
     expect(text).toMatch(/Contact: yadav\.vinod579@gmail\.com · https:\/\/www\.linkedin\.com/)
   })
 })
+
+// FUNC-017 / TEST-006 (15 Nov UAT): an AppSec manager JD asking for certifications, QSA audits and
+// hands-on penetration testing. Awareness and coordination aren't matches; certifications he doesn't
+// hold are listed as not evident.
+describe('application security manager JD (FUNC-017, TEST-006)', () => {
+  const APPSEC = `Application Security Manager
+Lead our application security program across web and mobile. CISSP or OSCP required; CISM, CEH or CSSLP a plus.
+Own PCI DSS compliance and run QSA audits. Perform hands-on penetration testing with Burp Suite.
+Own SAST and DAST tooling, OWASP Top 10 training, vulnerability management and DevSecOps practices across engineering teams.`
+
+  it('rates PCI DSS and penetration testing as related, with the evidence and why', () => {
+    const r = matchRole(APPSEC)
+    expect(labels(r.strong)).toEqual(expect.arrayContaining(['SAST', 'DAST', 'OWASP', 'Vulnerability management', 'DevSecOps']))
+    expect(labels(r.strong)).not.toContain('PCI DSS')
+    expect(labels(r.strong)).not.toContain('Penetration testing')
+    expect(r.related.find((m) => m.label === 'PCI DSS')).toMatchObject({ via: [], note: 'awareness only' })
+    expect(r.related.find((m) => m.label === 'Penetration testing')).toMatchObject({ via: [], note: 'coordination only' })
+    for (const m of r.related.filter((x) => x.note)) expect(m.evidence.length).toBeGreaterThan(0)
+  })
+
+  it('lists the certifications and QSA as not evident', () => {
+    const r = matchRole(APPSEC)
+    expect(labels(r.gaps)).toEqual(expect.arrayContaining(['CISSP', 'OSCP', 'CISM', 'CEH', 'CSSLP', 'PCI QSA']))
+    expect(r.summary).toMatch(/[1-9]\d* not evident in the profile/)
+  })
+})

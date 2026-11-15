@@ -18,8 +18,8 @@ describe('Hero', () => {
   it('shows the name, headline and pitch', () => {
     render(<HeroWithSwitch />)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Vinod Pyarelal Yadav')
-    expect(screen.getByText(/^Engineering Manager \| Mobile/)).toBeInTheDocument()
-    expect(screen.getByText(/^Engineering Manager leading a 35\+ engineer/)).toBeInTheDocument()
+    expect(screen.getByText(/^Engineering Manager \| Technical Program Manager \| Application Security/)).toBeInTheDocument()
+    expect(screen.getByText(/^Engineering Manager and Technical Program Manager leading a 35\+ engineer.*for a global bank;/)).toBeInTheDocument()
   })
 
   it('"Read more" expands the pitch', async () => {
@@ -33,13 +33,32 @@ describe('Hero', () => {
 
   it('has an email action and social links that open in a new tab', () => {
     render(<HeroWithSwitch />)
-    expect(screen.getByRole('link', { name: 'Email' })).toHaveAttribute('href', 'mailto:yadav.vinod579@gmail.com')
+    expect(screen.getByRole('button', { name: 'Email' })).toHaveAttribute('aria-expanded', 'false')
     const social = within(screen.getByRole('list', { name: 'Social profiles' })).getAllByRole('link')
     expect(social.map((a) => a.textContent)).toEqual(['LinkedIn (opens in a new tab)', 'GitHub (opens in a new tab)', 'Facebook (opens in a new tab)', 'X (Twitter, opens in a new tab)'])
     for (const a of social) {
       expect(a).toHaveAttribute('target', '_blank')
       expect(a).toHaveAttribute('rel', 'noopener noreferrer')
     }
+  })
+
+  it('"At a glance" sits right after Email and opens the stats and highlights in a dialog', async () => {
+    const user = userEvent.setup()
+    render(<HeroWithSwitch />)
+    const email = screen.getByRole('button', { name: 'Email' }).closest('.email')
+    const btn = screen.getByRole('button', { name: 'At a glance' })
+    expect(email.nextElementSibling).toBe(btn)
+    expect(btn).toHaveClass('btn')
+    expect(btn).not.toHaveClass('btn--primary')
+    await user.click(btn)
+    const dialog = screen.getByRole('dialog', { name: 'At a glance' })
+    expect(dialog).toHaveAttribute('open')
+    expect(within(dialog).getByText('Engineers led in a budget-owning org')).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('heading', { level: 3 }).length).toBeGreaterThan(0)
+    expect(dialog).not.toHaveTextContent(/years old|born|date of birth|\bage\b|open to new roles|resume\.pdf/i)
+    await user.click(within(dialog).getByRole('button', { name: 'Close dialog' }))
+    expect(dialog).not.toHaveAttribute('open')
+    expect(btn).toHaveFocus()
   })
 
   it('shows no availability, age or date of birth', () => {

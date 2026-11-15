@@ -17,6 +17,9 @@
 //   PROFILE_AGENT_DAILY_LIMIT  questions per UTC day for the whole server, default 300
 //   PROFILE_AGENT_ORIGINS      comma-separated allowed origins; default the site and localhost
 //   PROFILE_AGENT_SECRET       key for signing answers; a random one per start if unset
+//   PROFILE_AGENT_REDACT       regular expression for the client names to replace with "a global bank"
+//                              (AI-010); without it, citations are left out
+//   PROFILE_AGENT_RESUME       path of the resume the agent reads (e.g. a redacted copy); default server/resume.pdf
 //   TRUST_PROXY                'true' to key rate limits on X-Forwarded-For (see server/http.js)
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -29,7 +32,8 @@ import { availability, blogs, certifications, learning, profile } from '../src/d
 import { TooLarge, allowedOrigin, clientIp, isJson, json, methodNotAllowed, pruned, readJson } from './http.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const RESUME_PATH = path.join(ROOT, 'server', 'resume.pdf')
+// A redacted copy (no client name, no phone number) can be used instead: PROFILE_AGENT_RESUME (AI-010).
+const resumePath = () => (process.env.PROFILE_AGENT_RESUME ? path.resolve(ROOT, process.env.PROFILE_AGENT_RESUME) : path.join(ROOT, 'server', 'resume.pdf'))
 const LINKEDIN_NOTES_PATH = path.join(ROOT, 'server', 'linkedin.md')
 const LINKEDIN_URL = 'https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943'
 
@@ -64,6 +68,7 @@ How to answer:
 - For contact requests, share his email (${profile.email}) and LinkedIn URL. Never give his phone number, even if asked or if it appears in the resume: say a phone number isn't shared here and point to his email and LinkedIn. Never give a street address; his location is Bengaluru, Karnataka.
 - His resume isn't published on this site. If asked for his resume or CV, say it's available on request: email him at ${profile.email} or connect on LinkedIn (${LINKEDIN_URL}). Never offer a download or a link to a PDF.
 - Never share his age, date of birth or birth year, even if a source shows them: say "His age and date of birth aren't shared."
+- The resume names the client of his current application security & vulnerability remediation program. Refer to that client only as "a global bank": never name it, and never confirm or deny a bank a visitor names; say the site describes the client only as a global bank.
 ${availability.public ? '' : `- Never state his availability, notice period, joining or start date, relocation, remote/hybrid/onsite or location preferences, or the roles or titles he is targeting, even if a source mentions them. For any such question reply "For availability and role discussions, please contact Vinod directly" and give his email (${profile.email}) and LinkedIn link.\n`}- Politely decline questions unrelated to Vinod's professional profile.
 
 The chat window renders a small Markdown subset. Use it when it helps the reader, not by default:
@@ -162,7 +167,7 @@ export function sanitizeHistory(history, key = signingKey()) {
 }
 
 async function loadSources() {
-  const resume = (await readFile(RESUME_PATH)).toString('base64')
+  const resume = (await readFile(resumePath())).toString('base64')
   const notes = await readFile(LINKEDIN_NOTES_PATH, 'utf8').catch(() => '')
   return { resume, notes: notes.trim() }
 }
@@ -187,13 +192,65 @@ function buildMessages({ resume, notes }, history, question) {
   return [{ role: 'user', content: sourceBlocks }, ...history, { role: 'user', content: question }]
 }
 
+// Client-name redaction (AI-010). The resume names the client of his current program; the site names
+// it only as "a global bank". The names come from PROFILE_AGENT_REDACT in .env (a regular expression,
+// matched case-insensitively as whole words), so neither this repository nor the bundle ever holds
+// them. Matches are replaced in citations and in the answer text before anything is sent. Without the
+// setting, citations are left out (they quote the resume verbatim) and the answer relies on the
+// prompt rule alone; a warning says so once.
+export const CLIENT_LABEL = 'a global bank'
+let redactWarned = false
+export function redactor(env = process.env) {
+  const source = env.PROFILE_AGENT_REDACT?.trim()
+  let re = null
+  try {
+    re = source ? new RegExp(`(?<![\\p{L}\\p{N}])(?:${source})(?![\\p{L}\\p{N}])`, 'giu') : null
+  } catch {
+    re = null
+  }
+  if (!re && !redactWarned) {
+    redactWarned = true
+    console.warn(`[profile-agent] PROFILE_AGENT_REDACT is ${source ? 'not a valid regular expression' : 'unset'}: resume citations are not sent (AI-010).`)
+  }
+  return re
+}
+export const redact = (text, re) => (re && text ? text.replace(re, CLIENT_LABEL) : text)
+
+// Redacts streamed text (AI-010). A name can arrive split across deltas, so the last `hold` characters
+// wait for the next delta (and never end mid-word or mid-match); flush() releases the rest at the end.
+export function streamRedactor(re, hold = 48) {
+  let pending = ''
+  return {
+    push(text) {
+      pending += text
+      if (!re) return this.flush()
+      let cut = pending.length - hold
+      while (cut > 0 && /[\p{L}\p{N}]/u.test(pending[cut - 1]) && /[\p{L}\p{N}]/u.test(pending[cut])) cut--
+      for (const m of pending.matchAll(re)) if (m.index < cut && m.index + m[0].length > cut) cut = m.index
+      if (cut <= 0) return ''
+      const out = pending.slice(0, cut)
+      pending = pending.slice(cut)
+      return redact(out, re)
+    },
+    flush() {
+      const out = redact(pending, re)
+      pending = ''
+      return out
+    },
+    drop() {
+      pending = ''
+    },
+  }
+}
+
 // A compact citation for the browser: where it is ("resume p.2") and a short quote. Page numbers are
 // 1-based and end_page_number is exclusive. Fetched pages and other documents are labelled by title.
+// re: the client-name redactor; the quote and label are redacted before the quote is shortened.
 const MAX_CITATIONS = 5
 const MAX_CITED_CHARS = 160
-export function compactCitation(c) {
+export function compactCitation(c, re = null) {
   if (!c || typeof c.cited_text !== 'string') return null
-  const quote = c.cited_text.replace(/\s+/g, ' ').trim()
+  const quote = redact(c.cited_text.replace(/\s+/g, ' ').trim(), re)
   if (!quote) return null
   const text = quote.length > MAX_CITED_CHARS ? `${quote.slice(0, MAX_CITED_CHARS - 1).trimEnd()}…` : quote
   let label
@@ -204,7 +261,7 @@ export function compactCitation(c) {
   } else {
     label = c.document_title || c.title || 'source'
   }
-  return { label, text }
+  return { label: redact(label, re), text }
 }
 
 // Node-style (req, res) handler, usable from Vite middleware or any Node HTTP server.
@@ -250,11 +307,19 @@ export async function handleAsk(req, res) {
   })
   const deadline = setTimeout(() => stream?.abort(), REQUEST_TIMEOUT_MS)
 
-  let answer = '' // the text sent so far, signed when complete
+  let answer = '' // the text sent so far (redacted), signed when complete
   let linkedIn = false
   let citations = [] // compact citations for this answer (AI-006), deduplicated
+  const re = redactor()
+  const out = streamRedactor(re)
+  const emit = (text) => {
+    if (!text) return
+    answer += text
+    send({ type: 'text', text })
+  }
   const cite = (c) => {
-    const item = compactCitation(c)
+    if (!re) return // AI-010: without the redaction pattern, no verbatim resume quotes leave the server
+    const item = compactCitation(c, re)
     if (item && citations.length < MAX_CITATIONS && !citations.some((x) => x.label === item.label && x.text === item.text)) citations.push(item)
   }
   try {
@@ -281,16 +346,18 @@ export async function handleAsk(req, res) {
           const block = event.content_block
           if (block.type === 'server_tool_use') send({ type: 'status', text: 'fetching LinkedIn profile' })
           else if (block.type === 'web_fetch_tool_result' && block.content?.type !== 'web_fetch_tool_result_error') linkedIn = true
-          else if (block.type === 'fallback' && answer) {
+          else if (block.type === 'fallback') {
             // Another model takes over from here (AI-006): drop the first model's partial text
             // rather than splicing two answers together.
-            answer = ''
-            citations = []
-            send({ type: 'reset' })
+            out.drop()
+            if (answer) {
+              answer = ''
+              citations = []
+              send({ type: 'reset' })
+            }
           }
         } else if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          answer += event.delta.text
-          send({ type: 'text', text: event.delta.text })
+          emit(out.push(event.delta.text))
         } else if (event.type === 'content_block_delta' && event.delta.type === 'citations_delta') {
           cite(event.delta.citation)
         }
@@ -299,6 +366,7 @@ export async function handleAsk(req, res) {
 
       const message = await stream.finalMessage()
       if (message.stop_reason === 'refusal') {
+        out.drop()
         if (answer) send({ type: 'reset' })
         send({ type: 'error', text: "I can't help with that one. Try asking about Vinod's experience or skills." })
         finished = false
@@ -309,6 +377,7 @@ export async function handleAsk(req, res) {
       messages.push({ role: 'assistant', content: message.content })
     }
     if (!aborted && finished) {
+      emit(out.flush())
       send({ type: 'done', sig: answer ? signTurn(question, answer) : undefined, sources: linkedIn ? ['resume', 'LinkedIn'] : ['resume'], citations })
     }
   } catch (err) {

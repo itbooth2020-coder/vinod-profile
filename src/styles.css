@@ -188,6 +188,31 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
 .btn:hover { border-color: var(--accent); }
 .btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn--primary:hover { filter: brightness(1.08); }
+/* Email chooser (EmailButton.jsx): the Email button opens a small menu below it. The menu is a popover in the
+   top layer (or, without the Popover API, portalled to <body>), so no .card or dialog clips it (FUNC-021).
+   It's fixed: JavaScript places it from the button's rectangle, above it when there's no room below, and
+   inside the viewport. inset/margin undo the UA's centred [popover] style. It never gets taller than the
+   viewport; the rest scrolls inside (UI-014). */
+.email { position: relative; display: inline-flex; max-width: 100%; }
+.email > .btn { cursor: pointer; text-align: left; }
+.email__menu { position: fixed; inset: auto; top: 0; left: 0; z-index: 35; margin: 0; box-sizing: border-box; width: max-content; min-width: 220px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); overflow: auto; overscroll-behavior: contain; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.5); }
+.email__addr { margin: 0 0 8px; padding: 0 6px; font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; user-select: all; }
+.email__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.email__item { display: flex; align-items: center; gap: 4px; box-sizing: border-box; width: 100%; min-height: 40px; padding: 6px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font: 600 14px var(--sans); text-align: left; text-decoration: none; cursor: pointer; }
+.email__item:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+.email__item:focus-visible { outline-offset: 0; }
+.email__status { margin: 0; padding: 0 6px; font-size: 13px; color: var(--accent2); overflow-wrap: anywhere; }
+.email__status:not(:empty) { margin-top: 6px; }
+/* "Didn't open?" notice (mailtoCheck.js): the same menu, wider, with steps for this device. */
+.email__menu--notice { width: 360px; }
+.email__notice:focus { outline: none; }
+.email__notice:focus-visible { outline: 2px solid var(--accent2); outline-offset: 4px; }
+.email__notice p { margin: 0 0 8px; padding: 0 6px; font-size: 14px; line-height: 1.5; }
+.email__notice .email__ntitle { font-weight: 700; }
+.email__notice .email__step { color: var(--muted); font-size: 13px; }
+.email__nactions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 0 6px; }
+.email__link { min-height: 40px; padding: 0; border: 0; background: none; color: var(--accent2); font: 600 13px var(--sans); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+@media print { .email__menu { display: none; } }
 /* Photo: small, above the text on phones; beside it from 900px. width/height attrs reserve its space.
    "At a glance" (ProfileCard.jsx): after the text below 900px, under the photo from 900px. */
 .hero { display: grid; grid-template-columns: minmax(0, 1fr); }
@@ -443,14 +468,66 @@ h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), va
   .pdialog__details > div { grid-template-columns: 88px 1fr; gap: 10px; }
 }
 
+/* "At a glance" dialog (Impact.jsx): the metrics and highlights, opened from the hero beside Email. Its
+   body scrolls inside the dialog (dvh: phone toolbars), and the page behind it doesn't scroll; the
+   reserved gutter keeps the page from shifting when its scrollbar goes.
+   No `position: relative` on the dialog (FUNC-019): a top-layer modal given `relative` is laid out at the
+   top of the document, so opening it while scrolled jumped the page to the top. The UA's `position: fixed`
+   is already the Close button's containing block. Only a modal locks the page: while printing, the dialog
+   is open non-modally (Impact.jsx) and the page must not be clipped (FUNC-020). */
+.gdialog--glance { width: min(1000px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overscroll-behavior: contain; }
+:root:has(.gdialog--glance:modal) { overflow: hidden; scrollbar-gutter: stable; }
+.glance-dialog { padding: 16px 20px 20px; }
+.glance-dialog > h2 { margin: 4px 0 16px; padding-right: 90px; }
+.glance-dialog .stats { gap: 12px; margin-bottom: 12px; }
+.glance-dialog .grid { gap: 12px; }
+/* Phones (UI-013): Close stays in view while the dialog scrolls (sticky, floated beside the heading), and
+   the stats sit 2 × 2 with smaller figures, so the dialog is about one screen tall rather than two. */
+@media (max-width: 600px) {
+  .gdialog--glance { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); }
+  .gdialog--glance .pdialog__close { position: sticky; top: 8px; float: right; margin: 8px 8px 0 0; background: var(--panel2); }
+  .glance-dialog { padding: 12px 12px 14px; }
+  .glance-dialog > h2 { margin: 2px 0 12px; padding-right: 0; }
+  .glance-dialog .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .glance-dialog .stat { padding: 10px 12px; }
+  .glance-dialog .stat dt { font-size: 1.5rem; }
+  .glance-dialog .stat--long dt { font-size: 1.05rem; line-height: 1.5rem; }
+  .glance-dialog .stat dd { margin-top: 4px; font-size: 12.5px; line-height: 1.35; }
+  .glance-dialog .grid { gap: 8px; }
+  .glance-dialog .mc { padding: 10px 12px; }
+  .glance-dialog .mc h3 { margin-bottom: 2px; font-size: 0.95rem; }
+  .glance-dialog .mc p { font-size: 13.5px; }
+}
+/* The narrowest phones (320–360px): each highlight's title runs into its text, saving a line per card. */
+@media (max-width: 360px) {
+  .glance-dialog .stat { padding: 8px 10px; }
+  .glance-dialog .stat--long dt { font-size: 0.95rem; line-height: 1.5rem; }
+  .glance-dialog .mc { padding: 8px 10px; font-size: 13px; line-height: 1.4; }
+  .glance-dialog .mc h3 { display: inline; font-size: 0.9rem; }
+  .glance-dialog .mc h3::after { content: ': '; }
+  .glance-dialog .mc p { display: inline; font-size: 13px; }
+}
+/* Full-page print keeps "At a glance" after the hero, as on the page before it became a dialog. */
+@media print {
+  .hero .actions:has(> .gdialog--glance) { display: block; grid-column: 1 / -1; }
+  .hero .actions:has(> .gdialog--glance) > :not(dialog), .gdialog--glance .pdialog__close, .gdialog--glance::backdrop { display: none; }
+  .gdialog--glance { position: static; display: block; width: auto; max-width: none; max-height: none; margin: 16px 0 0; padding: 0; border: 0; overflow: visible; }
+  .glance-dialog { padding: 0; }
+  .glance-dialog > h2 { padding-right: 0; }
+}
+
 /* Sections */
 section { padding: 20px 0; }
 h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-/* Balanced rows, no orphaned last card: four-card groups (highlights, How I lead) as 2×2; three cards
-   (credentials) in one row; the ten skill groups flow into up to three columns. */
+/* Balanced rows, no orphaned last card: card pairs (highlights, How I lead) in two columns, an odd
+   last card spanning both; three cards (credentials) in one row; the skill groups flow into up to
+   three columns. */
 .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 640px) { .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 640px) {
+  .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid--2 > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
 @media (min-width: 720px) { .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .grid--skills { display: block; columns: 3 300px; column-gap: 16px; }
 .grid--skills > * { break-inside: avoid; margin-bottom: 16px; }
@@ -531,7 +608,7 @@ h2.sec { font: 700 1.3rem var(--sans); margin: 0 0 14px; }
   .mc--clickable:hover, .mc--clickable:focus-within { transform: none; }
   .pdialog__quote { transition: none; animation: none; }
 }
-/* Full-page print: the resume sections (hero, impact, leadership, projects, experience, skills,
+/* Full-page print: the resume sections (hero with "At a glance", leadership, projects, experience, skills,
    credentials, contact). Interactive parts and the AI block are left out; Experience.jsx opens every
    role before printing. Brief and case-study printing have their own rules. */
 @media print {

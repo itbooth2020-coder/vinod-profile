@@ -23,6 +23,7 @@ describe('Brief', () => {
     setup()
     expect(screen.getByText('3 weeks to 5 days')).toHaveClass('sr-only')
     expect(screen.getByRole('heading', { name: 'Top projects' })).toBeInTheDocument()
+    expect(screen.getByText('Global Bank – Application Security & Vulnerability Remediation')).toBeInTheDocument()
     expect(screen.getByText('Darwin Portal – Syngenta')).toBeInTheDocument()
     expect(screen.getByRole('region')).not.toHaveTextContent(/open to new roles|notice|relocat/i)
   })
@@ -149,7 +150,7 @@ describe('Brief', () => {
 
   it('has email, role fit and LinkedIn actions', () => {
     setup()
-    expect(screen.getByRole('link', { name: 'Email' })).toHaveAttribute('href', 'mailto:yadav.vinod579@gmail.com')
+    expect(screen.getByRole('button', { name: 'Email' })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByRole('link', { name: 'Check role fit' })).toHaveAttribute('href', '#fit')
     expect(screen.getByRole('link', { name: /^LinkedIn\s*\(opens in a new tab\)$/ })).toHaveAttribute('target', '_blank')
   })

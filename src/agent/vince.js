@@ -19,6 +19,9 @@ const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 
 const YEARS = profile.tagline.match(/\d+\+?/)[0] // e.g. '14+'
 const firstSentence = (s) => s.split(/\.(?:\s|$)/)[0] // without its full stop; keeps "99.9%"
 const lowerFirst = (s) => (/^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1)) // keeps acronyms like "AI"
+const article = (s) => (/^[aeiou]/i.test(s) ? 'an' : 'a')
+// A project in the tour: its short data.js tourLine, else the first sentence of its card text.
+const tourLine = (p) => p.tourLine || `${article(p.text)} ${lowerFirst(firstSentence(p.text))}`
 const pick = (list) => list[Math.floor(Math.random() * list.length)]
 const shuffle = (list) => list.map((v) => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v)
 
@@ -48,7 +51,8 @@ export const acknowledge = () => pick(ACKNOWLEDGEMENTS)
 // Questions VINCE can suggest, grouped by topic.
 const QUESTIONS = {
   intro: [`Who is ${FIRST}?`, 'Give me a quick summary of his career'],
-  role: ['What is his current role?', `What does he do at ${experience[0].company}?`],
+  role: ['What is his current role?', `What does he do at ${experience[0].company}?`, 'Is he a technical program manager?'],
+  security: ['What application security work has he done?', 'Tell me about the bank program', 'Does he know OWASP and SAST?'],
   company: experience.slice(1, 5).map((e) => `What did he do at ${company(e.company)}?`),
   timeline: ['Show his career timeline', 'How has his career progressed?'],
   project: projects.map((p) => `Tell me about the ${project(p)} project`),
@@ -68,7 +72,8 @@ const QUESTIONS = {
 // Topics that naturally follow each other; the first related topics are suggested first.
 const RELATED = {
   intro: ['role', 'timeline', 'impact', 'project'],
-  role: ['project', 'leadership', 'ai', 'company'],
+  role: ['security', 'project', 'leadership', 'ai'],
+  security: ['role', 'project', 'skills', 'leadership'],
   company: ['timeline', 'project', 'impact', 'skills'],
   timeline: ['company', 'impact', 'education'],
   project: ['ai', 'skills', 'project', 'impact'],
@@ -93,6 +98,7 @@ const DETECT = [
   ['education', /stud(y|ied)|educat|degree|college|universit|mca|b\.?sc/],
   ['certs', /certif|course/],
   ['location', /\bbased\b|located|location|where (is|does) he live|city/],
+  ['security', /secur|vulnerab|remediat|owasp|masvs|\bs[ac]st\b|\bdast\b|\bsca\b|penetration|pen ?test|appsec|\bbank\b/],
   ['ai', /\bai\b|agent|claude|copilot|generative|llm|machine learning|prompt|few-?shot/],
   ['project', new RegExp(`project|portfolio|${names(projects.map((p) => p.name))}`)],
   ['leadership', /team|lead|mentor|hiring|manag/],
@@ -237,14 +243,17 @@ export function toSpeech(md, max = 480) {
 export function tourSteps() {
   const first = experience.at(-1)
   const [p1, p2] = projects
+  const now = highlights.find((h) => /^[A-Z][\w-]*ing\b/.test(h.text))
   return [
     {
       target: 'top',
       text: `Very well. Let's begin. ${profile.name} is a ${profile.role} at ${profile.company}, based in Bengaluru. ${profile.tagline}`,
     },
     {
-      target: 'impact',
-      text: `At a glance: he has ${highlights.slice(0, 3).map((h) => lowerFirst(h.text)).join(', ').replace(/, ([^,]*)$/, ', and $1')}.`,
+      target: 'glance', // the hero's "At a glance" button (Impact.jsx); its dialog stays closed, so VINCE stays usable
+      // CHAT-014: the dialog is closed during the tour, so this stop points to the button and names what it
+      // holds (the stats, without their qualifiers), then the current program ("Program-managing …").
+      text: `Press At a glance for his headline numbers: ${list(stats.map((s) => `${s.sr || s.value} ${lowerFirst(s.label.split(/,|;| across | in a /)[0])}`))}.${now ? ` He is currently ${lowerFirst(now.text)}.` : ''}`,
     },
     {
       target: 'lead',
@@ -252,7 +261,7 @@ export function tourSteps() {
     },
     {
       target: 'projects',
-      text: `Among his key projects: ${project(p1)}, an ${lowerFirst(firstSentence(p1.text))}. And ${project(p2)}, a ${lowerFirst(firstSentence(p2.text))}.`,
+      text: `Among his key projects: ${project(p1)}, ${tourLine(p1)}. And ${project(p2)}, ${tourLine(p2)}.`,
     },
     {
       target: 'experience',

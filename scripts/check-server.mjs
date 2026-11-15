@@ -15,7 +15,8 @@ delete process.env.TRUST_PROXY
 
 const { audible, audibleWav, DISK_CACHE, fixedLines, handleSpeak } = await import('../server/voiceAgent.js')
 const { clientIp, stripPort } = await import('../server/http.js')
-const { allowedOrigin, isJson, handleAsk, signTurn, verifyTurn, sanitizeHistory, compactCitation } = await import('../server/profileAgent.js')
+const { allowedOrigin, isJson, handleAsk, signTurn, verifyTurn, sanitizeHistory, compactCitation, redact, redactor, streamRedactor } = await import('../server/profileAgent.js')
+delete process.env.PROFILE_AGENT_REDACT
 
 let failed = 0
 const check = (name, ok) => {
@@ -142,9 +143,26 @@ check(
   JSON.stringify(compactCitation({ type: 'page_location', cited_text: ' Led  the Darwin\nPortal ', document_index: 0, document_title: 'Resume', start_page_number: 2, end_page_number: 3 })) ===
     JSON.stringify({ label: 'resume p. 2', text: 'Led the Darwin Portal' }),
 )
+
+// --- Client-name redaction (AI-010) --------------------------------------------------------------
+// The real names live only in .env (PROFILE_AGENT_REDACT); these checks use a made-up client.
+const FAKE = 'Examplebank|Example Group'
+const rx = redactor({ PROFILE_AGENT_REDACT: FAKE })
+check(
+  'redact: the client name in a citation quote becomes "a global bank"',
+  compactCitation({ type: 'page_location', cited_text: "Technical Program Manager for Examplebank's Application Security Program", document_index: 0, start_page_number: 1, end_page_number: 2 }, rx)?.text ===
+    "Technical Program Manager for a global bank's Application Security Program",
+)
+check('redact: whole words in any case only', redact('EXAMPLEBANK, example group and Examplebanking', rx) === 'a global bank, a global bank and Examplebanking')
+const sr = streamRedactor(rx)
+const streamed = ['He works for Exam', 'plebank on its Ap', 'pSec program with Example', ' Group teams and the ', 'bank'].map((t) => sr.push(t)).join('') + sr.flush()
+check('redact: a name split across streamed deltas is still replaced', streamed === 'He works for a global bank on its AppSec program with a global bank teams and the bank')
+check('redact: unset or invalid pattern: no redactor (citations are then left out)', redactor({}) === null && redactor({ PROFILE_AGENT_REDACT: '(' }) === null)
+
 const cited = [
   { type: 'page_location', cited_text: 'Custom Software Engineering Manager, Accenture, Jun 2024 – Present', document_index: 0, document_title: 'Resume of Vinod Pyarelal Yadav', start_page_number: 1, end_page_number: 2 },
   { type: 'page_location', cited_text: 'managing a team of 35+ engineers across Android, iOS, and web stacks', document_index: 0, document_title: 'Resume of Vinod Pyarelal Yadav', start_page_number: 1, end_page_number: 2 },
+  { type: 'page_location', cited_text: "Serving as Technical Program Manager for Examplebank's Application Security & Vulnerability Remediation Program", document_index: 0, document_title: 'Resume of Vinod Pyarelal Yadav', start_page_number: 1, end_page_number: 2 },
 ]
 const sse = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`
 let mockRequest = null
@@ -162,7 +180,9 @@ const mock = http.createServer(async (rq, rs) => {
       sse('content_block_start', { index: 1, content_block: { type: 'text', text: '', citations: [] } }) +
       sse('content_block_delta', { index: 1, delta: { type: 'citations_delta', citation: cited[1] } }) +
       sse('content_block_delta', { index: 1, delta: { type: 'citations_delta', citation: cited[1] } }) + // duplicate: listed once
-      sse('content_block_delta', { index: 1, delta: { type: 'text_delta', text: ', leading 35+ engineers.' } }) +
+      sse('content_block_delta', { index: 1, delta: { type: 'citations_delta', citation: cited[2] } }) +
+      sse('content_block_delta', { index: 1, delta: { type: 'text_delta', text: ', leading 35+ engineers, and TPM for Example' } }) +
+      sse('content_block_delta', { index: 1, delta: { type: 'text_delta', text: "bank's AppSec program." } }) +
       sse('content_block_stop', { index: 1 }) +
       sse('message_delta', { delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 12 } }) +
       sse('message_stop', {}),
@@ -173,21 +193,32 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${mock.address().port}`
 const mocked = await import('../server/profileAgent.js?mock-citations')
 const askServer = http.createServer(mocked.handleAsk)
 await new Promise((r) => askServer.listen(0, '127.0.0.1', r))
-res = await fetch(`http://127.0.0.1:${askServer.address().port}/`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:4173' },
-  body: '{"question":"Where does he work?"}',
-})
-const events = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
+const ask = async () => {
+  const r = await fetch(`http://127.0.0.1:${askServer.address().port}/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:4173' },
+    body: '{"question":"Where does he work?"}',
+  })
+  return (await r.text()).trim().split('\n').map((l) => JSON.parse(l))
+}
+process.env.PROFILE_AGENT_REDACT = FAKE
+const events = await ask()
 const done = events.find((e) => e.type === 'done')
 const doc = mockRequest?.messages?.[0]?.content?.find((b) => b.type === 'document')
 check('citations: the resume document block has citations enabled', doc?.citations?.enabled === true)
-check('citations: streamed text arrives', events.filter((e) => e.type === 'text').map((e) => e.text).join('') === 'He is a Custom Software Engineering Manager at Accenture, leading 35+ engineers.')
+check(
+  'citations: streamed text arrives, with the client name redacted across deltas (AI-010)',
+  events.filter((e) => e.type === 'text').map((e) => e.text).join('') === "He is a Custom Software Engineering Manager at Accenture, leading 35+ engineers, and TPM for a global bank's AppSec program.",
+)
 check(
   'citations: done carries compact, deduplicated citations',
-  done?.citations?.length === 2 && done.citations.every((c) => c.label === 'resume p. 1' && typeof c.text === 'string') && done.citations[1].text.startsWith('managing a team of 35+'),
+  done?.citations?.length === 3 && done.citations.every((c) => c.label === 'resume p. 1' && typeof c.text === 'string') && done.citations[1].text.startsWith('managing a team of 35+'),
 )
+check('citations: the client name is redacted from cited resume text (AI-010)', done?.citations?.[2]?.text.includes("for a global bank's Application Security") && !JSON.stringify(events).includes('Examplebank'))
 check('citations: the answer is still signed', typeof done?.sig === 'string' && done.sig.length > 20)
+delete process.env.PROFILE_AGENT_REDACT
+const unredacted = (await ask()).find((e) => e.type === 'done')
+check('citations: without PROFILE_AGENT_REDACT no resume quotes are sent (AI-010)', Array.isArray(unredacted?.citations) && unredacted.citations.length === 0)
 askServer.close()
 mock.close()
 

@@ -1,7 +1,9 @@
 // Fresh-wording test for the offline profile agent (src/agent/localAgent.js), AI-003 round 3.
 // 40 recruiter and hiring-manager questions, written for this round in wording not used in
 // scripts/test-local-agent.mjs or the UAT tables, across every topic, each with a check graded
-// against src/data.js, plus 6 AI-009 regression questions (Nov 2026). Target 40/46.
+// against src/data.js, plus 6 AI-009 regression questions, 8 on his current program for a global bank (Nov 2026)
+// 16 from the 15 Nov UAT (AI-011, AI-012, AI-013, TEST-003 to TEST-005) and 5 from its release round (AI-014).
+// Target 61/75.
 // Rule for this set: improve the agent's concepts and synonyms (src/agent/concepts.js), never code
 // aimed at one of these strings, and don't edit a question or check to make it pass. Replace the set
 // with new wording at the next UAT round; then it can join the regression suites.
@@ -10,7 +12,7 @@ import { answerLocally, ensureLexicon } from '../src/agent/localAgent.js'
 
 await ensureLexicon() // FUNC-015: the role-fit lexicon loads on demand
 
-const TARGET = 40
+const TARGET = 61
 const MAX_CHARS = 1200 // prose, without charts, tables and images (CHAT-003)
 
 const has = (...patterns) => (a) => patterns.every((p) => p.test(a))
@@ -21,6 +23,8 @@ const lead = (n, re) => (a) => re.test(prose(a).trim().slice(0, n))
 const sentences = (a) => prose(a).replace(/\[[^\]]*\]\([^)]*\)/g, '').trim().split(/(?<=[.!?])\s+(?=[A-Z*])/).filter((x) => x.trim()).length
 const found = lacks(/couldn't find that/i)
 const noNote = lacks(/doesn't mention/i)
+// The owner's line for the client, with nothing confirmed or denied.
+const neutral = all(has(/described only as a global bank/), lacks(/\b(yes|no|isn't|is not|wasn't)\b/i))
 const maxLen = (n) => (a) => a.length <= n
 // Owner decisions (Oct 2026): availability is hidden (data.js availability.public = false) and the
 // resume PDF isn't published (available on request).
@@ -87,6 +91,42 @@ const FRESH = [
   ['Sum Vinod up in a sentence', all(has(/14\+ years/), (a) => sentences(a) <= 1)],
   ['Give me the elevator pitch on Vinod', all(has(/Engineering Manager/, /35\+/), (a) => sentences(a) <= 2, found)],
   ['Briefly, what is his notice period?', all(hiddenAvail, (a) => sentences(a) <= 2, lacks(/^\|/m))],
+  // Current program (resume update, Nov 2026): application security & vulnerability remediation for a global bank
+  // (the site names the client only that way).
+  ['What is he working on at the moment?', all(has(/a global bank/, /3,000/), found)],
+  ['Has he got any AppSec background?', all(has(/global bank/, /OWASP|SAST/), noNote)],
+  ['How many apps is he responsible for remediating?', all(has(/3,000/), found)],
+  ['Is he familiar with DAST and penetration testing?', all(has(/DAST/, /penetration/i), noNote)],
+  ['Does he have experience in the banking sector?', all(has(/Global Bank/), noNote)],
+  ['What does his TPM role involve?', all(has(/Technical Program Manager/, /governance/i), found)],
+  ['Has he used Burp Suite?', has(/doesn't mention \*\*Burp Suite\*\*/)],
+  ['Which bank does he work with?', all(has(/a global bank/), found)],
+  // 15 Nov UAT (AI-011, TEST-004, TEST-005): who the client is. Stand-in bank names; the real one appears
+  // nowhere in this repo, and VINCE treats every name alike.
+  ['Name the bank please', neutral],
+  ["What's the name of the client?", neutral],
+  ['Is the client Examplebank?', all(neutral, lacks(/Examplebank|HTC Global Services/))],
+  ['Is his client Northwind Bank?', all(neutral, lacks(/Northwind/))],
+  ['Is the bank HSBC?', all(neutral, lacks(/HSBC/))],
+  ['Is it Examplebank?', all(neutral, lacks(/Examplebank/))],
+  ['Did he work at Examplebank?', all(neutral, lacks(/Examplebank/))],
+  ['Who was the client for Darwin?', all(has(/Syngenta/), lacks(/described only as a global bank/))],
+  // 15 Nov release round (AI-014): the guess with the name first, and his work "at" an unnamed organisation.
+  ['Was HSBC his client?', all(neutral, found, lacks(/HSBC|HTC Global Services/))],
+  ['Is Examplebank the client?', all(neutral, found, lacks(/Examplebank|HTC Global Services/))],
+  ['What did Vinod do for Northwind Bank?', all(neutral, found, lacks(/Northwind/))],
+  ['Tell me about his Examplebank work', all(neutral, found, lacks(/Examplebank/))],
+  ['What did he do at Accenture?', all(has(/Accenture/), lacks(/described only as a global bank/))],
+  // 15 Nov UAT (AI-012): the program in realistic questions, with what the resume doesn't say.
+  ['How many apps is he responsible for?', has(/covers \*\*approximately 3,000 Android, iOS, and web applications\*\*/)],
+  ['Has he worked in fintech?', has(/calls this work Banking/, /Global Bank/)],
+  ['Has he done pen testing himself?', has(/coordinating penetration testing/, /doesn't say he runs penetration tests himself/)],
+  ['Is he a security engineer?', has(/Technical Program Manager\*\*; the resume doesn't describe hands-on security engineering/)],
+  ['Does he have PCI DSS experience?', has(/PCI DSS awareness\*\*; the resume doesn't describe PCI DSS compliance/)],
+  ['How many vulnerabilities has he fixed?', has(/doesn't give a count of vulnerabilities/)],
+  // 15 Nov UAT (AI-013): a timed pitch is the hero pitch, not a "30%+" fragment.
+  ['Give me a 30 second pitch', all(has(/^Vinod is an Engineering Manager and Technical Program Manager/), lacks(/^Proven/))],
+  ['Pitch him to me in 30 seconds', all(has(/^Vinod is an Engineering Manager and Technical Program Manager/), lacks(/^Proven/))],
 ]
 
 const verbose = process.argv.includes('--verbose')

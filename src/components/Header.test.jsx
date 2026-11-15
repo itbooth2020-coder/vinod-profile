@@ -69,7 +69,7 @@ describe('Header', () => {
     window.scrollY = 0
   })
 
-  // UX-017: over a block that isn't in the nav (Impact, the domain graph, Credentials), no pill is current.
+  // UX-017: over a block that isn't in the nav (the domain graph, Credentials), no pill is current.
   it('clears the current pill over a top-level block that is not in the nav', async () => {
     const main = document.createElement('main')
     main.id = 'main'
@@ -82,7 +82,7 @@ describe('Header', () => {
       return el
     }
     const lead = block('lead', -900, -100)
-    const impact = block('impact', -100, 300)
+    const creds = block('credentials', -100, 300)
     const graph = block('', 300, 900)
     document.body.appendChild(main)
     Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 10000 })
@@ -96,7 +96,7 @@ describe('Header', () => {
 
     // Leadership crosses the line: its pill is current.
     lead.getBoundingClientRect = () => ({ top: 0, bottom: 800, height: 800 })
-    impact.getBoundingClientRect = () => ({ top: 800, bottom: 1200, height: 400 })
+    creds.getBoundingClientRect = () => ({ top: 800, bottom: 1200, height: 400 })
     graph.getBoundingClientRect = () => ({ top: 1200, bottom: 1800, height: 600 })
     act(() => fireEvent.scroll(window))
     await waitFor(() => expect(screen.getByRole('link', { name: 'leadership' })).toHaveAttribute('aria-current', 'true'))
@@ -104,7 +104,7 @@ describe('Header', () => {
     // The end of Leadership is still on screen, but an unnamed block (the domain graph's) has crossed
     // the line: cleared, not left on "leadership".
     lead.getBoundingClientRect = () => ({ top: -700, bottom: 100, height: 800 })
-    impact.getBoundingClientRect = () => ({ top: 100, bottom: 120, height: 20 })
+    creds.getBoundingClientRect = () => ({ top: 100, bottom: 120, height: 20 })
     graph.getBoundingClientRect = () => ({ top: 120, bottom: 720, height: 600 })
     act(() => fireEvent.scroll(window))
     await waitFor(() => expect(screen.getByRole('link', { name: 'leadership' })).not.toHaveAttribute('aria-current'))

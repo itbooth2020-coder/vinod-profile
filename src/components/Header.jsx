@@ -26,9 +26,11 @@ export default function Header() {
   // The header is sticky (styles.css); is-scrolled gives it a bottom edge once the page moves under it.
   // --header-h is its measured height, so anchor jumps, scrollIntoView and focused elements stop below
   // it (html scroll-padding-top). styles.css has per-breakpoint fallbacks for the no-JS page.
-  // The section in view gets aria-current: the one crossing a line a third of the way down the space
-  // below the header, or the last one once the page is scrolled to the end. Sections are looked up
-  // each time (role fit swaps its placeholder) and checked at most once a frame, only while scrolling.
+  // The block in view: the one crossing a line a third of the way down the space below the header, or
+  // the last one once the page is scrolled to the end. Every top-level block of <main> counts, so over
+  // one that isn't in the nav (Impact, the domain graph, Credentials) no pill is current (UX-017);
+  // over a nav section, its pill gets aria-current. Blocks are looked up each time (role fit swaps its
+  // placeholder) and checked at most once a frame, only while scrolling.
   useEffect(() => {
     const root = document.documentElement
     const ids = links.map((l) => l.href.slice(1))
@@ -39,14 +41,16 @@ export default function Header() {
       const top = ref.current?.getBoundingClientRect().bottom || 0
       const line = top + (window.innerHeight - top) / 3
       const atEnd = window.innerHeight + window.scrollY >= root.scrollHeight - 2
+      const blocks = new Set([...document.querySelectorAll('#main > *'), ...ids.map((id) => document.getElementById(id))])
+      blocks.delete(null)
+      const inOrder = [...blocks].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
       let current = ''
-      for (const id of ids) {
-        const el = document.getElementById(id)
-        if (!el?.getClientRects().length) continue
+      for (const el of inOrder) {
+        if (!el.getClientRects().length) continue
         const r = el.getBoundingClientRect()
-        if (atEnd ? r.top < window.innerHeight : r.top <= line && r.bottom > top) current = id
+        if (atEnd ? r.top < window.innerHeight : r.top <= line && r.bottom > top) current = el.id
       }
-      setActive(current)
+      setActive(ids.includes(current) ? current : '')
     }
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update)
@@ -72,7 +76,9 @@ export default function Header() {
   return (
     <header className={scrolled ? 'header is-scrolled' : 'header'} ref={ref}>
       <div className="wrap header__inner">
-        <nav aria-label="Sections" className="nav">
+        {/* A focused pill scrolls into view inside the sideways-scrolling row (UX-015); "nearest" leaves
+            the page where it is (the header is sticky and its controls count as in view, styles.css). */}
+        <nav aria-label="Sections" className="nav" onFocus={(e) => e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })}>
           {links.map((l) => (
             <a key={l.href} href={l.href} aria-current={active === l.href.slice(1) ? 'true' : undefined}>
               {l.label}

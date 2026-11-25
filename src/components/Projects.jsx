@@ -21,7 +21,14 @@ const addsToCard = (p) => {
 const cases = projects.filter(addsToCard)
 const caseFromHash = () => {
   const m = window.location.hash.match(/^#case-(.+)$/)
-  return m ? cases.find((p) => slugOf(p) === decodeURIComponent(m[1])) : undefined
+  if (!m) return undefined
+  let slug
+  try {
+    slug = decodeURIComponent(m[1])
+  } catch {
+    return undefined // a malformed link (#case-%E0%A4%A) opens nothing (SEC-004)
+  }
+  return cases.find((p) => slugOf(p) === slug)
 }
 
 export default function Projects() {

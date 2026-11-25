@@ -62,21 +62,15 @@ export const profileCard = [
   ['verticals', 'Banking, Retail, Transit, Healthcare, Agri-Tech, Enterprise Mobility'],
 ]
 
-// Availability, confirmed by Vinod (not in the resume). When shown: the hero and 30-second brief strip
-// (Availability.jsx), Contact, role fit, VINCE's brief narration and the assistants' answers.
-// `public` is the single switch for all of them. Vinod asked to hide it, so it's false: nothing renders
-// (no empty space), and the offline and live assistants answer availability, notice, relocation,
-// work-mode and target-role questions with "please contact Vinod directly". The details below are
-// kept so setting `public: true` brings everything back.
-export const availability = {
-  public: false,
-  open: true,
-  roles: ['Senior Engineering Manager', 'Head of Engineering', 'CTO'],
-  notice: '3 months',
-  location: 'Bengaluru',
-  workModes: ['Onsite', 'Hybrid', 'Remote'],
-  relocation: true,
-}
+// Availability. When shown: the hero and 30-second brief strip (Availability.jsx), Contact, role fit,
+// VINCE's brief narration and the assistants' answers. `public` is the single switch for all of them.
+// Vinod asked to hide it, so it's false: nothing renders (no empty space), and the offline and live
+// assistants answer availability, notice, relocation, work-mode and target-role questions with "please
+// contact Vinod directly". SEC-003: everything exported here ships in the public bundle and repo, so
+// while it's hidden only `{ public: false }` is kept. To show it again, set `public: true` and add the
+// details confirmed by Vinod: open (boolean), roles (string[]), notice (e.g. '3 months'), location,
+// workModes (string[]) and relocation (boolean).
+export const availability = { public: false }
 // True only when the availability details may be shown (switched on, and he's looking).
 export const showAvailability = availability.public && availability.open
 

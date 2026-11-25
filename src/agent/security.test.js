@@ -2,12 +2,15 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { answerLocally, ensureLexicon, explain, UNSURE } from './localAgent.js'
 import { matchRole, fitSummaryText } from './roleFit.js'
 import { isUnsure, nextQuestions, tourSteps } from './vince.js'
-import { BANK_NAMES, namesClient } from '../test/clientName.js'
+import { namedBanks } from '../test/bankMentions.js'
+
+// Made-up and real bank names a visitor might type, in the wordings the UAT used (stand-ins, not the client).
+const BANK_NAMES = ['Examplebank', 'Northwind Bank', 'Contoso Financial Group', 'HSBC']
 
 // The current program (15 Nov 2026 resume sync, t15): application security & vulnerability remediation
 // for a global bank, where Vinod is Technical Program Manager at Accenture. Owner decision: the client
-// is named only as "a global bank"; its name must appear nowhere (namesClient checks by hash, so it isn't
-// written here either), and a named bank is neither confirmed nor denied. VINCE has no name-specific
+// is named only as "a global bank"; its name must appear nowhere (namedBanks flags any named bank, and no
+// form of the real name is written in the repo, SEC-001), and a named bank is neither confirmed nor denied. VINCE has no name-specific
 // logic, so it's asked about stand-in banks (BANK_NAMES), and must not repeat those either.
 const NEUTRAL = /described only as a global bank/
 const CONFIRM_OR_DENY = /\b(yes|no|correct|confirm(ed|s)?|indeed|that's right|is not|isn't|wasn't|was not)\b/i
@@ -93,13 +96,22 @@ describe('security and TPM answers', () => {
   it("the tour's At a glance stop names the current program without naming the client", () => {
     const glance = tourSteps().find((s) => s.target === 'glance').text
     expect(glance).toMatch(/for a global bank\./)
-    expect(namesClient(glance)).toBe(false)
+    expect(namedBanks(glance)).toEqual([])
   })
 })
 
 describe('the client is "a global bank" (owner decision)', () => {
-  it('the name check recognises the client by hash only', () => {
-    expect(namesClient('a global bank, Accenture, Syngenta')).toBe(false)
+  it('the named-bank check passes "a global bank" and flags a named bank (self-check)', () => {
+    expect(namedBanks('a global bank, Accenture, Syngenta, Global Bank – Application Security')).toEqual([])
+    expect(namedBanks('He works with Northwind Bank and Contoso Financial Group.')).toEqual(['Northwind Bank', 'Contoso Financial Group'])
+  })
+
+  it('a client question gets CLIENT_NOTE and never echoes the typed name', () => {
+    for (const n of BANK_NAMES) {
+      const a = answerLocally(`Is the client ${n}?`)
+      expect(a).toMatch(/Clients aren't always named on this site: the client of his current program is described only as a global bank\./)
+      expect(a.toLowerCase()).not.toContain(n.toLowerCase())
+    }
   })
 
   it.each(['Which bank is the client?', 'Who is the client of the bank program?', 'Which bank?', 'Which bank does he work with?', 'who is the client of the security program?'])(
@@ -107,7 +119,7 @@ describe('the client is "a global bank" (owner decision)', () => {
     (q) => {
       const a = answerLocally(q)
       expect(a).toMatch(/a global bank/i)
-      expect(namesClient(a)).toBe(false)
+      expect(namedBanks(a)).toEqual([])
       expect(a.startsWith(UNSURE)).toBe(false)
     },
   )
@@ -128,7 +140,7 @@ describe('the client is "a global bank" (owner decision)', () => {
   it.each(WORKED)('TEST-003: does not repeat the bank name in its answer: %s', (q) => {
     const a = answerLocally(q)
     expect(echoes(a, nameIn(q))).toBe(false)
-    expect(namesClient(a)).toBe(false)
+    expect(namedBanks(a)).toEqual([])
   })
 
   // TEST-004 (fixed 15 Nov): "Is the client <bank>?" got an unrelated HTC passage about "client engagements".
@@ -146,7 +158,7 @@ describe('the client is "a global bank" (owner decision)', () => {
   it.each([...BANK_IS, ...CLIENT_IS, ...IT_IS, ...BANK_NAMES])('never confirms or denies a named bank, nor repeats its name: %s', (q) => {
     const a = answerLocally(q)
     expect(echoes(a, nameIn(q))).toBe(false)
-    expect(namesClient(a)).toBe(false)
+    expect(namedBanks(a)).toEqual([])
     expect(a).not.toMatch(CONFIRM_OR_DENY)
   })
 })
@@ -158,7 +170,7 @@ describe('client-name questions (AI-011, TEST-003 to TEST-005, 15 Nov fixes)', (
       const a = answerLocally(q)
       expect(a).toMatch(NEUTRAL)
       if (nameIn(q)) expect(echoes(a, nameIn(q))).toBe(false)
-      expect(namesClient(a)).toBe(false)
+      expect(namedBanks(a)).toEqual([])
       expect(a).not.toMatch(CONFIRM_OR_DENY)
       expect(a.startsWith(UNSURE)).toBe(false)
     },
@@ -204,7 +216,7 @@ describe('AI-014: name-first client guesses and "what did he do at X"', () => {
     expect(a).toMatch(NEUTRAL)
     expect(a).not.toMatch(/couldn't find|HTC Global Services/)
     expect(echoes(a, nameIn(q))).toBe(false)
-    expect(namesClient(a)).toBe(false)
+    expect(namedBanks(a)).toEqual([])
     expect(a).not.toMatch(CONFIRM_OR_DENY)
   })
 
@@ -334,8 +346,8 @@ Requirements: 10+ years experience, TPM background, DevSecOps and secure coding 
 
   it('never names the client in its evidence or copied summary', () => {
     const r = matchRole(JD)
-    expect(namesClient(JSON.stringify(r))).toBe(false)
-    expect(namesClient(fitSummaryText(r))).toBe(false)
+    expect(namedBanks(JSON.stringify(r))).toEqual([])
+    expect(namedBanks(fitSummaryText(r))).toEqual([])
     expect(fitSummaryText(r)).toMatch(/Technical program management/)
   })
 

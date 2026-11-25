@@ -7,10 +7,10 @@ import App from './App.jsx'
 import * as data from './data.js'
 import { media } from './agent/media.js'
 import { tourSteps, briefNarration } from './agent/vince.js'
-import { namesClient } from './test/clientName.js'
+import { namedBanks } from './test/bankMentions.js'
 
 // Page-level contracts for the 15 Nov 2026 changes (t15): page and nav order, the tour's targets in page
-// order, the client named only as "a global bank" (its name appears nowhere; namesClient checks by hash),
+// order, the client named only as "a global bank" (its name appears nowhere; namedBanks flags any named bank),
 // and no DOB, age or phone number.
 // A phone number: 10+ digits, optionally with +, spaces, dots, dashes or brackets. Years, ranges
 // ("2016 – 2024") and figures ("10,000+") don't reach 10 digits in one run.
@@ -77,21 +77,21 @@ describe('client named only as "a global bank" (t15)', () => {
     const user = userEvent.setup()
     renderApp()
     const text = await openBothDialogs(user)
-    expect(namesClient(text)).toBe(false)
-    expect(namesClient(document.body.innerHTML)).toBe(false)
-    expect(namesClient(document.head.innerHTML)).toBe(false)
+    expect(namedBanks(text)).toEqual([])
+    expect(namedBanks(document.body.innerHTML)).toEqual([])
+    expect(namedBanks(document.head.innerHTML)).toEqual([])
   })
 
   it("the client's name appears nowhere in the 30-second brief", async () => {
     history.replaceState(null, '', '/?brief=1')
     renderApp()
-    expect(namesClient(screen.getByRole('region', { name: /30-second brief/ }).textContent)).toBe(false)
-    expect(namesClient(document.body.innerHTML)).toBe(false)
+    expect(namedBanks(screen.getByRole('region', { name: /30-second brief/ }).textContent)).toEqual([])
+    expect(namedBanks(document.body.innerHTML)).toEqual([])
   })
 
   it("the client's name appears nowhere in the site data, media labels, tour or brief narration", () => {
     const blob = JSON.stringify({ ...data, media, tour: tourSteps(), brief: briefNarration() })
-    expect(namesClient(blob)).toBe(false)
+    expect(namedBanks(blob)).toEqual([])
     // The new project and its client.
     const bank = data.projects.find((p) => /^Global Bank\b/.test(p.name))
     expect(bank.caseStudy.client).toBe('A global bank')
@@ -100,7 +100,7 @@ describe('client named only as "a global bank" (t15)', () => {
 
   it("the client's name appears nowhere in index.html (static fallback and meta tags)", () => {
     const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8')
-    expect(namesClient(html)).toBe(false)
+    expect(namedBanks(html)).toEqual([])
   })
 })
 

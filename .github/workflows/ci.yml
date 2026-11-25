@@ -1,0 +1,62 @@
+# CI (SEC-007): tests, the production build and the release gate on every push and pull request.
+# The deploy workflow (S3 + CloudFront, .claude/agents/aws-deployer.md) must run the same build and
+# `npm run check-dist` before any upload. Actions are pinned to commit SHAs; Dependabot updates them.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VINCE_VOICE: 'off'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      # SEC-014: no dependency install scripts, except esbuild's binary check, which the build needs.
+      # VINCE's server voice (server/package.json) is never installed here.
+      - name: Install
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild esbuild
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Unit and component tests
+        run: npx vitest run
+
+      - name: Offline agent checks
+        run: npm run test:agent
+
+      - name: Server checks
+        run: npm run test:server
+
+      - name: Build
+        run: npm run build
+
+      # Fails on a PDF, a source map, a phone-like number, availability details or a key in dist/.
+      # The client-name check runs only when the CLIENT_NAME_PATTERN secret is set (never in the repo).
+      - name: Release gate (check-dist)
+        run: npm run check-dist
+        env:
+          CLIENT_NAME_PATTERN: ${{ secrets.CLIENT_NAME_PATTERN }}

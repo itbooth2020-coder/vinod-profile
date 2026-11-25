@@ -63,12 +63,17 @@ export function pruned(map, isStale, { every = 10 * 60 * 1000, max = 10_000 } = 
 // from an allowed Origin (or Referer, for browsers that omit Origin). A page elsewhere can't send a
 // JSON content type without a CORS preflight, which these endpoints never approve, and can't fake
 // its Origin. PROFILE_AGENT_ORIGINS (comma-separated) replaces the defaults.
+// SEC-012: this is a CSRF guard, not abuse control: a non-browser client can send any Origin, so the
+// per-IP limits, the daily budget and the Anthropic spend limit (plus a WAF rate rule in Phase 2) bound
+// abuse. In production (NODE_ENV=production) localhost origins are never allowed by default; set
+// PROFILE_AGENT_ORIGINS explicitly there.
 const SITE_ORIGINS = ['https://www.vinodyadav.com', 'https://vinodyadav.com']
 const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/
 
 export function allowedOrigin(req, env = process.env) {
   const configured = (env.PROFILE_AGENT_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean)
-  const ok = (origin) => (configured.length ? configured.includes(origin) : SITE_ORIGINS.includes(origin) || LOCALHOST.test(origin))
+  const dev = env.NODE_ENV !== 'production'
+  const ok = (origin) => (configured.length ? configured.includes(origin) : SITE_ORIGINS.includes(origin) || (dev && LOCALHOST.test(origin)))
   const origin = req.headers.origin
   if (origin) return ok(origin)
   try {

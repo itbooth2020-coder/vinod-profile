@@ -35,18 +35,41 @@ const loadFont = (id) => {
 const KEY = 'site-theme'
 const DEFAULTS = { palette: 'console', font: 'inter', accent: '', accent2: '' }
 
+// SEC-011: a custom accent is applied only when it is a colour: #rrggbb (what <input type="color">
+// gives) or a plain hsl(h, s%, l%). Anything else read from storage (url(…), var(…), "red;…") is
+// dropped, both when it's loaded and when it's applied. index.html's inline script checks the same way.
+const HEX = /^#[0-9a-f]{6}$/i
+const HSL = /^hsl\(\s*(\d{1,3}(?:\.\d+)?)(?:deg)?(?:\s*,\s*|\s+)(\d{1,3}(?:\.\d+)?)%(?:\s*,\s*|\s+)(\d{1,3}(?:\.\d+)?)%\s*\)$/i
+export const isAccent = (v) => typeof v === 'string' && (HEX.test(v) || HSL.test(v))
+const accentOr = (v) => (isAccent(v) ? v : '')
+
 const load = () => {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }
+    const saved = JSON.parse(localStorage.getItem(KEY) || '{}')
+    const t = { ...DEFAULTS, ...(saved && typeof saved === 'object' ? saved : {}) }
+    return { ...t, accent: accentOr(t.accent), accent2: accentOr(t.accent2) }
   } catch {
     return DEFAULTS
   }
 }
 
+// [r, g, b] in 0..1 for an accent that passed isAccent().
+const rgbOf = (c) => {
+  if (HEX.test(c)) return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255)
+  const [, h, s, l] = c.match(HSL).map(Number)
+  const S = Math.min(s, 100) / 100
+  const L = Math.min(l, 100) / 100
+  const a = S * Math.min(L, 1 - L)
+  return [0, 8, 4].map((n) => {
+    const k = (n + h / 30) % 12
+    return L - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+  })
+}
+
 // Black or white text on a custom accent, whichever contrasts more: at least 4.58:1 for any accent
 // (an off-black ink could fall to 4.39:1), e.g. on the current-section pill in the header nav.
-const inkFor = (hex) => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+const inkFor = (color) => {
+  const [r, g, b] = rgbOf(color)
   const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
   const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
   return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? '#000000' : '#ffffff'
@@ -68,10 +91,11 @@ export default function ThemePicker() {
     el.dataset.palette = theme.palette
     el.dataset.font = theme.font
     loadFont(theme.font)
-    for (const [prop, val] of [['--accent', theme.accent], ['--accent2', theme.accent2]]) {
+    const accent = accentOr(theme.accent)
+    for (const [prop, val] of [['--accent', accent], ['--accent2', accentOr(theme.accent2)]]) {
       val ? el.style.setProperty(prop, val) : el.style.removeProperty(prop)
     }
-    theme.accent ? el.style.setProperty('--accent-ink', inkFor(theme.accent)) : el.style.removeProperty('--accent-ink')
+    accent ? el.style.setProperty('--accent-ink', inkFor(accent)) : el.style.removeProperty('--accent-ink')
     try { localStorage.setItem(KEY, JSON.stringify(theme)) } catch {}
     setResolved({ accent: cssVar('--accent'), accent2: cssVar('--accent2') })
   }, [theme])

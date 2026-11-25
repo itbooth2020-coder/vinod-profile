@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
-    include: ['src/**/*.test.{js,jsx}', 'server/**/*.test.js'],
+    include: ['src/**/*.test.{js,jsx}', 'server/**/*.test.js', 'scripts/**/*.test.js'],
     restoreMocks: true,
     // TEST-007: on Windows, a workspace opened as c:\… (lowercase drive) made the default pool load
     // Vitest twice, once per drive spelling, so every file failed with "Vitest failed to find the

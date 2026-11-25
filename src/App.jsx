@@ -127,9 +127,10 @@ export default function App() {
         <main id="main">
           <Hero brief={brief} onToggleBrief={() => showBrief(!brief)} toggleRef={toggleRef} />
           {brief && <Brief headingRef={headingRef} onClose={(opts) => showBrief(false, opts)} />}
-          {/* Keep Header.jsx nav and VINCE's tour (agent/vince.js tourSteps) in this order. "At a glance" is
+          {/* SEC-004: each eager section has its own boundary too, so one that throws can't blank the page.
+              Keep Header.jsx nav and VINCE's tour (agent/vince.js tourSteps) in this order. "At a glance" is
               a dialog opened from the hero (Impact.jsx), not a section. */}
-          <Leadership />
+          <SectionBoundary id="lead" title="How I lead"><Leadership /></SectionBoundary>
           <div className="layout">
             {/* Full width; the profile card is in the hero (Hero.jsx). Questions go to VINCE (the
                 floating panel; the header's "ask VINCE" opens it). */}
@@ -142,8 +143,8 @@ export default function App() {
               ) : graphPlaceholder}
             </SectionBoundary>
           </div>
-          <Projects />
-          <Experience />
+          <SectionBoundary id="projects" title="Key projects"><Projects /></SectionBoundary>
+          <SectionBoundary id="experience" title="Experience"><Experience /></SectionBoundary>
           <SectionBoundary id="fit" className="lazy-ph lazy-ph--fit" title="Check role fit" onRetry={RoleFit.reset}>
             {mounted ? (
               <Suspense fallback={fitPlaceholder}>
@@ -151,10 +152,10 @@ export default function App() {
               </Suspense>
             ) : fitPlaceholder}
           </SectionBoundary>
-          <Skills />
-          <Credentials />
-          <Blogs />
-          <Contact />
+          <SectionBoundary id="skills" title="Technical skills"><Skills /></SectionBoundary>
+          <SectionBoundary id="credentials" title="Credentials"><Credentials /></SectionBoundary>
+          <SectionBoundary id="blogs" title="Writing"><Blogs /></SectionBoundary>
+          <SectionBoundary id="contact" title="Let's connect"><Contact /></SectionBoundary>
         </main>
         <Footer />
       </div>

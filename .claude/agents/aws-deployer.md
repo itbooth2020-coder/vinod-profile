@@ -29,7 +29,7 @@ The user's step-by-step guide is at `d:\Project-Doc\Vinod-Profile\deploy-vinodya
 | Domains | `www.vinodyadav.com` (canonical), `vinodyadav.com` (301 to www) |
 | Origin access | CloudFront OAC, bucket policy restricted to the distribution ARN |
 
-Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID, cert ARN, hosted zone ID, function name) to `deploy/aws-resources.md`. None of them are secrets. Read that file first on every later run, so a redeploy never creates duplicate resources.
+Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID, cert ARN, hosted zone ID, function name) to `deploy/aws-resources.md`. None of them are secrets, but the repo is public, so the file is gitignored (SEC-009): keep it local and never commit it. Read that file first on every later run, so a redeploy never creates duplicate resources.
 
 ## Safety rules (always)
 
@@ -43,7 +43,7 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
 
 ## Phase 1: static site (S3 + CloudFront)
 
-1. **Build:** `npm ci && npm run build`. Check that `dist/index.html` and `dist/assets/` exist.
+1. **Build:** `npm ci --ignore-scripts && npm rebuild esbuild && npm run build`, then `npm run check-dist` (SEC-007: fails on a PDF, a source map, a phone-like number, availability details or a key in `dist/`; set `CLIENT_NAME_PATTERN` from the secret to check the client's name too). Never upload when it fails. Check that `dist/index.html` and `dist/assets/` exist.
 2. **Bucket:** `aws s3api create-bucket --bucket vinodyadav-com-site --region ap-south-1 --create-bucket-configuration LocationConstraint=ap-south-1`, then `put-public-access-block` with all four settings true.
 3. **Hosted zone:** find the zone for `vinodyadav.com`. If none exists and the user agrees, create one and give them the NS records for their registrar. Check propagation with `nslookup -type=NS vinodyadav.com` and wait until the AWS nameservers show up before validating the certificate.
 4. **Certificate (us-east-1):** request a certificate for `vinodyadav.com` with SAN `www.vinodyadav.com` and DNS validation. Create the validation CNAMEs in Route 53 with `change-resource-record-sets`, then `aws acm wait certificate-validated`.
@@ -52,7 +52,7 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
    - `ViewerProtocolPolicy: redirect-to-https`, GET/HEAD, `Compress: true`, managed CachingOptimized policy `658327ea-f89d-4fab-a63d-7e88639e58f6`
    - aliases for both domains, the ACM cert with `sni-only` and `TLSv1.2_2021`, `DefaultRootObject: index.html`, `HttpVersion: http2and3`, IPv6 on, price class `PriceClass_200` unless the user picks otherwise
    - custom error responses: 403 and 404 → `ResponsePagePath: /404.html`, `ResponseCode: 404`, `ErrorCachingMinTTL: 60` (the private bucket answers 403 for missing keys, so both must map to the 404 page)
-   - response headers policy: a **custom** policy instead of the AWS-managed SecurityHeadersPolicy, because it adds a Content-Security-Policy header. Create it once with `aws cloudfront create-response-headers-policy` (name `vinodyadav-security-headers`) and attach it to the default behavior:
+   - response headers policy: a **custom** policy instead of the AWS-managed SecurityHeadersPolicy, because it adds a Content-Security-Policy header. Create it once with `aws cloudfront create-response-headers-policy` (name `vinodyadav-security-headers`) and attach it to the default behavior. If it already exists, update it to match (`get-response-headers-policy-config`, then `update-response-headers-policy` with the ETag):
      ```json
      {
        "Name": "vinodyadav-security-headers",
@@ -61,14 +61,24 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
          "ContentTypeOptions": { "Override": true },
          "FrameOptions": { "FrameOption": "DENY", "Override": true },
          "ReferrerPolicy": { "ReferrerPolicy": "strict-origin-when-cross-origin", "Override": true },
-         "XSSProtection": { "Protection": true, "ModeBlock": true, "Override": true },
+         "XSSProtection": { "Protection": false, "Override": true },
          "ContentSecurityPolicy": {
            "ContentSecurityPolicy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self' mailto:",
            "Override": true
          }
+       },
+       "CustomHeadersConfig": {
+         "Quantity": 4,
+         "Items": [
+           { "Header": "Permissions-Policy", "Value": "microphone=(self), camera=(), geolocation=(), payment=(), usb=(), interest-cohort=()", "Override": true },
+           { "Header": "Cross-Origin-Opener-Policy", "Value": "same-origin", "Override": true },
+           { "Header": "Cross-Origin-Resource-Policy", "Value": "same-origin", "Override": true },
+           { "Header": "X-Permitted-Cross-Domain-Policies", "Value": "none", "Override": true }
+         ]
        }
      }
      ```
+     SEC-008: `XSSProtection` with `Protection: false` sends `X-XSS-Protection: 0` (the legacy filter is deprecated and caused info-leak bugs; the CSP protects instead). `Permissions-Policy` allows the microphone for this site only (VINCE's speech input) and nothing else. COOP and CORP `same-origin` isolate the page and its files from other sites; the Email chooser's Gmail and Outlook links open in a new tab with `noopener`, so they still work. Keep HSTS at 1 year without `preload`: add `"Preload": true` (and submit to hstspreload.org) only once every subdomain of `vinodyadav.com` is HTTPS-only for good, because preload is hard to undo.
      The full policy lives in each page as a `<meta http-equiv="Content-Security-Policy">`: `npm run build` writes it into `dist/index.html` with the sha256 hashes of that page's inline script and style (see `vite.config.js`), and `404.html` and `privacy.html` carry their own. The browser enforces the header and the meta together, so the effective policy for the home page is `default-src 'self'; script-src 'self' <inline hashes>; style-src 'self' <inline hash> https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' mailto:; frame-ancestors 'none'`. Keep only the page-independent directives in the header: hashes in a header would go stale whenever an inline script changes, and would block the other pages' inline styles. `frame-ancestors` can only be sent as a header (browsers ignore it in a meta tag).
 6. **Bucket policy:** allow `s3:GetObject` to principal `cloudfront.amazonaws.com`, with the condition `AWS:SourceArn` = the distribution ARN.
 7. **Apex → www redirect:** create, publish and associate the CloudFront Function from the guide (viewer-request) on the default behavior.
@@ -96,19 +106,20 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
 Offer this only after Phase 1 is live, and explain the extra cost first (about $10–20/month for an always-on instance, plus Claude API usage).
 
 - Add a small production entry point, for example `server/index.js`, that serves `/api/ask` and `/api/speak` with Node's `http` module and the existing `handleAsk` and `handleSpeak`. Don't change the handlers' behavior. Delegate code changes to the `developer` agent if the change is more than a thin wrapper.
-- `kokoro-js` (the voice server's TTS) is a **devDependency** (PERF-BE-006: its 7 `npm audit` findings stay out of `npm audit --omit=dev`, and the static build doesn't need it). On the Phase 2 instance install with `npm ci --include=dev` (or `npm install --include=dev`), or move `kokoro-js` back to `dependencies`, or `/api/speak` can't load Kokoro and VINCE falls back to the browser voice.
+- `kokoro-js` (the voice server's TTS) has its own `server/package.json` (SEC-014: its `sharp` advisories and native install scripts stay out of the site's install, CI and build). On the Phase 2 instance run `npm ci` and then `npm run install:voice`, or `/api/speak` can't load Kokoro and VINCE falls back to the browser voice.
 - Recommended host: one Lightsail instance or a small EC2 instance (2 GB RAM, Node 22, run under systemd or pm2) in `ap-south-1`. Avoid Lambda: Kokoro's model size and cold starts make it a poor fit, and the handlers expect Node's `req`/`res`.
 - Store `ANTHROPIC_API_KEY` in SSM Parameter Store as a SecureString, and have the instance load it at startup through an instance role.
 - Add a second CloudFront origin (the instance, HTTPS or HTTP-only from CloudFront) and an ordered cache behavior for `/api/*`: all methods, managed `CachingDisabled` policy, and the `AllViewerExceptHostHeader` origin request policy. Restrict the instance's security group to the CloudFront managed prefix list.
 - Per-visitor limits key on the `CloudFront-Viewer-Address` header (`server/http.js`), so the `/api/*` origin request policy must forward it: check with `aws cloudfront get-origin-request-policy` that it's included, and if not, create a custom policy with all viewer headers plus `CloudFront-Viewer-Address`. Only CloudFront may reach the instance (the prefix-list rule above), or the header could be forged.
 - Also set `PROFILE_AGENT_SECRET` (SecureString), and optionally `PROFILE_AGENT_DAILY_LIMIT` and `PROFILE_AGENT_MODEL`, and set a monthly spend limit on the Anthropic workspace (see `.env.example`).
+- Run the server with `NODE_ENV=production`. Then (SEC-006, SEC-012) it refuses to answer unless `PROFILE_AGENT_RESUME` points at a **redacted** resume (no phone number, address or client name; keep it outside the project folder), and localhost origins are no longer allowed. Set `PROFILE_AGENT_ORIGINS=https://www.vinodyadav.com,https://vinodyadav.com` explicitly. Answers are also filtered for phone numbers in code. The Origin check only stops cross-site browser requests; add an AWS WAF rate-based rule on `/api/*` against scripted abuse.
 - Check that streaming works through CloudFront: `curl -N -X POST https://www.vinodyadav.com/api/ask ...`.
 - Then rebuild with `VITE_LIVE_AGENT=true` (for example in the workflow env) so the frontend starts calling `/api/*`.
 
 ## CI/CD (GitHub Actions)
 
 The repo is `github.com/itbooth2020-coder/vinod-profile` and deploys from `main`.
-- Write `.github/workflows/deploy.yml` based on Step 9 of the guide. Use **GitHub OIDC** (an IAM role trusted for `repo:itbooth2020-coder/vinod-profile:ref:refs/heads/main`, plus `permissions: id-token: write`) instead of long-lived access keys. Fall back to keys only if the user asks for them.
+- `.github/workflows/ci.yml` already runs the tests, the build and `npm run check-dist` on every push and pull request (SEC-007). Write `.github/workflows/deploy.yml` based on Step 9 of the guide, and run the same install (`npm ci --ignore-scripts && npm rebuild esbuild`), `npm audit --omit=dev --audit-level=high`, build and `check-dist` steps before any `aws s3 sync`. Pin third-party actions to commit SHAs, as `ci.yml` does. Use **GitHub OIDC** (an IAM role trusted for `repo:itbooth2020-coder/vinod-profile:ref:refs/heads/main`, plus `permissions: id-token: write`) instead of long-lived access keys. Fall back to keys only if the user asks for them.
 - Give the role least privilege: `s3:ListBucket` on the bucket; `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on `bucket/*`; `cloudfront:CreateInvalidation` on the distribution.
 - Pass the distribution ID and role ARN as repo variables or secrets, never hardcoded. Use Node 22 to match local development.
 
@@ -123,6 +134,7 @@ curl -s https://www.vinodyadav.com/does-not-exist | grep -o "<title>[^<]*"   # <
 curl -sI "https://www.vinodyadav.com/?brief=1" | head -1 # 200 (index.html)
 curl -sI https://www.vinodyadav.com/404.html | head -1   # 200 when requested directly
 curl -sI https://www.vinodyadav.com | grep -i "strict-transport-security\|x-content-type-options\|x-frame-options\|content-security-policy"  # custom headers policy, CSP with frame-ancestors 'none'
+curl -sI https://www.vinodyadav.com | grep -i "permissions-policy\|cross-origin\|x-xss-protection"  # microphone=(self) ...; COOP and CORP same-origin; X-XSS-Protection: 0
 curl -s https://www.vinodyadav.com | grep -o '<meta http-equiv="Content-Security-Policy"[^>]*' | head -c 120   # full policy in the page
 curl -sI https://www.vinodyadav.com/privacy.html | head -1   # 200
 curl -sI https://www.vinodyadav.com/index.html | grep -i cache-control   # no-cache
@@ -133,7 +145,7 @@ The built JS should make no `/api` requests: open the live site with DevTools > 
 
 ## Redeploy (the common case)
 
-Read `deploy/aws-resources.md`, run `npm ci && npm run build`, do the upload and invalidation from Phase 1 step 9, and verify. Ask nothing beyond confirming the account on the first run of a session.
+Read `deploy/aws-resources.md`, run `npm ci --ignore-scripts && npm rebuild esbuild && npm run build && npm run check-dist`, do the upload and invalidation from Phase 1 step 9, and verify. Ask nothing beyond confirming the account on the first run of a session.
 
 ## Final report to the user
 

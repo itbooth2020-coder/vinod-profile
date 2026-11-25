@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { namesClient } from '../test/clientName.js'
+import { namedBanks } from '../test/bankMentions.js'
 import Projects from './Projects.jsx'
 
 // The new current project (15 Nov 2026 resume sync, t15): its card, case study and #case-bank-appsec link.
@@ -15,7 +15,7 @@ describe('Projects: the global bank program', () => {
     const first = within(region).getAllByRole('heading', { level: 3 })[0]
     expect(first).toHaveTextContent(NAME)
     expect(region).toHaveTextContent('Banking · Application Security')
-    expect(namesClient(region.textContent)).toBe(false)
+    expect(namedBanks(region.textContent)).toEqual([])
   })
 
   it('its case study button sets #case-bank-appsec, shows role, approach and no outcome figures, and returns focus on Close', async () => {
@@ -34,7 +34,7 @@ describe('Projects: the global bank program', () => {
     // outcomes and metrics are empty in data.js: no Outcome or Impact headings, no invented figures.
     expect(within(dialog).queryByRole('heading', { name: 'Outcome' })).toBeNull()
     expect(within(dialog).queryByRole('heading', { name: 'Impact' })).toBeNull()
-    expect(namesClient(dialog.textContent)).toBe(false)
+    expect(namedBanks(dialog.textContent)).toEqual([])
 
     await user.click(within(dialog).getByRole('button', { name: 'Close case study' }))
     expect(dialog).not.toHaveAttribute('open')

@@ -1,0 +1,18 @@
+# Dependency and GitHub Actions updates (SEC-007), weekly.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev:
+        dependency-type: development
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

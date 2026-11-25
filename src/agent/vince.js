@@ -351,7 +351,7 @@ export function briefNarration() {
     const end = i === stats.length - 1 ? '.' : ','
     return { text: pre + text + end, speech: speech && pre + speech + end }
   })
-  const [n, unit] = availability.notice.split(' ') // '3 months'
+  const [n, unit] = showAvailability ? availability.notice.split(' ') : [] // '3 months'
   const notice = `${NUMBER_WORDS[n] || n} ${unit}'` // "three months'"
   const segments = [
     { target: 'name', text: `${profile.name}, ${profile.role} at ${profile.company}.` },

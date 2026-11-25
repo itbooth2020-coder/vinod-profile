@@ -1,0 +1,10 @@
+{
+  "name": "vinod-profile-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "VINCE's server voice (Kokoro text-to-speech) for the dev server and the Phase 2 host only. Kept out of the site's package.json so the site's CI and build never install it or its native install scripts (SEC-014). Install with: npm run install:voice",
+  "dependencies": {
+    "kokoro-js": "^1.2.1"
+  }
+}

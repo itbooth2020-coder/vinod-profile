@@ -70,6 +70,13 @@ describe('allowedOrigin', () => {
     expect(allowedOrigin(req({ origin: 'https://vinodyadav.com' }), env)).toBe(false)
     expect(allowedOrigin(req({ origin: 'http://localhost:5173' }), env)).toBe(false)
   })
+
+  it('SEC-012: in production, localhost is not allowed by default (the site origins still are)', () => {
+    const env = { NODE_ENV: 'production' }
+    expect(allowedOrigin(req({ origin: 'http://localhost:5173' }), env)).toBe(false)
+    expect(allowedOrigin(req({ origin: 'http://127.0.0.1:4173' }), env)).toBe(false)
+    expect(allowedOrigin(req({ origin: 'https://www.vinodyadav.com' }), env)).toBe(true)
+  })
 })
 
 describe('isJson', () => {

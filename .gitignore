@@ -39,3 +39,19 @@ docs/uat
 # Resume PDF: kept local only (contains personal contact details); read by the optional live agent
 server/resume.pdf
 server/resume-redacted.pdf
+
+# Private inputs (SEC-009): any resume or other PDF, whatever its name, stays local. The site ships
+# no PDFs (scripts/check-dist.mjs fails the build on one); to publish one on purpose, add a
+# negation such as !public/<file>.pdf here.
+*.pdf
+server/linkedin.md
+server/*.local.*
+src/availability.local.js
+
+# Keys and cloud credentials
+*.pem
+*.key
+.aws/
+
+# Deploy notes with account and resource IDs: keep local (or in a private repo)
+deploy/aws-resources.md

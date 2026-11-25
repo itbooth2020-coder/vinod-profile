@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { blogs } from '../src/data.js'
+import { imageType, isAllowedThumbUrl, readCapped } from './thumb-check.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = path.join(ROOT, 'src/data/blogs.json')
@@ -31,26 +32,33 @@ const text = (html = '') =>
     .replace(/\s+/g, ' ')
     .trim()
 
-async function get(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': 'vinod-profile build (fetch-blogs)' } })
+async function get(url, options = {}) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': 'vinod-profile build (fetch-blogs)' }, ...options })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`)
   return res
 }
 
 // Downloads a thumbnail once (the name is a hash of its URL) and returns its public path, or null.
+// SEC-013: only Blogger's image hosts, no redirects, at most 2 MB, and real image bytes (thumb-check.mjs).
 async function thumbFor(url) {
   if (!url) return null
+  if (!isAllowedThumbUrl(url)) {
+    warn(`thumbnail skipped (host not allowed: ${String(url).slice(0, 80)})`)
+    return null
+  }
   // Blogger thumbnails come as 72px squares; ask for a 16:9 crop that fits the card.
   const src = url.replace(/\/s72(-[a-z0-9-]*)?\//, '/w480-h270-c/')
   const base = createHash('sha256').update(src).digest('hex').slice(0, 16)
   const existing = existsSync(THUMBS) && readdirSync(THUMBS).find((f) => f.startsWith(`${base}.`))
   if (existing) return `blog-thumbs/${existing}`
   try {
-    const res = await get(src)
-    const type = res.headers.get('content-type') || ''
-    const ext = /png/.test(type) ? 'png' : /webp/.test(type) ? 'webp' : /gif/.test(type) ? 'gif' : 'jpg'
+    if (!isAllowedThumbUrl(src)) throw new Error('host not allowed')
+    const res = await get(src, { redirect: 'error' })
+    const bytes = await readCapped(res)
+    const ext = imageType(bytes) // from the bytes, not the Content-Type header
+    if (!ext) throw new Error('not a JPEG, PNG, WebP or GIF image')
     mkdirSync(THUMBS, { recursive: true })
-    writeFileSync(path.join(THUMBS, `${base}.${ext}`), Buffer.from(await res.arrayBuffer()))
+    writeFileSync(path.join(THUMBS, `${base}.${ext}`), bytes)
     return `blog-thumbs/${base}.${ext}`
   } catch (e) {
     warn(`thumbnail skipped (${e.message})`)

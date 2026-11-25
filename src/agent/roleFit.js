@@ -164,11 +164,13 @@ const TEAM_RANGE = profile.summary.match(/teams of (\d+)[–-](\d+) engineers/)
 const PROFILE_TEAM = num(TEAM_RANGE?.[2] || stats[0].value.match(/\d+/)?.[0] || 0)
 const TEAM_TEXT = TEAM_RANGE ? `teams of ${TEAM_RANGE[1]}–${TEAM_RANGE[2]} engineers; ${stats[0].value} ${stats[0].label.toLowerCase()}` : `${stats[0].value} ${stats[0].label.toLowerCase()}`
 
-const YEARS_RE = /(?<![\d.])(\d{1,2})\s*(?:\+|plus)?\s*(?:(?:-|–|to)\s*\d{1,2}\s*\+?\s*)?(?:years?|yrs)\b(?!\s+(?:ago|old)\b)/gi
+// SEC-010: no two whitespace quantifiers sit side by side ("\s*\+?\s*" backtracked quadratically on a
+// digit followed by a long run of spaces); "\s*(?:\+\s*)?" and "(?:\s*\+)?[\s-]*" match the same text.
+const YEARS_RE = /(?<![\d.])(\d{1,2})\s*(?:(?:\+|plus)\s*)?(?:(?:-|–|to)\s*\d{1,2}\s*(?:\+\s*)?)?(?:years?|yrs)\b(?!\s+(?:ago|old)\b)/gi
 const TEAM_RES = [
-  /(?<![\d.,])(\d{1,3}(?:,\d{3})*|\d+)\s*\+?\s*(?:(?:-|–|to)\s*\d[\d,]*\s*\+?\s*)?(?:software |mobile |product |platform )?(?:engineers|developers|engineering staff|direct reports|ICs)\b/gi,
+  /(?<![\d.,])(\d{1,3}(?:,\d{3})*|\d+)\s*(?:\+\s*)?(?:(?:-|–|to)\s*\d[\d,]*\s*(?:\+\s*)?)?(?:software |mobile |product |platform )?(?:engineers|developers|engineering staff|direct reports|ICs)\b/gi,
   /\b(?:teams?|org(?:ani[sz]ation)?|department|headcount) of (?:about |around |over |more than |up to )?(\d{1,3}(?:,\d{3})*|\d+)\s*\+?/gi,
-  /(?<![\d.,])(\d{1,4})\s*\+?[\s-]*(?:person|people|member|engineer)\s+(?:engineering\s+)?(?:team|org|organi[sz]ation|department)\b/gi,
+  /(?<![\d.,])(\d{1,4})(?:\s*\+)?[\s-]*(?:person|people|member|engineer)\s+(?:engineering\s+)?(?:team|org|organi[sz]ation|department)\b/gi,
 ]
 // "No direct reports" and "no people management" start with their own negation, so notAsked only
 // rules out a negation before them ("not an individual contributor role").

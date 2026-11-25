@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { FakeObserver } from '../test/setup.js'
-import { namesClient } from '../test/clientName.js'
+import { namedBanks } from '../test/bankMentions.js'
 import { highlights, stats } from '../data.js'
 import Impact from './Impact.jsx'
 
@@ -33,7 +33,7 @@ describe('At a glance dialog (extra)', () => {
     const dialog = glanceDialog()
     const card = within(dialog).getByRole('heading', { name: 'Application Security', level: 3 }).closest('article')
     expect(card).toHaveTextContent(/~3,000 Android, iOS, and web applications for a global bank/)
-    expect(namesClient(dialog.textContent)).toBe(false)
+    expect(namedBanks(dialog.textContent)).toEqual([])
   })
 
   it('a click inside the content does not close it; only the backdrop (the <dialog> itself) does', async () => {
@@ -164,7 +164,7 @@ describe('At a glance dialog (extra)', () => {
     })
 
     it('FUNC-019 / UI-013 / FUNC-020: the dialog keeps the UA position, Close is sticky on phones, and only a modal locks the page', async () => {
-      const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+      const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8').replace(/\r\n?/g, '\n') // TEST-010: CRLF checkouts
       const base = css.match(/^\.gdialog--glance \{[^}]*\}/m)[0]
       expect(base).not.toMatch(/position/)
       expect(css).toMatch(/:root:has\(\.gdialog--glance:modal\) \{ overflow: hidden;/)

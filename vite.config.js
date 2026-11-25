@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // Server-side settings read from .env / the environment (never bundled). See .env.example.
 const SERVER_ENV = [
@@ -160,8 +160,27 @@ function preview404() {
   }
 }
 
+// SEC-005: the dev server serves the whole project root, so private files (the resume PDF with his
+// phone number, LinkedIn notes, UAT docs, agent and deploy notes, .env) are denied by path. Vite matches
+// these globs against absolute paths, so they're anchored at the project root. Setting deny replaces
+// Vite's defaults, so those are repeated first. Both servers listen on localhost only; don't pass
+// --host while server/resume.pdf is in the tree.
+const ROOT = fileURLToPath(new URL('.', import.meta.url)).replace(/\\/g, '/').replace(/\/$/, '').replace(/[()[\]{}!*?+@]/g, '\\$&')
+const FS_DENY = [
+  '.env', '.env.*', '*.{crt,pem,key}', '**/.git/**',
+  `${ROOT}/.env*`,
+  `${ROOT}/server/**/*.pdf`,
+  `${ROOT}/server/resume*`,
+  `${ROOT}/server/linkedin.md`,
+  `${ROOT}/docs/**`,
+  `${ROOT}/.claude/**`,
+  `${ROOT}/deploy/**`,
+]
+
 export default defineConfig(({ mode }) => ({
   plugins: [react(), prerender(), contentSecurityPolicy(), preview404(), profileAgent(loadEnv(mode, process.cwd(), ''))],
   // The footer's © year: the prerendered HTML and the hydrating app must render the same one.
   define: { __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()) },
+  server: { host: 'localhost', fs: { deny: FS_DENY } },
+  preview: { host: 'localhost' },
 }))

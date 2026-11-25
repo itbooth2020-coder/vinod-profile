@@ -1,11 +1,27 @@
 import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import App from './App.jsx'
+import SectionBoundary from './components/SectionBoundary.jsx'
+import { profile } from './data.js'
 import './styles.css'
+
+// SEC-004: a last-resort boundary, so an error outside the sections' own boundaries (App.jsx) shows a
+// short message with a way out instead of an empty page.
+const failed = (
+  <main id="main" className="wrap section-error">
+    <h1>{profile.name}</h1>
+    <p>Something went wrong showing this page.</p>
+    <p>
+      <a className="btn" href="/">Reload the page</a> or email <a href={`mailto:${profile.email}`}>{profile.email}</a>.
+    </p>
+  </main>
+)
 
 const app = (
   <StrictMode>
-    <App />
+    <SectionBoundary fallback={failed}>
+      <App />
+    </SectionBoundary>
   </StrictMode>
 )
 

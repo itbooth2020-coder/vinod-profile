@@ -33,7 +33,18 @@ import { TooLarge, allowedOrigin, clientIp, isJson, json, methodNotAllowed, prun
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // A redacted copy (no client name, no phone number) can be used instead: PROFILE_AGENT_RESUME (AI-010).
-const resumePath = () => (process.env.PROFILE_AGENT_RESUME ? path.resolve(ROOT, process.env.PROFILE_AGENT_RESUME) : path.join(ROOT, 'server', 'resume.pdf'))
+// SEC-006: it's preferred whenever it's set. Without it, the full local resume is read (dev only, with a
+// warning once); a production server (NODE_ENV=production) refuses to answer rather than send it.
+let resumeWarned = false
+export function resumePath(env = process.env) {
+  if (env.PROFILE_AGENT_RESUME?.trim()) return path.resolve(ROOT, env.PROFILE_AGENT_RESUME.trim())
+  if (env.NODE_ENV === 'production') throw new Error('PROFILE_AGENT_RESUME must point at a redacted resume in production (SEC-006).')
+  if (!resumeWarned) {
+    resumeWarned = true
+    console.warn('[profile-agent] PROFILE_AGENT_RESUME is unset: reading the full server/resume.pdf (dev only; use a redacted copy for Phase 2, SEC-006).')
+  }
+  return path.join(ROOT, 'server', 'resume.pdf')
+}
 const LINKEDIN_NOTES_PATH = path.join(ROOT, 'server', 'linkedin.md')
 const LINKEDIN_URL = 'https://www.linkedin.com/in/vinod-pyarelal-yadav-46ba1943'
 
@@ -214,19 +225,27 @@ export function redactor(env = process.env) {
   }
   return re
 }
-export const redact = (text, re) => (re && text ? text.replace(re, CLIENT_LABEL) : text)
+// SEC-006: phone numbers are filtered from the output in code, not only by the prompt rule: any run of
+// 10+ digits, each optionally followed by one space, dot, dash or bracket (with an optional +). Years,
+// ranges ("2016 – 2024") and figures ("~3,000", "30K+") don't reach 10 digits in one such run.
+export const PHONE_NOTE = '[phone number not shared]'
+const PHONE = /(?:\+?\d[\s().-]?){10,}/g
+const PHONE_CHAR = /[\d\s().+-]/
+export const redactPhones = (text) => (text ? text.replace(PHONE, (m) => PHONE_NOTE + (/\s$/.test(m) ? m.slice(-1) : '')) : text)
+export const redact = (text, re) => redactPhones(re && text ? text.replace(re, CLIENT_LABEL) : text)
 
-// Redacts streamed text (AI-010). A name can arrive split across deltas, so the last `hold` characters
-// wait for the next delta (and never end mid-word or mid-match); flush() releases the rest at the end.
+// Redacts streamed text (AI-010, SEC-006). A name or a phone number can arrive split across deltas, so
+// the last `hold` characters wait for the next delta (and never end mid-word, mid-match or inside a run
+// of digits and separators); flush() releases the rest at the end.
 export function streamRedactor(re, hold = 48) {
   let pending = ''
   return {
     push(text) {
       pending += text
-      if (!re) return this.flush()
       let cut = pending.length - hold
       while (cut > 0 && /[\p{L}\p{N}]/u.test(pending[cut - 1]) && /[\p{L}\p{N}]/u.test(pending[cut])) cut--
-      for (const m of pending.matchAll(re)) if (m.index < cut && m.index + m[0].length > cut) cut = m.index
+      while (cut > 0 && PHONE_CHAR.test(pending[cut - 1])) cut--
+      if (re) for (const m of pending.matchAll(re)) if (m.index < cut && m.index + m[0].length > cut) cut = m.index
       if (cut <= 0) return ''
       const out = pending.slice(0, cut)
       pending = pending.slice(cut)

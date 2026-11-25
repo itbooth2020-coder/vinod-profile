@@ -250,7 +250,8 @@ const email = () => `[Email ${FIRST}](mailto:${profile.email})`
 const statLine = (s) => `**${s.sr || s.value}** ${lowerFirst(s.label)}`
 
 const PROJECT_NAMES = /\b(bank|darwin|syngenta|presto|metrolinx|vusion|vusiongroup|meijer|meta|facebook|qculous|intelity|bayer|elder|clinic)\b/
-const ROLE_NAMES = new RegExp(`\\b(${availability.roles.map((r) => r.toLowerCase()).join('|')})s?\\b`)
+// Matches nothing while availability, and so its target roles, is hidden (SEC-003).
+const ROLE_NAMES = availability.roles?.length ? new RegExp(`\\b(${availability.roles.map((r) => r.toLowerCase()).join('|')})s?\\b`) : /(?!)/
 
 // Verticals from the domain graph, with the words visitors use for them.
 const VERTICAL_WORDS = { Banking: 'bank\\w*|financial services|fin-?tech',Healthcare: 'health ?care|medical|pharma|hospital', 'Agri-Tech': 'agri\\w*|agriculture|farming', Transit: 'transit|transport\\w*|transit payments?', Retail: 'retail|grocery', Hospitality: 'hospitality|hotels?', 'Enterprise Mobility': 'enterprise mobility' }

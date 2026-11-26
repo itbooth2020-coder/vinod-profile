@@ -1,0 +1,118 @@
+# DRAFT: move to .github/workflows/deploy.yml only after the GitHub OIDC role exists in AWS and the
+# repo variables AWS_DEPLOY_ROLE_ARN and CLOUDFRONT_DISTRIBUTION_ID are set.
+# Deploys www.vinodyadav.com (S3 + CloudFront) on every push to main. Same install, audit, tests,
+# build and release gate as ci.yml (SEC-007, SEC-014); upload order per FUNC-013.
+# Actions are pinned to commit SHAs; Dependabot updates them.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC -> AWS role, no long-lived keys
+
+# Never run two deploys at once, and never cancel one half-way through the upload.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  BUCKET: vinodyadav-com-site
+
+jobs:
+  deploy:
+    if: github.repository == 'itbooth2020-coder/vinod-profile'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # No `environment:` here: it would change the OIDC subject to
+    # repo:itbooth2020-coder/vinod-profile:environment:<name>, and the role trusts ref:refs/heads/main.
+    env:
+      VINCE_VOICE: 'off'
+      # Static build: no /api calls. Set to 'true' only once Phase 2 serves /api/*.
+      VITE_LIVE_AGENT: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      # SEC-014: no dependency install scripts, except esbuild's binary check, which the build needs.
+      - name: Install
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild esbuild
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Unit and component tests
+        run: npx vitest run
+
+      - name: Offline agent checks
+        run: npm run test:agent
+
+      - name: Build
+        run: npm run build
+
+      - name: Release gate (check-dist)
+        run: npm run check-dist
+        env:
+          CLIENT_NAME_PATTERN: ${{ secrets.CLIENT_NAME_PATTERN }}
+
+      - name: Sanity-check dist
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          test -d dist/assets
+          if find dist -iname '*.pdf' | grep -q .; then echo "PDF found in dist/"; exit 1; fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: vinod-profile-deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 1. New hashed assets next to the old ones (no --delete: the live index.html still uses the old ones).
+      - name: Upload hashed assets
+        run: aws s3 sync dist/assets "s3://$BUCKET/assets" --cache-control "public,max-age=31536000,immutable"
+
+      # 2. Everything else except the two entry pages (short TTL).
+      - name: Upload other files
+        run: >
+          aws s3 sync dist/ "s3://$BUCKET" --delete
+          --exclude "assets/*" --exclude "index.html" --exclude "404.html"
+          --cache-control "public,max-age=300"
+
+      # 3. The new entry pages, then invalidate them and wait.
+      - name: Upload entry pages and invalidate
+        env:
+          DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          aws s3 cp dist/index.html "s3://$BUCKET/index.html" --cache-control "no-cache"
+          aws s3 cp dist/404.html "s3://$BUCKET/404.html" --cache-control "no-cache"
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/index.html" "/404.html" \
+            --query 'Invalidation.Id' --output text)
+          echo "Invalidation $INVALIDATION_ID"
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$INVALIDATION_ID"
+
+      # 4. Only now remove the previous release's assets.
+      - name: Remove previous release's assets
+        run: aws s3 sync dist/assets "s3://$BUCKET/assets" --delete --cache-control "public,max-age=31536000,immutable"
+
+      - name: Smoke test
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://www.vinodyadav.com/)
+          echo "www: $code"; test "$code" = 200
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://www.vinodyadav.com/resume.pdf)
+          echo "resume.pdf: $code"; test "$code" = 404

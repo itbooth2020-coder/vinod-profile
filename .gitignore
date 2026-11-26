@@ -33,8 +33,8 @@ dist-ssr
 # VINCE voice: prepared lines (regenerated automatically)
 server/.voice-cache
 
-# UAT Doc
-docs/uat
+# Docs (UAT reports, deployment plan): kept local only
+docs/
 
 # Resume PDF: kept local only (contains personal contact details); read by the optional live agent
 server/resume.pdf

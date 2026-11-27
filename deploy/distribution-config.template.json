@@ -12,7 +12,7 @@
     "Items": [
       {
         "Id": "s3-vinodyadav-com-site",
-        "DomainName": "vinodyadav-com-site.s3.ap-south-1.amazonaws.com",
+        "DomainName": "vinodyadav-com-site.s3.ap-southeast-2.amazonaws.com",
         "OriginPath": "",
         "CustomHeaders": { "Quantity": 0 },
         "S3OriginConfig": { "OriginAccessIdentity": "" },

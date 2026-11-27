@@ -24,12 +24,24 @@ The user's step-by-step guide is at `d:\Project-Doc\Vinod-Profile\deploy-vinodya
 | Setting | Value |
 |---|---|
 | Bucket | `vinodyadav-com-site` (private, Block Public Access ON) |
-| Bucket region | `ap-south-1` |
+| Bucket region | `ap-southeast-2` |
 | ACM certificate region | `us-east-1` (required by CloudFront) |
 | Domains | `www.vinodyadav.com` (canonical), `vinodyadav.com` (301 to www) |
 | Origin access | CloudFront OAC, bucket policy restricted to the distribution ARN |
 
 Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID, cert ARN, hosted zone ID, function name) to `deploy/aws-resources.md`. None of them are secrets, but the repo is public, so the file is gitignored (SEC-009): keep it local and never commit it. Read that file first on every later run, so a redeploy never creates duplicate resources.
+
+## Account type: AWS's new sign-up experience
+
+The owner's account (created Nov 2026) uses AWS's new sign-up experience: AWS Builder ID sign-in, a project `vinodyadav-com` as the AWS account, and billing and spend limits in AWS Settings (https://settings.aws.com). The CLI is signed in with `aws login` (temporary credentials, up to 12 hours), not `aws configure` with access keys. If credentials have expired, ask the owner to run `aws login` in their own terminal; never ask for keys, and never create IAM users or access keys without the owner's explicit approval.
+
+The docs (https://docs.aws.amazon.com/accounts/latest/reference/sign-in-new.html) say new-experience projects don't support multi-Region or cross-Region features, or Lambda@Edge (CloudFront Functions are fine). In preflight, before creating anything, check that the plan works:
+- run read-only calls such as `aws acm list-certificates --region us-east-1` and `aws cloudfront list-distributions`, and confirm the project's default region.
+- If the us-east-1 certificate (required by CloudFront) or any cross-Region step is blocked, stop and explain the options to the owner:
+  - put the bucket in us-east-1 too, so everything is single-Region;
+  - or have the owner activate advanced features in AWS Settings. This can't be undone and changes how they sign in.
+  Don't pick for them.
+- The project's spend limit pauses the project and stops its resources when reached. Mention it in the cost summary.
 
 ## Safety rules (always)
 
@@ -44,11 +56,11 @@ Write the IDs you create (account ID, bucket, distribution ID and domain, OAC ID
 ## Phase 1: static site (S3 + CloudFront)
 
 1. **Build:** `npm ci --ignore-scripts && npm rebuild esbuild && npm run build`, then `npm run check-dist` (SEC-007: fails on a PDF, a source map, a phone-like number, availability details or a key in `dist/`; set `CLIENT_NAME_PATTERN` from the secret to check the client's name too). Never upload when it fails. Check that `dist/index.html` and `dist/assets/` exist.
-2. **Bucket:** `aws s3api create-bucket --bucket vinodyadav-com-site --region ap-south-1 --create-bucket-configuration LocationConstraint=ap-south-1`, then `put-public-access-block` with all four settings true.
+2. **Bucket:** `aws s3api create-bucket --bucket vinodyadav-com-site --region ap-southeast-2 --create-bucket-configuration LocationConstraint=ap-southeast-2`, then `put-public-access-block` with all four settings true.
 3. **Hosted zone:** find the zone for `vinodyadav.com`. If none exists and the user agrees, create one and give them the NS records for their registrar. Check propagation with `nslookup -type=NS vinodyadav.com` and wait until the AWS nameservers show up before validating the certificate.
 4. **Certificate (us-east-1):** request a certificate for `vinodyadav.com` with SAN `www.vinodyadav.com` and DNS validation. Create the validation CNAMEs in Route 53 with `change-resource-record-sets`, then `aws acm wait certificate-validated`.
 5. **OAC + distribution:** create the OAC (`aws cloudfront create-origin-access-control`, SigV4, always sign). Write the distribution config JSON to a temporary file:
-   - origin `vinodyadav-com-site.s3.ap-south-1.amazonaws.com` with the OAC and an empty `S3OriginConfig.OriginAccessIdentity`
+   - origin `vinodyadav-com-site.s3.ap-southeast-2.amazonaws.com` with the OAC and an empty `S3OriginConfig.OriginAccessIdentity`
    - `ViewerProtocolPolicy: redirect-to-https`, GET/HEAD, `Compress: true`, managed CachingOptimized policy `658327ea-f89d-4fab-a63d-7e88639e58f6`
    - aliases for both domains, the ACM cert with `sni-only` and `TLSv1.2_2021`, `DefaultRootObject: index.html`, `HttpVersion: http2and3`, IPv6 on, price class `PriceClass_200` unless the user picks otherwise
    - custom error responses: 403 and 404 → `ResponsePagePath: /404.html`, `ResponseCode: 404`, `ErrorCachingMinTTL: 60` (the private bucket answers 403 for missing keys, so both must map to the 404 page)
@@ -107,7 +119,7 @@ Offer this only after Phase 1 is live, and explain the extra cost first (about $
 
 - Add a small production entry point, for example `server/index.js`, that serves `/api/ask` and `/api/speak` with Node's `http` module and the existing `handleAsk` and `handleSpeak`. Don't change the handlers' behavior. Delegate code changes to the `developer` agent if the change is more than a thin wrapper.
 - `kokoro-js` (the voice server's TTS) has its own `server/package.json` (SEC-014: its `sharp` advisories and native install scripts stay out of the site's install, CI and build). On the Phase 2 instance run `npm ci` and then `npm run install:voice`, or `/api/speak` can't load Kokoro and VINCE falls back to the browser voice.
-- Recommended host: one Lightsail instance or a small EC2 instance (2 GB RAM, Node 22, run under systemd or pm2) in `ap-south-1`. Avoid Lambda: Kokoro's model size and cold starts make it a poor fit, and the handlers expect Node's `req`/`res`.
+- Recommended host: one Lightsail instance or a small EC2 instance (2 GB RAM, Node 22, run under systemd or pm2) in `ap-southeast-2`. Avoid Lambda: Kokoro's model size and cold starts make it a poor fit, and the handlers expect Node's `req`/`res`.
 - Store `ANTHROPIC_API_KEY` in SSM Parameter Store as a SecureString, and have the instance load it at startup through an instance role.
 - Add a second CloudFront origin (the instance, HTTPS or HTTP-only from CloudFront) and an ordered cache behavior for `/api/*`: all methods, managed `CachingDisabled` policy, and the `AllViewerExceptHostHeader` origin request policy. Restrict the instance's security group to the CloudFront managed prefix list.
 - Per-visitor limits key on the `CloudFront-Viewer-Address` header (`server/http.js`), so the `/api/*` origin request policy must forward it: check with `aws cloudfront get-origin-request-policy` that it's included, and if not, create a custom policy with all viewer headers plus `CloudFront-Viewer-Address`. Only CloudFront may reach the instance (the prefix-list rule above), or the header could be forged.
@@ -138,7 +150,7 @@ curl -sI https://www.vinodyadav.com | grep -i "permissions-policy\|cross-origin\
 curl -s https://www.vinodyadav.com | grep -o '<meta http-equiv="Content-Security-Policy"[^>]*' | head -c 120   # full policy in the page
 curl -sI https://www.vinodyadav.com/privacy.html | head -1   # 200
 curl -sI https://www.vinodyadav.com/index.html | grep -i cache-control   # no-cache
-curl -sI https://vinodyadav-com-site.s3.ap-south-1.amazonaws.com/index.html  # 403: bucket not public
+curl -sI https://vinodyadav-com-site.s3.ap-southeast-2.amazonaws.com/index.html  # 403: bucket not public
 curl -sI https://www.vinodyadav.com/resume.pdf | head -1  # 404: the resume is intentionally not published
 ```
 The built JS should make no `/api` requests: open the live site with DevTools > Network filtered to `/api` and ask the console a question; nothing should appear.
